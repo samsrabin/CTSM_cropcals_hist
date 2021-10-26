@@ -1,3 +1,12 @@
+# %% Options
+
+# Years to include (set to None to leave that edge unbounded)
+y1 = 2000
+yN = 2000
+
+
+# %% Imports
+
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
@@ -88,11 +97,6 @@ crop_dict = {
     "irrigated_tropical_soybean": set_crop_dict(78, "soy_ir"),
 }
 
-# %% Import time variable
-popd_ds = xr.open_dataset(templatefile)
-time_iv = popd_ds.variables['time']
-popd_ds.close ;
-
 
 # %% Define variable dictionary and output files
 # As "CLM: [GGCMI, outfile]"
@@ -105,12 +109,25 @@ variable_dict = {
     # "hdate": set_var_dict("maturity_day", "")
 }
 
+def slice_yr(y):
+    if y == None:
+        return None
+    else:
+        return str(y)
+
+# Open and time-slice template dataset
+template_ds = xr.open_dataset(templatefile)
+template_ds = template_ds.sel(time=slice(slice_yr(y1), slice_yr(yN)))
+y1 = template_ds.time.values[0].year
+yN = template_ds.time.values[-1].year
+
+# Create output files
 for v in variable_dict:
-    outfile = outdir + v + "s" + file_specifier + ".nc"
+    outfile = "%s%ss%s.%d-%d.nc" % (outdir, v, file_specifier, y1, yN)
     variable_dict[v]["outfile"] = outfile
-    # Copy template file to output file
-    if not exists(outfile):
-        shutil.copyfile(templatefile, outfile)
+    template_ds.to_netcdf(path=outfile)
+
+template_ds.close()
 
 
 # %% Process all crops
@@ -173,7 +190,7 @@ for thiscrop_clm in crop_dict:
         
         # Add time dimension (https://stackoverflow.com/a/62862440)
         # (Repeats original map for every timestep)
-        thisvar_ds = thisvar_ds.expand_dims(time = time_iv)
+        thisvar_ds = thisvar_ds.expand_dims(time = template_ds.time)
         # "True" here shows that the time dimension was created by just repeating the one map.
         # tmp = thisvar_ds[varname_ggcmi]
         # np.all((np.diff(tmp.values, axis=0) == 0.0) | np.isnan(np.diff(tmp.values, axis=0)))
@@ -198,3 +215,5 @@ for thiscrop_clm in crop_dict:
             encoding = \
                 {varname_clm: {"dtype": "int16", "_FillValue": new_fillvalue}}
             )
+    
+    cropcal_ds.close()
