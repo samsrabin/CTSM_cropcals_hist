@@ -11,7 +11,8 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 import shutil
-from os.path import exists
+import os
+import time
 
 
 # %% Setup
@@ -116,7 +117,7 @@ def slice_yr(y):
         return str(y)
 
 # Open and time-slice template dataset
-template_ds = xr.open_dataset(templatefile)
+template_ds = xr.open_dataset(templatefile, decode_times=True)
 template_ds = template_ds.sel(time=slice(slice_yr(y1), slice_yr(yN)))
 y1 = template_ds.time.values[0].year
 yN = template_ds.time.values[-1].year
@@ -152,7 +153,7 @@ for thiscrop_clm in crop_dict:
             len(crop_dict)))
     
     file_ggcmi = indir + thiscrop_ggcmi + file_specifier + ".nc4"
-    if not exists(file_ggcmi):
+    if not os.path.exists(file_ggcmi):
         raise Exception("Input file not found: " + file_ggcmi)
     cropcal_ds = xr.open_dataset(file_ggcmi)
     
@@ -168,8 +169,12 @@ for thiscrop_clm in crop_dict:
         # Get CLM netCDF info
         varname_clm = thisvar_clm + "1_" + str(thiscrop_int)
         file_clm = variable_dict[thisvar_clm]["outfile"]
-        if not exists(file_clm):
+        if not os.path.exists(file_clm):
             raise Exception("Output file not found: " + file_clm)
+        file_clm_tmp = file_clm + ".tmp"
+        
+        # "Read" the file
+        out_ds = xr.open_dataset(file_clm)
         
         # Strip dataset to just this variable
         droplist = []
@@ -190,30 +195,39 @@ for thiscrop_clm in crop_dict:
         
         # Add time dimension (https://stackoverflow.com/a/62862440)
         # (Repeats original map for every timestep)
+        # Probably not necessary to use this method, since I only end up extracting thisvar_ds.values anyway---I could probably use some numpy method instead.
         thisvar_ds = thisvar_ds.expand_dims(time = template_ds.time)
         # "True" here shows that the time dimension was created by just repeating the one map.
         # tmp = thisvar_ds[varname_ggcmi]
         # np.all((np.diff(tmp.values, axis=0) == 0.0) | np.isnan(np.diff(tmp.values, axis=0)))
 
-        # Rename GGCMI variable to CLM name
-        thisvar_ds = thisvar_ds.rename({varname_ggcmi: varname_clm})
+        # Add variable to output dataset
+        out_ds[varname_clm]=(thisvar_ds[varname_ggcmi].dims,
+                             thisvar_ds[varname_ggcmi].values)
 
-        # Edit/add variable attributes
-        longname = thisvar_ds[varname_clm].attrs["long_name"]
+        # Edit/add variable attributes etc.
+        longname = thisvar_ds[varname_ggcmi].attrs["long_name"]
         longname = longname.replace("rainfed", thiscrop_clm).replace("irrigated", thiscrop_clm)
-        thisvar_ds[varname_clm].attrs["long_name"] = longname
-        thisvar_ds[varname_clm].attrs["crop_name_clm"] = thiscrop_clm
-        thisvar_ds[varname_clm].attrs["crop_name_ggcmi"] = thiscrop_ggcmi
-        thisvar_ds[varname_clm].attrs["short_name_ggcmi"] = varname_ggcmi
+        out_ds[varname_clm].attrs["long_name"] = longname
+        out_ds[varname_clm].attrs["crop_name_clm"] = thiscrop_clm
+        out_ds[varname_clm].attrs["crop_name_ggcmi"] = thiscrop_ggcmi
+        out_ds[varname_clm].attrs["short_name_ggcmi"] = varname_ggcmi
+        out_ds[varname_clm].encoding["_FillValue"] = new_fillvalue
 
         # Save
         if verbose:
             print("    Saving %s..." % varname_ggcmi)
-        thisvar_ds.to_netcdf(
-            path = file_clm, 
-            mode = "a",
-            encoding = \
-                {varname_clm: {"dtype": "int16", "_FillValue": new_fillvalue}}
-            )
+        # start = time.time()
+        # Can't overwrite file_clm while you have it open (as out_ds), so first copy it to a temporary file...
+        shutil.copyfile(file_clm, file_clm_tmp)
+        # ... then save out_ds to the temporary file...
+        out_ds.to_netcdf(file_clm_tmp)
+        # ... then close out_ds...
+        out_ds.close()
+        # ... and finally replace the original file with the new temporary file (deleting the temporary file in the process)
+        os.replace(file_clm_tmp, file_clm)
+        # end = time.time()
+        # print(end - start)
+        ### NOTE: This method gets slower and slower as the file gets bigger! (The entire process, but also the out_ds.to_netcdf() step.) Is there a better way?
     
     cropcal_ds.close()
