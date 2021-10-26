@@ -4,6 +4,14 @@
 y1 = 2000
 yN = 2000
 
+# Global attributes for output files
+out_attrs = {
+    "title": "GGCMI crop calendar for Phase 3, v1.01",
+    "author_thisfile": "Sam Rabin (sam.rabin@gmail.com)",
+    "author_original": "Jonas Jägermeyr (jaegermeyr@uchicago.edu)",
+    "comment": "Day of year is 1-indexed (i.e., Jan. 1 = 1)."
+}
+
 
 # %% Imports
 
@@ -13,6 +21,7 @@ import matplotlib.pyplot as plt
 import shutil
 import os
 import time
+import datetime as dt
 
 
 # %% Setup
@@ -22,6 +31,9 @@ templatefile = "/Volumes/Reacher/CESM_inputdata/lnd/clm2/firedata/clmforc.Li_201
 indir = "/Volumes/Reacher/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar/"
 outdir = "/Volumes/Reacher/CESM_work/crop_dates/"
 file_specifier = "_ggcmi_crop_calendar_phase3_v1.01" # In name of input and output files
+
+# Add current date/time to output attributes
+out_attrs["created"] = dt.datetime.now().replace(microsecond=0).astimezone().isoformat()
 
 # Define crop dictionary
 # As "CLMname: [number, GGCMIname]"
@@ -121,6 +133,10 @@ template_ds = xr.open_dataset(templatefile, decode_times=True)
 template_ds = template_ds.sel(time=slice(slice_yr(y1), slice_yr(yN)))
 y1 = template_ds.time.values[0].year
 yN = template_ds.time.values[-1].year
+template_ds.attrs = out_attrs
+
+#  Remove variable we don't need
+template_ds = template_ds.drop("hdm")
 
 # Create output files
 for v in variable_dict:
@@ -173,7 +189,7 @@ for thiscrop_clm in crop_dict:
             raise Exception("Output file not found: " + file_clm)
         file_clm_tmp = file_clm + ".tmp"
         
-        # "Read" the file
+        # "Read" the file (doesn't actually bring anything into memory yet)
         out_ds = xr.open_dataset(file_clm)
         
         # Strip dataset to just this variable
@@ -212,6 +228,7 @@ for thiscrop_clm in crop_dict:
         out_ds[varname_clm].attrs["crop_name_clm"] = thiscrop_clm
         out_ds[varname_clm].attrs["crop_name_ggcmi"] = thiscrop_ggcmi
         out_ds[varname_clm].attrs["short_name_ggcmi"] = varname_ggcmi
+        out_ds[varname_clm].attrs["units"] = "day of year"
         out_ds[varname_clm].encoding["_FillValue"] = new_fillvalue
 
         # Save
@@ -231,3 +248,5 @@ for thiscrop_clm in crop_dict:
         ### NOTE: This method gets slower and slower as the file gets bigger! (The entire process, but also the out_ds.to_netcdf() step.) Is there a better way?
     
     cropcal_ds.close()
+
+print("Done!")
