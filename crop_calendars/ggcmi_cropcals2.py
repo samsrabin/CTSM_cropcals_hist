@@ -64,26 +64,26 @@ crop_dict = {
     "irrigated_winter_rye": set_crop_dict(32, "wwh_ir"),
     "cassava": set_crop_dict(33, "cas_rf"),
     "irrigated_cassava": set_crop_dict(34, "cas_ir"),
-    # "citrus": set_crop_dict(35, "_rf"),
-    # "irrigated_citrus": set_crop_dict(36, "_ir"),
-    # "cocoa": set_crop_dict(37, "_rf"),
-    # "irrigated_cocoa": set_crop_dict(38, "_ir"),
-    # "coffee": set_crop_dict(39, "_rf"),
-    # "irrigated_coffee": set_crop_dict(40, "_ir"),
+    "citrus": set_crop_dict(35, None),
+    "irrigated_citrus": set_crop_dict(36, None),
+    "cocoa": set_crop_dict(37, None),
+    "irrigated_cocoa": set_crop_dict(38, None),
+    "coffee": set_crop_dict(39, None),
+    "irrigated_coffee": set_crop_dict(40, None),
     "cotton": set_crop_dict(41, "cot_rf"),
     "irrigated_cotton": set_crop_dict(42, "cot_ir"),
-    # "datepalm": set_crop_dict(43, "_rf"),
-    # "irrigated_datepalm": set_crop_dict(44, "_ir"),
-    # "foddergrass": set_crop_dict(45, "_rf"),
-    # "irrigated_foddergrass": set_crop_dict(46, "_ir"),
-    # "grapes": set_crop_dict(47, "_rf"),
-    # "irrigated_grapes": set_crop_dict(48, "_ir"),
+    "datepalm": set_crop_dict(43, None),
+    "irrigated_datepalm": set_crop_dict(44, None),
+    "foddergrass": set_crop_dict(45, None),
+    "irrigated_foddergrass": set_crop_dict(46, None),
+    "grapes": set_crop_dict(47, None),
+    "irrigated_grapes": set_crop_dict(48, None),
     "groundnuts": set_crop_dict(49, "nut_rf"),
     "irrigated_groundnuts": set_crop_dict(50, "nut_ir"),
     "millet": set_crop_dict(51, "mil_rf"),
     "irrigated_millet": set_crop_dict(52, "mil_ir"),
-    # "oilpalm": set_crop_dict(53, "_rf"),
-    # "irrigated_oilpalm": set_crop_dict(54, "_ir"),
+    "oilpalm": set_crop_dict(53, None),
+    "irrigated_oilpalm": set_crop_dict(54, None),
     "potatoes": set_crop_dict(55, "pot_rf"),
     "irrigated_potatoes": set_crop_dict(56, "pot_ir"),
     "pulses": set_crop_dict(57, "pea_rf"),
@@ -100,14 +100,16 @@ crop_dict = {
     "irrigated_sugarcane": set_crop_dict(68, "sgc_ir"),
     "sunflower": set_crop_dict(69, "sun_rf"),
     "irrigated_sunflower": set_crop_dict(70, "sun_ir"),
-    # "miscanthus": set_crop_dict(71, "_rf"),
-    # "irrigated_miscanthus": set_crop_dict(72, "_ir"),
-    # "switchgrass": set_crop_dict(73, "_rf"),
-    # "irrigated_switchgrass": set_crop_dict(74, "_ir"),
+    "miscanthus": set_crop_dict(71, None),
+    "irrigated_miscanthus": set_crop_dict(72, None),
+    "switchgrass": set_crop_dict(73, None),
+    "irrigated_switchgrass": set_crop_dict(74, None),
     "tropical_corn": set_crop_dict(75, "mai_rf"),
     "irrigated_tropical_corn": set_crop_dict(76, "mai_ir"),
     "tropical_soybean": set_crop_dict(77, "soy_rf"),
     "irrigated_tropical_soybean": set_crop_dict(78, "soy_ir"),
+    "c3_crop": set_crop_dict(15, None),
+    "c3_irrigated": set_crop_dict(16, None),
 }
 
 
@@ -153,28 +155,39 @@ verbose = True
 
 for thiscrop_clm in crop_dict:
 
-    if list(crop_dict.keys()).index(thiscrop_clm)+1 < 18:
-        continue
+    # Which crop are we on?
+    c = list(crop_dict.keys()).index(thiscrop_clm) + 1
 
     # Get information about this crop
     this_dict = crop_dict[thiscrop_clm]
     thiscrop_int = this_dict["clm_num"]
     thiscrop_ggcmi = this_dict["thiscrop_ggcmi"]
-    # Import crop calendar file
-    if verbose:
-        print("Importing %s -> %s (%d of %d)..." \
-            % (str(thiscrop_ggcmi), 
-            str(thiscrop_clm),
-            list(crop_dict.keys()).index(thiscrop_clm)+1, 
+    
+    # If no corresponding GGCMI crop, skip opening dataset.
+    # Will use previous cropcal_ds as a template.
+    if thiscrop_ggcmi == None:
+        if c == 1:
+            raise ValueError(f"First crop ({thiscrop_clm}) must have a GGCMI type")
+        print("Filling %s with dummy data (%d of %d)..." \
+            % (str(thiscrop_clm),
+            c, 
             len(crop_dict)))
     
-    file_ggcmi = indir + thiscrop_ggcmi + file_specifier + ".nc4"
-    if not os.path.exists(file_ggcmi):
-        raise Exception("Input file not found: " + file_ggcmi)
-    cropcal_ds = xr.open_dataset(file_ggcmi)
-    
-    # Flip latitude to match destination
-    cropcal_ds = cropcal_ds.reindex(lat=cropcal_ds.lat[::-1])
+    # Otherwise, import crop calendar file
+    else:
+        if verbose:
+            print("Importing %s -> %s (%d of %d)..." \
+                % (str(thiscrop_ggcmi), 
+                str(thiscrop_clm),
+                c, 
+                len(crop_dict)))
+        
+        file_ggcmi = indir + thiscrop_ggcmi + file_specifier + ".nc4"
+        if not os.path.exists(file_ggcmi):
+            raise Exception("Input file not found: " + file_ggcmi)
+        cropcal_ds = xr.open_dataset(file_ggcmi)
+        # Flip latitude to match destination
+        cropcal_ds = cropcal_ds.reindex(lat=cropcal_ds.lat[::-1])
     
     for thisvar_clm in variable_dict:
         # Get GGCMI netCDF info
@@ -202,12 +215,16 @@ for thiscrop_clm in crop_dict:
 
         # Convert to integer
         new_fillvalue = -1
+        dummyvalue = -1
         thisvar_ds.variables[varname_ggcmi].encoding["_FillValue"] \
             = new_fillvalue
-        thisvar_ds.variables[varname_ggcmi].values[np.isnan(thisvar_ds.variables[varname_ggcmi].values)] \
-            = new_fillvalue
-        thisvar_ds.variables[varname_ggcmi].values \
-            = thisvar_ds.variables[varname_ggcmi].values.astype("int16")
+        if thiscrop_ggcmi == None:
+            thisvar_ds.variables[varname_ggcmi].values.fill(dummyvalue)
+        else:
+            thisvar_ds.variables[varname_ggcmi].values[np.isnan(thisvar_ds.variables[varname_ggcmi].values)] \
+                = new_fillvalue
+            thisvar_ds.variables[varname_ggcmi].values \
+                = thisvar_ds.variables[varname_ggcmi].values.astype("int16")
         
         # Add time dimension (https://stackoverflow.com/a/62862440)
         # (Repeats original map for every timestep)
@@ -225,8 +242,12 @@ for thiscrop_clm in crop_dict:
         longname = thisvar_ds[varname_ggcmi].attrs["long_name"]
         longname = longname.replace("rainfed", thiscrop_clm).replace("irrigated", thiscrop_clm)
         out_ds[varname_clm].attrs["long_name"] = longname
-        out_ds[varname_clm].attrs["crop_name_clm"] = thiscrop_clm
-        out_ds[varname_clm].attrs["crop_name_ggcmi"] = thiscrop_ggcmi
+        if thiscrop_ggcmi == None:
+            out_ds[varname_clm].attrs["crop_name_clm"] = "none"
+            out_ds[varname_clm].attrs["crop_name_ggcmi"] = "none"
+        else:
+            out_ds[varname_clm].attrs["crop_name_clm"] = thiscrop_clm
+            out_ds[varname_clm].attrs["crop_name_ggcmi"] = thiscrop_ggcmi
         out_ds[varname_clm].attrs["short_name_ggcmi"] = varname_ggcmi
         out_ds[varname_clm].attrs["units"] = "day of year"
         out_ds[varname_clm].encoding["_FillValue"] = new_fillvalue
