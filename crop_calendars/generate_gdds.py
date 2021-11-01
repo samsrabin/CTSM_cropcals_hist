@@ -84,7 +84,10 @@ is_hdate = np.concatenate((is_hdate, false_1xNpft))
 def get_dates(thisCrop, vegtype_str, is_somedate, year_jday):
     is_somedate_thiscrop = is_somedate[:,[d==thisCrop for d in vegtype_str]]
     is_somedate_thiscrop = np.squeeze(is_somedate_thiscrop)
-    return year_jday[is_somedate_thiscrop,:]
+    result = year_jday[is_somedate_thiscrop,:]
+    if result.size == 0:
+        raise ValueError("No dates found")
+    return result
 
 # Loop through crops and print their sowing and harvest dates
 for thisCrop in this_ds.patches1d_itype_veg_str.values:
