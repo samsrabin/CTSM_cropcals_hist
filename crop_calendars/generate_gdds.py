@@ -74,11 +74,13 @@ false_1xNpft = np.full((1,np.size(this_ds.patches1d_itype_veg_str.values)), fill
 is_sdate = np.bitwise_and( \
     cphase_da.values[:-1,:]==4, \
     cphase_da.values[1:,:]<4)
-is_sdate = np.concatenate((is_sdate, false_1xNpft))
 is_hdate = np.bitwise_and( \
     cphase_da.values[:-1,:]<4, \
     cphase_da.values[1:,:]==4)
-is_hdate = np.concatenate((is_hdate, false_1xNpft))
+
+# Add False to beginning or end of is_date arrays to ensure correct alignment
+is_sdate = np.concatenate((is_sdate, false_1xNpft))
+is_hdate = np.concatenate((false_1xNpft, is_hdate))
 
 # Define function for extracting an array of sowing or harvest dates (each row: year, DOY) for a given crop
 def get_dates(thisCrop, vegtype_str, is_somedate, year_jday):
