@@ -16,7 +16,6 @@ import warnings
 import glob
 import cftime
 import cartopy.crs as ccrs
-from mpl_toolkits.basemap import Basemap
 from matplotlib.colors import LinearSegmentedColormap
 import os
 
