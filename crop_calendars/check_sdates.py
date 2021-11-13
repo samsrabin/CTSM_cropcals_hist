@@ -38,7 +38,6 @@ filelist = glob.glob(indir + pattern)
 
 # Import
 this_ds = utils.import_ds(filelist, myVars=["SDATES", "HDATES"], myVegtypes=utils.define_mgdcrop_list())
-this_ds = this_ds.squeeze(drop=True)
 
 # this_ds
 
