@@ -39,8 +39,6 @@ filelist = glob.glob(indir + pattern)
 # Import
 this_ds = utils.import_ds(filelist, myVars=["SDATES", "HDATES"], myVegtypes=utils.define_mgdcrop_list())
 
-# this_ds
-
 
 # %% Import expected sowing dates
 
@@ -89,16 +87,15 @@ outdir = f"{indir}/sdates"
 if not os.path.exists(outdir):
     os.makedirs(outdir)
 
-def make_map(ax, this_map, this_title):
-    # this_map = utils.cyclic_dataarray(this_map)
-    im1 = ax.pcolor(this_map.lon.values, this_map.lat.values, 
-            this_map, cmap="hsv", shading="auto")
+def make_map(ax, this_map, this_title):        
+    im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+            this_map, cmap="hsv", shading="auto",
+            vmin=1, vmax=365)
     ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
     ax.coastlines()
     ax.set_title(this_title)
     # ax.colorbar(im1, ax=ax, shrink=0.07)
     plt.colorbar(im1, orientation="horizontal", pad=0.0)
-    # plt.show()
 
 ny = 2
 nx = 1
@@ -118,11 +115,11 @@ for i, vt_str in enumerate(this_ds.vegtype_str.values):
     ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
     out_map = sdatesO_gridded.sel(ivt_str=vt_str).squeeze(drop=True)
     make_map(ax, out_map, f"Output {vt_str}")
-    
+        
     # Prepend filename with "_" if output map empty
     if not np.any(np.bitwise_not(np.isnan(out_map))): 
         vt_str = "_" + vt_str
-    
+        
     print("Saving...")
     outfile = f"{outdir}/{vt_str}.png"
     plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
