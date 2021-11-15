@@ -40,6 +40,10 @@ filelist = glob.glob(indir + pattern)
 
 # Import
 this_ds = utils.import_ds(filelist, myVars=["SDATES", "HDATES"], myVegtypes=utils.define_mgdcrop_list())
+sdates_gridded = utils.grid_one_variable(\
+    this_ds, 
+    "SDATES", 
+    time=1)
 
 
 # %% Import expected sowing dates
@@ -80,11 +84,6 @@ sdates_rx = utils.import_ds(sdate_inFile, myVars=sdate_varList)
 # import importlib
 # importlib.reload(utils)
 
-sdatesO_gridded = utils.grid_one_variable(\
-    this_ds, 
-    "SDATES", 
-    time=1)
-
 outdir = f"{indir}/sdates"
 if not os.path.exists(outdir):
     os.makedirs(outdir)
@@ -117,7 +116,7 @@ for i, vt_str in enumerate(this_ds.vegtype_str.values):
     
     # Output
     ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
-    out_map = sdatesO_gridded.sel(ivt_str=vt_str).squeeze(drop=True)
+    out_map = sdates_gridded.sel(ivt_str=vt_str).squeeze(drop=True)
     make_map(ax, out_map, f"Output {vt_str}")
         
     # Prepend filename with "_" if output map empty
