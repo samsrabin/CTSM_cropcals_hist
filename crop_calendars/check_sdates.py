@@ -8,6 +8,7 @@ my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myf
 # generate_gdds = False
 # indir = "/Volumes/Reacher/CESM_runs/numa_20211014_rx/"
 indir = "/Volumes/Reacher/CESM_runs/f10_f10_mg37/"
+# indir = "/Volumes/Reacher/CESM_runs/f10_f10_mg37/2021-11-10/"
 
 import numpy as np
 import xarray as xr
@@ -16,7 +17,8 @@ import warnings
 import glob
 import cftime
 import cartopy.crs as ccrs
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib import cm
+
 import os
 
 import sys
@@ -86,15 +88,17 @@ sdatesO_gridded = utils.grid_one_variable(\
 outdir = f"{indir}/sdates"
 if not os.path.exists(outdir):
     os.makedirs(outdir)
-
-def make_map(ax, this_map, this_title):        
+    
+def make_map(ax, this_map, this_title): 
+    new_cmap = cm.get_cmap('hsv', 365)
+    new_cmap.set_under((0.5,0.5,0.5,1.0))    
+    new_cmap.set_over("k")       
     im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
-            this_map, cmap="hsv", shading="auto",
+            this_map, cmap=new_cmap, shading="auto",
             vmin=1, vmax=365)
     ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
     ax.coastlines()
     ax.set_title(this_title)
-    # ax.colorbar(im1, ax=ax, shrink=0.07)
     plt.colorbar(im1, orientation="horizontal", pad=0.0)
 
 ny = 2
