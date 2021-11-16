@@ -46,6 +46,15 @@ sdates_gridded = utils.grid_one_variable(\
     time=1)
 
 
+# %% Check that sowing dates were the same in 2000 and 2001
+
+this_ds.SDATES.isel(time=2).values[this_ds.SDATES.isel(time=1).values
+                            != this_ds.SDATES.isel(time=2).values]
+
+this_ds.HDATES.isel(time=2).values[this_ds.SDATES.isel(time=1).values
+                            != this_ds.SDATES.isel(time=2).values]
+
+
 # %% Import expected sowing dates
 
 
@@ -206,3 +215,4 @@ for i, vt_str in enumerate(this_ds.vegtype_str.values):
     plt.close()
         
 print("Done!")
+
