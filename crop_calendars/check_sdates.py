@@ -79,7 +79,7 @@ sdates_rx = utils.import_ds(sdate_inFile, myVars=sdate_varList)
 #     lon=this_ds.patches1d_lon.values[0], 
 #     method="nearest")
 
-# %% Make sdate maps
+# %% Compare simulated to prescribed sdates
 
 # import importlib
 # importlib.reload(utils)
@@ -124,7 +124,83 @@ for i, vt_str in enumerate(this_ds.vegtype_str.values):
         vt_str = "_" + vt_str
         
     print("Saving...")
-    outfile = f"{outdir}/{vt_str}.png"
+    outfile = f"{outdir}/sdates_{vt_str}.png"
+    plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+        bbox_inches='tight')
+    plt.close()
+        
+print("Done!")
+
+
+
+# %% Map harvest and sowing dates
+
+# import importlib
+# importlib.reload(utils)
+
+hdates00_gridded = utils.grid_one_variable(\
+    this_ds, 
+    "HDATES", 
+    time=1)
+
+sdates00_gridded = utils.grid_one_variable(\
+    this_ds, 
+    "SDATES", 
+    time=1)
+
+hdates01_gridded = utils.grid_one_variable(\
+    this_ds, 
+    "HDATES", 
+    time=2)
+
+sdates01_gridded = utils.grid_one_variable(\
+    this_ds, 
+    "SDATES", 
+    time=2)
+
+outdir = f"{indir}/sowing_and_harvest"
+if not os.path.exists(outdir):
+    os.makedirs(outdir)
+    
+def make_map(ax, this_map, this_title): 
+    new_cmap = cm.get_cmap('hsv', 365)
+    new_cmap.set_under((0.5,0.5,0.5,1.0))    
+    new_cmap.set_over("k")       
+    im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+            this_map, cmap=new_cmap, shading="auto",
+            vmin=1, vmax=365)
+    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
+    ax.coastlines()
+    ax.set_title(this_title)
+    plt.colorbar(im1, orientation="horizontal", pad=0.0)
+
+ny = 2
+nx = 2
+for i, vt_str in enumerate(this_ds.vegtype_str.values):
+    
+    print(vt_str)
+    fig = plt.figure(figsize=(12,8))
+            
+    # Output
+    ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
+    out_map = hdates00_gridded.sel(ivt_str=vt_str).squeeze(drop=True)
+    make_map(ax, out_map, f"Sim harv {vt_str} '00")
+    ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
+    out_map = sdates00_gridded.sel(ivt_str=vt_str).squeeze(drop=True)
+    make_map(ax, out_map, f"Sim sow {vt_str} '00")
+    ax = fig.add_subplot(ny,nx,3,projection=ccrs.PlateCarree())
+    out_map = hdates01_gridded.sel(ivt_str=vt_str).squeeze(drop=True)
+    make_map(ax, out_map, f"Sim harv {vt_str} '01")
+    ax = fig.add_subplot(ny,nx,4,projection=ccrs.PlateCarree())
+    out_map = sdates01_gridded.sel(ivt_str=vt_str).squeeze(drop=True)
+    make_map(ax, out_map, f"Sim sow {vt_str} '01")
+                    
+    # Prepend filename with "_" if output map empty
+    if not np.any(np.bitwise_not(np.isnan(out_map))): 
+        vt_str = "_" + vt_str
+        
+    print("Saving...")
+    outfile = f"{outdir}/hshsdates_{vt_str}.png"
     plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
         bbox_inches='tight')
     plt.close()
