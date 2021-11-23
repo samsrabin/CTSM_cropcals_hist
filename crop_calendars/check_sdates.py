@@ -211,3 +211,38 @@ for i, vt_str in enumerate(dates_ds.vegtype_str.values):
         
 print("Done!")
 
+
+# %% Inspecting one gridcell's daily outputs
+
+thisVar = "CPHASE"
+
+daily_ds = utils.import_ds(glob.glob(indir + "*h1.*-01-01-00000.nc"), \
+    myVegtypes=utils.define_mgdcrop_list())
+
+dates1_ds = dates_ds.isel(time=1, mxgrowseas=0).squeeze(drop=True)
+
+tmp = (dates1_ds.SDATES.values > 50) & (dates1_ds.SDATES.values < 75) & (dates1_ds.patches1d_itype_veg_str.values=="temperate_corn")
+if tmp.sum() != 1:
+    raise RuntimeError(f"Expected 1 match of condition; found {tmp.sum()}")
+thisPatch = dates_ds.patch.values[np.where(tmp)][0]
+
+# Get dates in a format that matplotlib can use
+with warnings.catch_warnings():
+    # Ignore this warning in this with-block
+    warnings.filterwarnings("ignore", message="Converting a CFTimeIndex with dates from a non-standard calendar, 'noleap', to a pandas.DatetimeIndex, which uses dates from the standard calendar.  This may lead to subtle errors in operations that depend on the length of time between dates.")
+    datetime_vals = daily_ds.indexes["time"].to_datetimeindex()
+
+this_ds = daily_ds.sel(patch=thisPatch)
+
+thisvar_da = daily_ds[thisVar].sel(patch=thisPatch)
+thisLon = daily_ds.lon.values[int(daily_ds.patches1d_ixy.sel(patch=thisPatch).values.item())]
+thisLat = daily_ds.lat.values[int(daily_ds.patches1d_jxy.sel(patch=thisPatch).values.item())]
+
+fig = plt.figure(figsize=(12,8))
+plt.plot(datetime_vals, thisvar_da.values)
+plt.title(f"{thisVar} ({thisLon} lon, {thisLat} lat)")
+plt.ylabel(daily_ds.variables[thisVar].attrs['units'])
+plt.show()
+
+
+
