@@ -140,6 +140,69 @@ for i, vt_str in enumerate(dates_ds.vegtype_str.values):
 print("Done!")
 
 
+# %% Compare simulated sdates to those from Python's NN selection
+
+year = 2001
+
+outdir = f"{indir}/sdates_check"
+if not os.path.exists(outdir):
+    os.makedirs(outdir)
+
+sdates_grid = utils.grid_one_variable(\
+    dates_ds, 
+    "SDATES", 
+    time__values=f"{year}")
+sdates_grid = utils.lon_pm2idl(sdates_grid)
+
+rx_interp = sdates_rx.interp(lon=sdates_grid.lon,
+                             lat=sdates_grid.lat, 
+                             method="nearest",
+                             kwargs={"fill_value": "extrapolate"})
+
+ny = 2
+nx = 2
+for i, vt_str in enumerate(dates_ds.vegtype_str.values):
+    
+    # Input
+    vt = dates_ds.ivt.values[i]
+    thisVar = f"sdate1_{vt}"
+    if not thisVar in sdates_rx:
+        continue
+    print(vt_str)
+    fig = plt.figure(figsize=(15,9))
+    rx_thiscrop = sdates_rx[thisVar]
+    ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
+    make_map(ax, rx_thiscrop.squeeze(drop=True), f"Input {vt_str}")
+    # Extrapolating here means that any CTSM coordinates outside the limits of the prescribed 
+    # dates' axes will just use the value at the corresponding edge of the corresponding prescribed 
+    # dates' axis. So for example, grid resolution f10_f10_mg37 has a cell centered at lon -180° 
+    # lat Y°, but the prescribed dates' longitude axis has its first cell centered at -179.75°. The 
+    # extrapolated value will be taken from that first column (i.e., -179.75°).
+    rx_thiscrop_interp = rx_interp[thisVar].squeeze(drop=True)
+    ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
+    make_map(ax, rx_thiscrop_interp, f"Input {vt_str} (CTSM res.)")
+    
+    # Output
+    ax = fig.add_subplot(ny,nx,3,projection=ccrs.PlateCarree())
+    out_thiscrop = sdates_grid.sel(ivt_str=vt_str).squeeze(drop=True)
+    make_map(ax, out_thiscrop, f"Output {vt_str} ({year})")
+    
+    # Difference
+    ax = fig.add_subplot(ny,nx,4,projection=ccrs.PlateCarree())
+    diff_map = out_thiscrop - rx_thiscrop_interp
+    diff_map.values[diff_map.values==0] = np.nan
+    new_caxis_lim = max(abs(np.nanmin(diff_map)), abs(np.nanmax(diff_map)))      
+    make_map(ax, diff_map, "Difference (out – in)", 
+             use_new_cmap=False,
+             vmin=-new_caxis_lim, vmax=new_caxis_lim)
+
+    print("Saving...")
+    outfile = f"{outdir}/sdatescheck_{vt_str}.png"
+    plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+        bbox_inches='tight')
+    plt.close()
+        
+
 # %% Map harvest and sowing dates
 
 # import importlib
