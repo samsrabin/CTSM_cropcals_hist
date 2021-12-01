@@ -94,12 +94,12 @@ sdates_rx = utils.import_ds(sdate_inFile, myVars=sdate_varList)
 #     lon=this_ds.patches1d_lon.values[0], 
 #     method="nearest")
 
-# %% Compare simulated to prescribed sdates
+# %% Make maps of simulated vs. prescribed sdates
 
 # import importlib
 # importlib.reload(utils)
 
-sdates_gridded = utils.grid_one_variable(\
+sdates_grid = utils.grid_one_variable(\
     dates_ds, 
     "SDATES", 
     time__values="2001")
@@ -124,9 +124,9 @@ for i, vt_str in enumerate(dates_ds.vegtype_str.values):
     
     # Output
     ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
-    out_map = sdates_gridded.sel(ivt_str=vt_str).squeeze(drop=True)
+    out_map = sdates_grid.sel(ivt_str=vt_str).squeeze(drop=True)
     make_map(ax, out_map, f"Output {vt_str}")
-        
+                
     # Prepend filename with "_" if output map empty
     if not np.any(np.bitwise_not(np.isnan(out_map))): 
         vt_str = "_" + vt_str
