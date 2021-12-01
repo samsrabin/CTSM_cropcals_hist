@@ -91,13 +91,18 @@ outdir = f"{indir}/sdates"
 if not os.path.exists(outdir):
     os.makedirs(outdir)
     
-def make_map(ax, this_map, this_title): 
-    new_cmap = cm.get_cmap('hsv', 365)
-    new_cmap.set_under((0.5,0.5,0.5,1.0))    
-    new_cmap.set_over("k")       
-    im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
-            this_map, cmap=new_cmap, shading="auto",
-            vmin=1, vmax=365)
+def make_map(ax, this_map, this_title, use_new_cmap=True, vmin=1, vmax=365): 
+    if use_new_cmap:
+        new_cmap = cm.get_cmap('hsv', 365)
+        new_cmap.set_under((0.5,0.5,0.5,1.0))    
+        new_cmap.set_over("k")
+        im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+                this_map, cmap=new_cmap, shading="auto",
+                vmin=vmin, vmax=vmax)
+    else:
+        im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+                this_map, shading="auto",
+                vmin=vmin, vmax=vmax)
     ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
     ax.coastlines()
     ax.set_title(this_title)
