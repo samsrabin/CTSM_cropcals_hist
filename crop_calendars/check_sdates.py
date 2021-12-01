@@ -29,6 +29,23 @@ import warnings
 warnings.filterwarnings("ignore", message="__len__ for multi-part geometries is deprecated and will be removed in Shapely 2.0. Check the length of the `geoms` property instead to get the  number of parts of a multi-part geometry.")
 warnings.filterwarnings("ignore", message="Iteration over multi-part geometries is deprecated and will be removed in Shapely 2.0. Use the `geoms` property to access the constituent parts of a multi-part geometry.")
 
+def make_map(ax, this_map, this_title, use_new_cmap=True, vmin=1, vmax=365): 
+    if use_new_cmap:
+        new_cmap = cm.get_cmap('hsv', 365)
+        new_cmap.set_under((0.5,0.5,0.5,1.0))    
+        new_cmap.set_over("k")
+        im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+                this_map, cmap=new_cmap, shading="auto",
+                vmin=vmin, vmax=vmax)
+    else:
+        im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+                this_map, shading="auto",
+                vmin=vmin, vmax=vmax)
+    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
+    ax.coastlines()
+    ax.set_title(this_title)
+    plt.colorbar(im1, orientation="horizontal", pad=0.0)
+ 
 
 # %% Import sowing and harvest dates
 dates_ds = utils.import_ds(glob.glob(indir + "*h2.*-01-01-00000.nc"), \
@@ -90,23 +107,6 @@ sdates_gridded = utils.grid_one_variable(\
 outdir = f"{indir}/sdates"
 if not os.path.exists(outdir):
     os.makedirs(outdir)
-    
-def make_map(ax, this_map, this_title, use_new_cmap=True, vmin=1, vmax=365): 
-    if use_new_cmap:
-        new_cmap = cm.get_cmap('hsv', 365)
-        new_cmap.set_under((0.5,0.5,0.5,1.0))    
-        new_cmap.set_over("k")
-        im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
-                this_map, cmap=new_cmap, shading="auto",
-                vmin=vmin, vmax=vmax)
-    else:
-        im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
-                this_map, shading="auto",
-                vmin=vmin, vmax=vmax)
-    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
-    ax.coastlines()
-    ax.set_title(this_title)
-    plt.colorbar(im1, orientation="horizontal", pad=0.0)
 
 ny = 2
 nx = 1
