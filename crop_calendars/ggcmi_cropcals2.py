@@ -9,7 +9,7 @@ out_attrs = {
     "title": "GGCMI crop calendar for Phase 3, v1.01",
     "author_thisfile": "Sam Rabin (sam.rabin@gmail.com)",
     "author_original": "Jonas Jägermeyr (jaegermeyr@uchicago.edu)",
-    "comment": "Day of year is 1-indexed (i.e., Jan. 1 = 1)."
+    "comment": "Day of year is 1-indexed (i.e., Jan. 1 = 1). Filled using cdo -remapnn,$original -setmisstonn"
 }
 
 
@@ -28,9 +28,9 @@ import datetime as dt
 
 # Files/directories to use
 templatefile = "/Volumes/Reacher/CESM_inputdata/lnd/clm2/firedata/clmforc.Li_2018_SSP1_CMIP6_hdm_0.5x0.5_AVHRR_simyr1850-2100_c181205.nc"
-indir = "/Volumes/Reacher/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar/"
+indir = "/Volumes/Reacher/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar-nninterp/"
 outdir = "/Volumes/Reacher/CESM_work/crop_dates/"
-file_specifier = "_ggcmi_crop_calendar_phase3_v1.01" # In name of input and output files
+file_specifier = "_ggcmi_crop_calendar_phase3_v1.01_nninterp" # In name of input and output files
 
 # Add current date/time to output attributes
 out_attrs["created"] = dt.datetime.now().replace(microsecond=0).astimezone().isoformat()
