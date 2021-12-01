@@ -36,13 +36,13 @@ dates_ds = utils.import_ds(glob.glob(indir + "*h2.*-01-01-00000.nc"), \
     myVegtypes=utils.define_mgdcrop_list())
 
 
-# %% Check that sowing dates were the same in 2000 and 2001
+# %% Check that sowing and harvest dates were the same in 2000 and 2001
 
-dates_ds.SDATES.isel(time=2).values[dates_ds.SDATES.isel(time=1).values
-                            != dates_ds.SDATES.isel(time=2).values]
+print(dates_ds.SDATES.isel(time=2).values[dates_ds.SDATES.isel(time=1).values
+                                          != dates_ds.SDATES.isel(time=2).values])
 
-dates_ds.HDATES.isel(time=2).values[dates_ds.SDATES.isel(time=1).values
-                            != dates_ds.SDATES.isel(time=2).values]
+print(dates_ds.HDATES.isel(time=2).values[dates_ds.HDATES.isel(time=1).values
+                                          != dates_ds.HDATES.isel(time=2).values])
 
 
 # %% Import expected sowing dates
