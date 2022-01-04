@@ -27,10 +27,10 @@ import datetime as dt
 # %% Setup
 
 # Files/directories to use
-templatefile = "/Volumes/Reacher/CESM_inputdata/lnd/clm2/firedata/clmforc.Li_2018_SSP1_CMIP6_hdm_0.5x0.5_AVHRR_simyr1850-2100_c181205.nc"
-indir = "/Volumes/Reacher/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar-nninterp/"
-outdir = "/Volumes/Reacher/CESM_work/crop_dates/"
-file_specifier = "_ggcmi_crop_calendar_phase3_v1.01_nninterp" # In name of input and output files
+templatefile = "/Users/Shared/CESM_runs/f10_f10_mg37/2021-11-23/f10_f10_mg37.clm2.h3.2000-01-01-00000.nc"
+indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar-nninterp-f10_f10_mg37/"
+file_specifier = "_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37" # In name of input and output files
+outdir = "/Users/Shared/CESM_work/crop_dates/"
 
 # Add current date/time to output attributes
 out_attrs["created"] = dt.datetime.now().replace(microsecond=0).astimezone().isoformat()
@@ -137,8 +137,10 @@ y1 = template_ds.time.values[0].year
 yN = template_ds.time.values[-1].year
 template_ds.attrs = out_attrs
 
-#  Remove variable we don't need
-template_ds = template_ds.drop("hdm")
+#  Remove variable(s) we don't need
+for v in ["hdm", "HDATES", "SDATE1", "SDATES"]:
+    if v in template_ds:
+        template_ds = template_ds.drop(v)
 
 # Create output files
 for v in variable_dict:
