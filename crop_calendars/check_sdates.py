@@ -4,11 +4,11 @@
 my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
 
 # Directory where input file(s) can be found
-# indir = "/Volumes/Reacher/CESM_runs/numa_20211014_rx/normal/"
+# indir = "/Users/Shared/CESM_runs/numa_20211014_rx/normal/"
 # generate_gdds = False
-# indir = "/Volumes/Reacher/CESM_runs/numa_20211014_rx/"
-indir = "/Volumes/Reacher/CESM_runs/f10_f10_mg37/"
-# indir = "/Volumes/Reacher/CESM_runs/f10_f10_mg37/2021-11-10/"
+# indir = "/Users/Shared/CESM_runs/numa_20211014_rx/"
+indir = "/Users/Shared/CESM_runs/f10_f10_mg37/"
+# indir = "/Users/Shared/CESM_runs/f10_f10_mg37/2021-11-10/"
 
 import numpy as np
 import xarray as xr
@@ -64,7 +64,9 @@ print(dates_ds.HDATES.isel(time=2).values[dates_ds.HDATES.isel(time=1).values
 
 # %% Import expected sowing dates
 
-sdate_inFile = "/Volumes/Reacher/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp.2000-2000.nc"
+# sdate_inFile = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp.2000-2000.nc"
+sdate_inFile = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
+
 
 # Get run info:
 # Max number of growing seasons per year
@@ -108,7 +110,7 @@ outdir = f"{indir}/sdates"
 if not os.path.exists(outdir):
     os.makedirs(outdir)
 
-ny = 2
+ny = 3
 nx = 1
 for i, vt_str in enumerate(dates_ds.vegtype_str.values):
     
@@ -118,15 +120,26 @@ for i, vt_str in enumerate(dates_ds.vegtype_str.values):
     # Input
     vt = dates_ds.ivt.values[i]
     thisVar = f"sdate1_{vt}"
-    if thisVar in sdates_rx:
-        ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
-        make_map(ax, sdates_rx[thisVar].squeeze(drop=True), f"Input {vt_str}")
+    if thisVar not in sdates_rx:
+        continue
+    ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
+    in_map = sdates_rx[thisVar].squeeze(drop=True)
+    make_map(ax, in_map, f"Input {vt_str}")
     
     # Output
     ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
     out_map = sdates_grid.sel(ivt_str=vt_str).squeeze(drop=True)
     make_map(ax, out_map, f"Output {vt_str}")
-                
+    
+    # Difference
+    ax = fig.add_subplot(ny,nx,3,projection=ccrs.PlateCarree())
+    diff_map = out_map - in_map
+    diff_map.values[diff_map.values==0] = np.nan
+    new_caxis_lim = max(abs(np.nanmin(diff_map)), abs(np.nanmax(diff_map)))      
+    make_map(ax, diff_map, "Difference (out – in)", 
+             use_new_cmap=False,
+             vmin=-new_caxis_lim, vmax=new_caxis_lim)
+                    
     # Prepend filename with "_" if output map empty
     if not np.any(np.bitwise_not(np.isnan(out_map))): 
         vt_str = "_" + vt_str
@@ -202,6 +215,16 @@ for i, vt_str in enumerate(dates_ds.vegtype_str.values):
         bbox_inches='tight')
     plt.close()
         
+
+# %%
+import importlib
+importlib.reload(utils)
+
+rx_interp2 = utils.lon_idl2pm(rx_interp)
+
+rx_interp.to_netcdf(path="/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp.2000-2000.f10_f10_mg37.pm.nc", format="NETCDF3_CLASSIC")
+rx_interp2.to_netcdf(path="/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp.2000-2000.f10_f10_mg37.idl.nc", format="NETCDF3_CLASSIC")
+
 
 # %% Map harvest and sowing dates
 
