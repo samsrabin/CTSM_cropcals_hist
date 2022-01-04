@@ -2,7 +2,7 @@
 
 # Years of interest
 y1 = 1980
-yN = 2010
+yN = 2009
 
 # Your path to ctsm_py directory (i.e., where utils.py lives)
 my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
@@ -56,12 +56,16 @@ def import_rx_dates(s_or_h, date_inFile, dates_ds):
 
 # %% Import output sowing and harvest dates
 
+# Keep 1 extra year to avoid incomplete final growing season for crops harvested after Dec. 31.
+y1_import_str = f"{y1+1}-01-01"
+yN_import_str = f"{yN+2}-01-01"
+
+print(f"Importing netCDF time steps {y1_import_str} through {yN_import_str}")
+
 dates_ds = utils.import_ds(glob.glob(indir + "*h2.*"), \
     myVars=["SDATES", "HDATES"], 
     myVegtypes=utils.define_mgdcrop_list())
-y1_import_str = f"{y1+1}-01-01"
-yN_import_str = f"{yN+1}-01-01"
-print(f"Using netCDF time steps {y1_import_str} through {yN_import_str}")
+
 dates_ds = utils.xr_flexsel(dates_ds, \
     time__values=slice(y1_import_str,
                        yN_import_str))
