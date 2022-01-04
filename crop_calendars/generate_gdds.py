@@ -52,3 +52,55 @@ for v in ["SDATES", "HDATES"]:
             raise RuntimeError(f"{v} timestep {t} does not match timestep 0")
 print("✅ CLM output sowing and harvest dates do not vary between years.")
 
+
+# %% Import expected sowing dates
+
+sdate_inFile = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
+
+# Get run info:
+# Max number of growing seasons per year
+if "mxgrowseas" in dates_ds:
+    mxgrowseas = dates_ds.dims["mxgrowseas"]
+else:
+    mxgrowseas = 1
+    
+# Which vegetation types were simulated?
+itype_veg_toImport = np.unique(dates_ds.patches1d_itype_veg)
+
+sdate_varList = []
+for i in itype_veg_toImport:
+    for g in np.arange(mxgrowseas):
+        thisVar = f"sdate{g+1}_{i}"
+        sdate_varList = sdate_varList + [thisVar]
+
+sdates_rx = utils.import_ds(sdate_inFile, myVars=sdate_varList)
+
+
+# %% Check that input and output sdates match
+
+sdates_grid = utils.grid_one_variable(\
+    dates_ds, 
+    "SDATES")
+
+all_ok = True
+for i, vt_str in enumerate(dates_ds.vegtype_str.values):
+    
+    # Input
+    vt = dates_ds.ivt.values[i]
+    thisVar = f"sdate1_{vt}"
+    if thisVar not in sdates_rx:
+        continue
+    in_map = sdates_rx[thisVar].squeeze(drop=True)
+    
+    # Output
+    out_map = sdates_grid.sel(ivt_str=vt_str).squeeze(drop=True)
+    
+    # Check for differences
+    diff_map = out_map - in_map
+    if np.any(diff_map.values[np.invert(np.isnan(diff_map.values))]):
+        print(f"Difference(s) found in {vt_str}")
+        all_ok = False
+        
+if all_ok:
+    print("✅ Input and output sdates match!")
+
