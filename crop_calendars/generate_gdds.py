@@ -29,8 +29,33 @@ import warnings
 warnings.filterwarnings("ignore", message="__len__ for multi-part geometries is deprecated and will be removed in Shapely 2.0. Check the length of the `geoms` property instead to get the  number of parts of a multi-part geometry.")
 warnings.filterwarnings("ignore", message="Iteration over multi-part geometries is deprecated and will be removed in Shapely 2.0. Use the `geoms` property to access the constituent parts of a multi-part geometry.")
 
+def import_rx_dates(s_or_h, date_inFile, dates_ds):
+    # Get run info:
+    # Max number of growing seasons per year
+    if "mxgrowseas" in dates_ds:
+        mxgrowseas = dates_ds.dims["mxgrowseas"]
+    else:
+        mxgrowseas = 1
+        
+    # Which vegetation types were simulated?
+    itype_veg_toImport = np.unique(dates_ds.patches1d_itype_veg)
 
-# %% Import sowing and harvest dates
+    date_varList = []
+    for i in itype_veg_toImport:
+        for g in np.arange(mxgrowseas):
+            thisVar = f"{s_or_h}date{g+1}_{i}"
+            date_varList = date_varList + [thisVar]
+
+    ds = utils.import_ds(date_inFile, myVars=date_varList)
+    
+    for v in ds:
+        ds = ds.rename({v: v.replace(f"{s_or_h}date","gs")})
+    
+    return ds
+
+
+# %% Import output sowing and harvest dates
+
 dates_ds = utils.import_ds(glob.glob(indir + "*h2.*"), \
     myVars=["SDATES", "HDATES"], 
     myVegtypes=utils.define_mgdcrop_list())
@@ -57,23 +82,7 @@ print("✅ CLM output sowing and harvest dates do not vary between years.")
 
 sdate_inFile = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
 
-# Get run info:
-# Max number of growing seasons per year
-if "mxgrowseas" in dates_ds:
-    mxgrowseas = dates_ds.dims["mxgrowseas"]
-else:
-    mxgrowseas = 1
-    
-# Which vegetation types were simulated?
-itype_veg_toImport = np.unique(dates_ds.patches1d_itype_veg)
-
-sdate_varList = []
-for i in itype_veg_toImport:
-    for g in np.arange(mxgrowseas):
-        thisVar = f"sdate{g+1}_{i}"
-        sdate_varList = sdate_varList + [thisVar]
-
-sdates_rx = utils.import_ds(sdate_inFile, myVars=sdate_varList)
+sdates_rx = import_rx_dates("s", sdate_inFile, dates_ds)
 
 
 # %% Check that input and output sdates match
