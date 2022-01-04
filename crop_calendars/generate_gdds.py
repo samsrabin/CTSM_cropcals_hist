@@ -71,12 +71,20 @@ year_jday = np.stack((year, jday), axis=1)
 # Find sowing and harvest dates in dataset
 cphase_da = utils.get_thisVar_da("CPHASE", this_ds)
 false_1xNpft = np.full((1,np.size(this_ds.patches1d_itype_veg_str.values)), fill_value=False)
-is_sdate = np.bitwise_and( \
-    cphase_da.values[:-1,:]==4, \
-    cphase_da.values[1:,:]<4)
-is_hdate = np.bitwise_and( \
-    cphase_da.values[:-1,:]<4, \
-    cphase_da.values[1:,:]==4)
+if generate_gdds:
+    is_sdate = np.bitwise_and( \
+        cphase_da.values[:-1,:]>3, \
+        cphase_da.values[1:,:]==1)
+    is_hdate = np.bitwise_and( \
+        cphase_da.values[:-1,:]<4, \
+        cphase_da.values[1:,:]==4)
+else:
+    is_sdate = np.bitwise_and( \
+        cphase_da.values[:-1,:]==4, \
+        cphase_da.values[1:,:]<4)
+    is_hdate = np.bitwise_and( \
+        cphase_da.values[:-1,:]<4, \
+        cphase_da.values[1:,:]==4)
 
 # Add False to beginning or end of is_date arrays to ensure correct alignment
 is_sdate = np.concatenate((is_sdate, false_1xNpft))
