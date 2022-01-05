@@ -117,3 +117,30 @@ for i, vt_str in enumerate(dates_ds.vegtype_str.values):
 if all_ok:
     print("✅ Input and output sdates match!")
 
+
+# %% Import prescribed harvest dates
+
+hdate_inFile = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
+
+hdates_rx = import_rx_dates("h", hdate_inFile, dates_ds)
+
+# Determine cells where growing season crosses new year
+grows_across_newyear = hdates_rx < sdates_rx
+
+
+# %% Import accumulated GDDs
+
+# Keep 1 extra year to avoid incomplete final growing season for crops harvested after Dec. 31.
+y1_import_str = f"{y1}-01-01"
+yN_import_str = f"{yN+1}-12-31"
+
+print(f"Importing netCDF time steps {y1_import_str} through {yN_import_str}")
+
+accumGDD_ds = utils.import_ds(glob.glob(indir + "*h1.*"), \
+    myVars=["GDDPLANT"], 
+    myVegtypes=utils.define_mgdcrop_list(),
+    timeSlice=slice(y1_import_str, yN_import_str))
+
+if not np.any(accumGDD_ds.GDDPLANT.values != 0):
+    raise RuntimeError("All GDDPLANT values are zero!")
+
