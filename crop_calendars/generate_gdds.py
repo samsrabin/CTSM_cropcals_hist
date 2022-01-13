@@ -307,3 +307,16 @@ if not os.path.exists(outdir):
     os.makedirs(outdir)
 outfile = outdir + "gdds_" + dt.datetime.now().strftime("%Y%m%d_%H%M%S") + ".nc"
 gdd_maps_ds.to_netcdf(outfile, format="NETCDF3_CLASSIC")
+
+    
+
+# %% Misc.
+
+# # %% View GDD for a single crop and cell
+
+# tmp = accumGDD_ds.GDDPLANT.values
+# incl = np.bitwise_and(accumGDD_ds.patches1d_lon.values==270, accumGDD_ds.patches1d_lat.values==40)
+# tmp2 = tmp[:,incl]
+# plt.plot(tmp2)
+
+
