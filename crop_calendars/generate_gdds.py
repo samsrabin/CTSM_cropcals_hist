@@ -280,7 +280,8 @@ for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
     # Make figure    
     if save_figs:
         ax = plt.axes(projection=ccrs.PlateCarree())
-        make_map(ax, thisCrop_gridded, vegtype_str)
+        map_yx = thisCrop_gridded.where(thisCrop_gridded != fillValue)
+        make_map(ax, map_yx, vegtype_str)
         outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}.png"
         plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
             bbox_inches='tight')
