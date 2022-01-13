@@ -255,7 +255,7 @@ for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
     thisVar = f"gdd1_{vegtype_int}"
     
     # Grid
-    thisCrop_gridded = utils.grid_one_variable(gdds_mean_ds, thisVar, vegtype=vegtype_int)
+    thisCrop_gridded = utils.grid_one_variable(gdds_mean_ds, thisVar, fillValue=-1, vegtype=vegtype_int)
     thisCrop_gridded = thisCrop_gridded.squeeze(drop=True)
     
     # Add to Dataset
