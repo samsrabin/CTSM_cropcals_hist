@@ -272,3 +272,11 @@ for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
         plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
             bbox_inches='tight')
         plt.close()
+
+# Add lon/lat attributes
+gdd_maps_ds.lon.attrs = {\
+    "long_name": "coordinate_longitude",
+    "units": "degrees_east"}
+gdd_maps_ds.lat.attrs = {\
+    "long_name": "coordinate_latitude",
+    "units": "degrees_north"}
