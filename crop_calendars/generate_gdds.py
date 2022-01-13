@@ -7,7 +7,7 @@ yN = 2009
 # Your path to ctsm_py directory (i.e., where utils.py lives)
 my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
 
-# Directory where input file(s) can be found
+# Directory where input file(s) can be found (figure files will be saved in subdir here)
 indir = "/Users/Shared/CESM_runs/f10_f10_mg37_1850/"
 
 # Directory to save output netCDF
@@ -202,7 +202,11 @@ for v, vegtype_str in enumerate(accumGDD_ds.vegtype_str.values):
     # There's almost certainly a more efficient way to do this than looping through patches!
     for p in np.arange(thisCrop_hdates_rx.size):
         thisPatch_da = thisCrop_da.isel(patch=p)
+        
+        # Extract time range of interest plus extra year for cells where growing season crosses the new year
         thisCell_gdds_da = thisPatch_da.isel(time=np.where(doy==thisCrop_hdates_rx.sel(patch=p).values)[0])
+        
+        # Extract the actual time range of interest for this cell, depending on whether its growing season crosses the new year
         if thisCrop_gany[p]:
             thisCell_gdds_da = thisCell_gdds_da.isel(time=time_indsP1[1:])
         else:
