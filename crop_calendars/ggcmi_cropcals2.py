@@ -121,7 +121,7 @@ def set_var_dict(name_ggcmi, outfile):
 
 variable_dict = {
     "sdate": set_var_dict("planting_day", ""),
-    # "hdate": set_var_dict("maturity_day", "")
+    "hdate": set_var_dict("maturity_day", "")
 }
 
 def slice_yr(y):
