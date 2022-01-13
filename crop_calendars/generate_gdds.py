@@ -53,6 +53,13 @@ def import_rx_dates(s_or_h, date_inFile, dates_ds):
     
     return ds
 
+def thisCrop_map_to_patches(lon_points, lat_points, map_ds, vegtype_int):
+    # xarray pointwise indexing; see https://xarray.pydata.org/en/stable/user-guide/indexing.html#more-advanced-indexing
+    return map_ds[f"gs1_{vegtype_int}"].sel( \
+        lon=xr.DataArray(lon_points, dims="patch"),
+        lat=xr.DataArray(lat_points, dims="patch")).squeeze(drop=True)
+    
+
 
 # %% Import output sowing and harvest dates
 
@@ -144,3 +151,124 @@ accumGDD_ds = utils.import_ds(glob.glob(indir + "*h1.*"), \
 if not np.any(accumGDD_ds.GDDPLANT.values != 0):
     raise RuntimeError("All GDDPLANT values are zero!")
 
+
+# %% Get mean GDDs in GGCMI growing season
+
+import cftime
+
+# Get day of year for each day in time axis
+# doy = [t.timetuple().tm_yday for t in accumGDD_ds.time.values]
+doy = np.array([t.timetuple().tm_yday for t in accumGDD_ds.time.values])
+
+# Get standard datetime axis for outputs
+t1 = accumGDD_ds.time.values[0]
+Nyears = yN - y1 + 1
+new_dt_axis = np.array([cftime.datetime(y, 1, 1, 
+                               calendar=t1.calendar,
+                               has_year_zero=t1.has_year_zero)
+               for y in np.arange(y1, yN+1)])
+time_indsP1 = np.arange(Nyears + 1)
+
+# Set up output Dataset
+gdds_ds = accumGDD_ds.isel(time=np.arange(Nyears))
+gdds_ds = gdds_ds.assign_coords(time=new_dt_axis)
+del gdds_ds["GDDPLANT"]
+
+incl_vegtype_indices = []
+for v, vegtype_str in enumerate(accumGDD_ds.vegtype_str.values):
+    vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+    newVar = f"gdd1_{vegtype_int}"
+    
+    # Get time series for each patch of this type
+    thisCrop_ds = utils.xr_flexsel(accumGDD_ds, vegtype=vegtype_str)
+    thisCrop_da = thisCrop_ds.GDDPLANT
+    if not thisCrop_da.size:
+        continue
+    print(f"{vegtype_str}...")
+    incl_vegtype_indices = incl_vegtype_indices + [v]
+    
+    # Get prescribed harvest dates for these patches
+    lon_points = thisCrop_ds.patches1d_lon.values
+    lat_points = thisCrop_ds.patches1d_lat.values
+    thisCrop_hdates_rx = thisCrop_map_to_patches(lon_points, lat_points, hdates_rx, vegtype_int)
+    # Get "grows across new year?" for these patches
+    thisCrop_gany = thisCrop_map_to_patches(lon_points, lat_points, grows_across_newyear, vegtype_int)
+    
+    # Get the accumulated GDDs at each prescribed harvest date
+    # There's almost certainly a more efficient way to do this than looping through patches!
+    for p in np.arange(thisCrop_hdates_rx.size):
+        thisPatch_da = thisCrop_da.isel(patch=p)
+        thisCell_gdds_da = thisPatch_da.isel(time=np.where(doy==thisCrop_hdates_rx.sel(patch=p).values)[0])
+        if thisCrop_gany[p]:
+            thisCell_gdds_da = thisCell_gdds_da.isel(time=time_indsP1[1:])
+        else:
+            thisCell_gdds_da = thisCell_gdds_da.isel(time=time_indsP1[:-1])
+        
+        # Set to standard datetime axis for outputs
+        thisCell_gdds_da = thisCell_gdds_da.assign_coords(time=new_dt_axis)
+        
+        # Add to new DataArray
+        if p==0:
+            gdds_da = thisCell_gdds_da
+            gdds_da = gdds_da.rename(newVar)
+        else:
+            gdds_da = xr.concat([gdds_da, thisCell_gdds_da], dim="patch")
+        
+    # Change attributes of gdds_da
+    gdds_da = gdds_da.assign_attrs({"long_name": f"GDD harvest target for {vegtype_str}"})
+    del gdds_da.attrs["cell_methods"]
+    
+    # Add to gdds_ds
+    gdds_ds[newVar] = gdds_da
+    
+# Fill NAs with dummy values
+dummy_fill = -1
+gdds_ds = gdds_ds.fillna(dummy_fill)
+
+# Remove unused vegetation types
+gdds_ds = gdds_ds.isel(ivt=incl_vegtype_indices)
+
+# Take mean
+gdds_mean_ds = gdds_ds.mean(dim="time", keep_attrs=True)
+
+
+# %% Grid
+
+# Save map figures to files?
+save_figs = False
+
+def make_map(ax, this_map, this_title): 
+    im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+            this_map, shading="auto",
+            vmin=0)
+    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
+    ax.coastlines()
+    ax.set_title(this_title)
+    plt.colorbar(im1, orientation="horizontal", pad=0.0)
+if save_figs:
+    outdir = indir + "maps/"
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+
+for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
+    vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+    thisVar = f"gdd1_{vegtype_int}"
+    
+    # Grid
+    thisCrop_gridded = utils.grid_one_variable(gdds_mean_ds, thisVar, vegtype=vegtype_int)
+    thisCrop_gridded = thisCrop_gridded.squeeze(drop=True)
+    
+    # Add to Dataset
+    if v==0:
+        gdd_maps_ds = thisCrop_gridded.to_dataset()
+    gdd_maps_ds[thisVar] = thisCrop_gridded
+    gdd_maps_ds[thisVar] = thisCrop_gridded
+    
+    # Make figure    
+    if save_figs:
+        ax = plt.axes(projection=ccrs.PlateCarree())
+        make_map(ax, thisCrop_gridded, vegtype_str)
+        outfile = f"{outdir}/{thisVar}_{vegtype_str}.png"
+        plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+            bbox_inches='tight')
+        plt.close()
