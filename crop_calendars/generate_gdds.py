@@ -10,6 +10,9 @@ my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myf
 # Directory where input file(s) can be found
 indir = "/Users/Shared/CESM_runs/f10_f10_mg37_1850/"
 
+# Directory to save output netCDF
+outdir = "/Users/Shared/CESM_work/crop_dates/"
+
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
@@ -18,6 +21,7 @@ import glob
 import cftime
 import cartopy.crs as ccrs
 from matplotlib import cm
+import datetime as dt
 
 import os
 
@@ -280,3 +284,22 @@ gdd_maps_ds.lon.attrs = {\
 gdd_maps_ds.lat.attrs = {\
     "long_name": "coordinate_latitude",
     "units": "degrees_north"}
+
+
+# %% Save to netCDF
+
+# TRY THIS IF INITIAL FILE DOESN'T WORK: Add one-element time axis (like hdates_rx)
+
+# Add global attributes
+comment = f"Derived from CLM run plus crop calendar input files {os.path.basename(sdate_inFile) and {os.path.basename(hdate_inFile)}}."
+gdd_maps_ds.attrs = {\
+    "author": "Sam Rabin (sam.rabin@gmail.com)",
+    "comment": comment,
+    "created": dt.datetime.now().astimezone().isoformat()
+    }
+
+# Save
+if not os.path.exists(outdir):
+    os.makedirs(outdir)
+outfile = outdir + "gdds_" + dt.datetime.now().strftime("%Y%m%d_%H%M%S") + ".nc"
+gdd_maps_ds.to_netcdf(outfile, format="NETCDF3_CLASSIC")
