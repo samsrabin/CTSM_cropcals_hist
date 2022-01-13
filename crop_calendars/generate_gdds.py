@@ -243,7 +243,10 @@ gdds_mean_ds = gdds_ds.mean(dim="time", keep_attrs=True)
 # %% Grid
 
 # Save map figures to files?
-save_figs = False
+save_figs = True
+
+# Fill value
+fillValue = -1
 
 def make_map(ax, this_map, this_title): 
     im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
@@ -254,16 +257,18 @@ def make_map(ax, this_map, this_title):
     ax.set_title(this_title)
     plt.colorbar(im1, orientation="horizontal", pad=0.0)
 if save_figs:
-    outdir = indir + "maps/"
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
+    outdir_figs = indir + "maps/"
+    if not os.path.exists(outdir_figs):
+        os.makedirs(outdir_figs)
 
 for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
     vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
     thisVar = f"gdd1_{vegtype_int}"
+    print(f"Gridding {vegtype_str}...")
     
     # Grid
-    thisCrop_gridded = utils.grid_one_variable(gdds_mean_ds, thisVar, fillValue=-1, vegtype=vegtype_int)
+    thisCrop_gridded = utils.grid_one_variable(gdds_mean_ds, thisVar, \
+        fillValue=fillValue, vegtype=vegtype_int)
     thisCrop_gridded = thisCrop_gridded.squeeze(drop=True)
     
     # Add to Dataset
@@ -276,7 +281,7 @@ for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
     if save_figs:
         ax = plt.axes(projection=ccrs.PlateCarree())
         make_map(ax, thisCrop_gridded, vegtype_str)
-        outfile = f"{outdir}/{thisVar}_{vegtype_str}.png"
+        outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}.png"
         plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
             bbox_inches='tight')
         plt.close()
@@ -288,6 +293,8 @@ gdd_maps_ds.lon.attrs = {\
 gdd_maps_ds.lat.attrs = {\
     "long_name": "coordinate_latitude",
     "units": "degrees_north"}
+
+print("Done.")
 
 
 # %% Save to netCDF
