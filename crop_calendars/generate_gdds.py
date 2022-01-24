@@ -287,6 +287,19 @@ for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
         plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
             bbox_inches='tight')
         plt.close()
+        
+# Add dummy variables for crops not actually simulated
+# Unnecessary?
+template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
+all_vars = [v.replace("sdate","gdd") for v in template_ds if "sdate" in v]
+all_longnames = [template_ds[v].attrs["long_name"].replace("Planting day ", longname_prefix) + " (dummy)" for v in template_ds if "sdate" in v]
+dummy_vars = [v for v in all_vars if v not in gdd_maps_ds]
+dummy_gridded = thisCrop_gridded
+dummy_gridded.values = dummy_gridded.values*0 - 1
+for v, thisVar in enumerate(dummy_vars):
+    dummy_gridded.name = thisVar
+    dummy_gridded.attrs["long_name"] = all_longnames[v]
+    gdd_maps_ds[thisVar] = dummy_gridded
 
 # Add lon/lat attributes
 gdd_maps_ds.lon.attrs = {\
