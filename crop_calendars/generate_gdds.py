@@ -322,8 +322,11 @@ gdd_maps_ds.attrs = {\
     "created": dt.datetime.now().astimezone().isoformat()
     }
 
-# Save
-gdd_maps_ds.to_netcdf(outfile, format="NETCDF3_CLASSIC")
+# Add time_bounds
+gdd_maps_ds["time_bounds"] = sdates_rx.time_bounds
+
+# Save cultivar GDDs
+gdd_maps_ds.to_netcdf(outfile, mode="a", format="NETCDF3_CLASSIC")
 
     
 
