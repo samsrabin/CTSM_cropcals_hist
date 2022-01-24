@@ -93,7 +93,7 @@ for v in ["SDATES", "HDATES"]:
 print("✅ CLM output sowing and harvest dates do not vary between years.")
 
 
-# %% Import expected sowing dates
+# %% Import expected sowing dates. This will be used as our template output file.
 
 sdate_inFile = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
 
@@ -177,6 +177,7 @@ time_indsP1 = np.arange(Nyears + 1)
 gdds_ds = accumGDD_ds.isel(time=np.arange(Nyears))
 gdds_ds = gdds_ds.assign_coords(time=new_dt_axis)
 del gdds_ds["GDDPLANT"]
+longname_prefix = "GDD harvest target for "
 
 incl_vegtype_indices = []
 for v, vegtype_str in enumerate(accumGDD_ds.vegtype_str.values):
@@ -223,7 +224,7 @@ for v, vegtype_str in enumerate(accumGDD_ds.vegtype_str.values):
             gdds_da = xr.concat([gdds_da, thisCell_gdds_da], dim="patch")
         
     # Change attributes of gdds_da
-    gdds_da = gdds_da.assign_attrs({"long_name": f"GDD harvest target for {vegtype_str}"})
+    gdds_da = gdds_da.assign_attrs({"long_name": f"{longname_prefix}{vegtype_str}"})
     del gdds_da.attrs["cell_methods"]
     
     # Add to gdds_ds
@@ -300,7 +301,18 @@ print("Done.")
 
 # %% Save to netCDF
 
-# TRY THIS IF INITIAL FILE DOESN'T WORK: Add one-element time axis (like hdates_rx)
+# Get output file path
+if not os.path.exists(outdir):
+    os.makedirs(outdir)
+outfile = outdir + "gdds_" + dt.datetime.now().strftime("%Y%m%d_%H%M%S") + ".nc"
+
+# Set up output file from template (i.e., prescribed sowing dates).
+template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
+for v in template_ds:
+    if "sdate" in v:
+        template_ds = template_ds.drop(v)
+template_ds.to_netcdf(path=outfile, format="NETCDF3_CLASSIC")
+template_ds.close()
 
 # Add global attributes
 comment = f"Derived from CLM run plus crop calendar input files {os.path.basename(sdate_inFile) and {os.path.basename(hdate_inFile)}}."
@@ -311,9 +323,6 @@ gdd_maps_ds.attrs = {\
     }
 
 # Save
-if not os.path.exists(outdir):
-    os.makedirs(outdir)
-outfile = outdir + "gdds_" + dt.datetime.now().strftime("%Y%m%d_%H%M%S") + ".nc"
 gdd_maps_ds.to_netcdf(outfile, format="NETCDF3_CLASSIC")
 
     
