@@ -253,6 +253,11 @@ for thiscrop_clm in crop_dict:
         out_ds[varname_clm].attrs["short_name_ggcmi"] = varname_ggcmi
         out_ds[varname_clm].attrs["units"] = "day of year"
         out_ds[varname_clm].encoding["_FillValue"] = new_fillvalue
+        # scale_factor and add_offset are required by I/O library for short data
+        # From https://www.unidata.ucar.edu/software/netcdf/workshops/2010/bestpractices/Packing.html:
+        #    unpacked_value = packed_value * scale_factor + add_offset
+        out_ds[varname_clm].attrs["scale_factor"] = np.int16(1)
+        out_ds[varname_clm].attrs["add_offset"] = np.int16(0)
 
         # Save
         if verbose:
