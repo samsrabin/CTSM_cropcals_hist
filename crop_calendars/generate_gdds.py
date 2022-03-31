@@ -368,7 +368,7 @@ def make_map(ax, this_map, this_title, vmax):
     ax.set_title(this_title)
     plt.colorbar(im1, orientation="horizontal", pad=0.0)
 if save_figs:
-    outdir_figs = indir + "maps/"
+    outdir_figs = indir + "figs/"
     if not os.path.exists(outdir_figs):
         os.makedirs(outdir_figs)
 
@@ -479,6 +479,94 @@ if save_figs:
             bbox_inches='tight')
         plt.close()
     print("Done.")
+
+
+# %% 
+# Save before/after boxplots, if doing so
+# (After https://stackoverflow.com/a/20132614/2965321)
+
+def get_non_nans(in_da, fillValue):
+    in_da = in_da.where(in_da != fillValue)
+    return in_da.values[~np.isnan(in_da.values)]
+
+def set_box_color(bp, color):
+    plt.setp(bp['boxes'], color=color)
+    plt.setp(bp['whiskers'], color=color)
+    plt.setp(bp['caps'], color=color)
+    plt.setp(bp['medians'], color=color)
+
+lat_bin_edges = np.arange(0, 91, 15)
+Nbins = len(lat_bin_edges)-1
+bin_names = ["All"]
+for b in np.arange(Nbins):
+    lower = lat_bin_edges[b]
+    upper = lat_bin_edges[b+1]
+    bin_names.append(f"{lower}–{upper}")
+    
+color_old = '#beaed4'
+color_new = '#7fc97f'
+def make_plot(data, offset):
+    linewidth = 1.5
+    offset = 0.4*offset
+    bpl = plt.boxplot(data, positions=np.array(range(len(data)))*2.0+offset, sym='', widths=0.6, 
+                      boxprops=dict(linewidth=linewidth), whiskerprops=dict(linewidth=linewidth), 
+                      capprops=dict(linewidth=linewidth), medianprops=dict(linewidth=linewidth))
+    return bpl
+
+if save_figs:
+    
+    print("Making before/after boxplots...")
+    for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
+        vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+        thisVar = f"gdd1_{vegtype_int}"
+        print(f"   {vegtype_str} ({vegtype_int})...")
+        
+        gdd_map = gdd_maps_ds[thisVar].isel(time=0, drop=True)
+        gdd_vector = get_non_nans(gdd_map, fillValue)
+        gddharv_map = gddharv_maps_ds[thisVar]
+        gddharv_vector = get_non_nans(gddharv_map, fillValue)
+        
+        # fig = plt.figure(figsize=(12,8))
+        # ax = plt.axes()
+        # plt.boxplot((gddharv_vector, gdd_vector), labels=["Old", "New"])
+        
+        lat_abs = np.abs(gdd_map.lat.values)
+        gdd_bybin_old = [gddharv_vector]
+        gdd_bybin_new = [gdd_vector]
+        for b in np.arange(Nbins):
+            lower = lat_bin_edges[b]
+            upper = lat_bin_edges[b+1]
+            lat_inds = np.where((lat_abs>=lower) & (lat_abs<upper))[0]
+            # gdd_map_thisBin = gdd_map.where(gdd_map.lat>=lower )
+            gdd_vector_thisBin = get_non_nans(gdd_map[lat_inds,:], fillValue)
+            gddharv_vector_thisBin = get_non_nans(gddharv_map[lat_inds,:], fillValue)
+            gdd_bybin_old.append(gddharv_vector_thisBin)
+            gdd_bybin_new.append(gdd_vector_thisBin)
+                
+        plt.figure()
+
+        bpl = make_plot(gdd_bybin_old, -1)
+        bpr = make_plot(gdd_bybin_new, 1)
+        set_box_color(bpl, color_old)
+        set_box_color(bpr, color_new)
+        
+        # draw temporary lines to create a legend
+        plt.plot([], c=color_old, label='Old')
+        plt.plot([], c=color_new, label='New')
+        plt.legend()
+
+        plt.xticks(range(0, len(bin_names) * 2, 2), bin_names)
+        plt.xlabel("|latitude| zone")
+        plt.ylabel("Growing degree-days")
+        plt.title(vegtype_str)
+        
+        outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}_boxplots.png"
+        plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+            bbox_inches='tight')
+        plt.close()
+
+    print("Done.")
+    
 
 # %% Check that all cells that had sdates are represented
 
