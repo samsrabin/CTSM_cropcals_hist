@@ -163,13 +163,22 @@ sdates_grid = utils.grid_one_variable(\
     "SDATES")
 
 all_ok = True
+any_found = False
+vegtypes_skipped = []
+vegtypes_included = []
+print("Checking for matching input and output sdates:")
 for i, vt_str in enumerate(dates_ds.vegtype_str.values):
     
     # Input
     vt = dates_ds.ivt.values[i]
-    thisVar = f"sdate1_{vt}"
+    thisVar = f"gs1_{vt}"
     if thisVar not in sdates_rx:
+        vegtypes_skipped = vegtypes_skipped + [vt_str]
+        # print(f"    {vt_str} ({vt}) SKIPPED...")
         continue
+    vegtypes_included = vegtypes_included + [vt_str]
+    any_found = True
+    print(f"    {vt_str} ({vt})...")
     in_map = sdates_rx[thisVar].squeeze(drop=True)
     
     # Output
@@ -180,7 +189,18 @@ for i, vt_str in enumerate(dates_ds.vegtype_str.values):
     if np.any(diff_map.values[np.invert(np.isnan(diff_map.values))]):
         print(f"Difference(s) found in {vt_str}")
         all_ok = False
-        
+
+if not (any_found):
+    raise RuntimeError("No matching variables found in sdates_rx!")
+
+# Sanity checks for included vegetation types
+vegtypes_skipped = np.unique([x.replace("irrigated_","") for x in vegtypes_skipped])
+vegtypes_skipped_weird = [x for x in vegtypes_skipped if x in vegtypes_included]
+if np.array_equal(vegtypes_included, [x.replace("irrigated_","") for x in vegtypes_included]):
+    print("\nWARNING: No irrigated crops included!!!\n")
+elif vegtypes_skipped_weird:
+    print(f"\nWarning: Some crop types had output rainfed patches but no irrigated patches: {vegtypes_skipped_weird}")
+       
 if all_ok:
     print("✅ Input and output sdates match!")
 
