@@ -430,7 +430,7 @@ print("Done.")
 
 
 # %% 
-# Save before/after map figures, if doing so
+# Save before/after map and boxplot figures, if doing so
 
 def make_map(ax, this_map, this_title, vmax): 
     im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
@@ -440,49 +440,7 @@ def make_map(ax, this_map, this_title, vmax):
     ax.coastlines()
     ax.set_title(this_title)
     plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02)
-
-if save_figs:
     
-    # Maps
-    ny = 2
-    nx = 1
-    print("Making before/after maps...")
-    for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
-        vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
-        thisVar = f"gdd1_{vegtype_int}"
-        print(f"   {vegtype_str} ({vegtype_int})...")
-        
-        gdd_map = gdd_maps_ds[thisVar].isel(time=0, drop=True)
-        gdd_map_yx = gdd_map.where(gdd_map != fillValue)
-        gddharv_map = gddharv_maps_ds[thisVar]
-        gddharv_map_yx = gddharv_map.where(gddharv_map != fillValue)
-                
-        fig = plt.figure(figsize=(12,8))
-        vmax = max(np.max(gdd_map_yx), np.max(gddharv_map_yx))
-        
-        ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
-        thisMin = int(np.round(np.min(gddharv_map_yx)))
-        thisMax = int(np.round(np.max(gddharv_map_yx)))
-        thisTitle = f"{vegtype_str}: Old (range {thisMin}–{thisMax})"
-        make_map(ax, gddharv_map_yx, thisTitle, vmax)
-        
-        ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
-        thisMin = int(np.round(np.min(gdd_map_yx)))
-        thisMax = int(np.round(np.max(gdd_map_yx)))
-        thisTitle = f"{vegtype_str}: New (range {thisMin}–{thisMax})"
-        make_map(ax, gdd_map_yx, thisTitle, vmax)
-
-        outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}.png"
-        plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
-            bbox_inches='tight')
-        plt.close()
-    print("Done.")
-
-
-# %% 
-# Save before/after boxplots, if doing so
-# (After https://stackoverflow.com/a/20132614/2965321)
-
 def get_non_nans(in_da, fillValue):
     in_da = in_da.where(in_da != fillValue)
     return in_da.values[~np.isnan(in_da.values)]
@@ -513,20 +471,45 @@ def make_plot(data, offset):
 
 if save_figs:
     
-    print("Making before/after boxplots...")
+    # Maps
+    ny = 3
+    nx = 1
+    print("Making before/after maps...")
     for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         thisVar = f"gdd1_{vegtype_int}"
         print(f"   {vegtype_str} ({vegtype_int})...")
         
-        gdd_map = gdd_maps_ds[thisVar].isel(time=0, drop=True)
-        gdd_vector = get_non_nans(gdd_map, fillValue)
-        gddharv_map = gddharv_maps_ds[thisVar]
-        gddharv_vector = get_non_nans(gddharv_map, fillValue)
         
+        # Maps #####################
+        
+        gdd_map = gdd_maps_ds[thisVar].isel(time=0, drop=True)
+        gdd_map_yx = gdd_map.where(gdd_map != fillValue)
+        gddharv_map = gddharv_maps_ds[thisVar]
+        gddharv_map_yx = gddharv_map.where(gddharv_map != fillValue)
+                
         # fig = plt.figure(figsize=(12,8))
-        # ax = plt.axes()
-        # plt.boxplot((gddharv_vector, gdd_vector), labels=["Old", "New"])
+        # fig = plt.figure(figsize=(18,32))
+        fig = plt.figure(figsize=(7.5,14))
+        vmax = max(np.max(gdd_map_yx), np.max(gddharv_map_yx))
+        
+        ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
+        thisMin = int(np.round(np.min(gddharv_map_yx)))
+        thisMax = int(np.round(np.max(gddharv_map_yx)))
+        thisTitle = f"{vegtype_str}: Old (range {thisMin}–{thisMax})"
+        make_map(ax, gddharv_map_yx, thisTitle, vmax)
+        
+        ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
+        thisMin = int(np.round(np.min(gdd_map_yx)))
+        thisMax = int(np.round(np.max(gdd_map_yx)))
+        thisTitle = f"{vegtype_str}: New (range {thisMin}–{thisMax})"
+        make_map(ax, gdd_map_yx, thisTitle, vmax)
+        
+        
+        # Boxplots #####################
+        
+        gdd_vector = get_non_nans(gdd_map, fillValue)
+        gddharv_vector = get_non_nans(gddharv_map, fillValue)
         
         lat_abs = np.abs(gdd_map.lat.values)
         gdd_bybin_old = [gddharv_vector]
@@ -541,7 +524,7 @@ if save_figs:
             gdd_bybin_old.append(gddharv_vector_thisBin)
             gdd_bybin_new.append(gdd_vector_thisBin)
                 
-        plt.figure()
+        ax = fig.add_subplot(ny,nx,3)
 
         bpl = make_plot(gdd_bybin_old, -1)
         bpr = make_plot(gdd_bybin_new, 1)
@@ -558,7 +541,7 @@ if save_figs:
         plt.ylabel("Growing degree-days")
         plt.title(vegtype_str)
         
-        outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}_boxplots.png"
+        outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}.png"
         plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
             bbox_inches='tight')
         plt.close()
