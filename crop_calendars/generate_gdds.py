@@ -396,37 +396,13 @@ for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
     if v==0:
         gdd_maps_ds = thisCrop_gridded.to_dataset()
         gdd_fill0_maps_ds = thisCrop_fill0_gridded.to_dataset()
+        if save_figs:
+            gddharv_maps_ds = gddharv_gridded.to_dataset()
     gdd_maps_ds[thisVar] = thisCrop_gridded
     gdd_fill0_maps_ds[thisVar] = thisCrop_fill0_gridded
-    
-    # Make figure
     if save_figs:
-        fig = plt.figure(figsize=(12,8))
-        ny = 2
-        nx = 1
-        
-        gdd_map = thisCrop_gridded.isel(time=0, drop=True)
-        gdd_map_yx = gdd_map.where(gdd_map != fillValue)
-        gddharv_map_yx = gddharv_gridded.where(gddharv_gridded != fillValue)
-        vmax = max(np.max(gdd_map_yx), np.max(gddharv_map_yx))
-        
-        ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
-        thisMin = int(np.round(np.min(gddharv_map_yx)))
-        thisMax = int(np.round(np.max(gddharv_map_yx)))
-        thisTitle = f"{vegtype_str}: Old (range {thisMin}–{thisMax})"
-        make_map(ax, gddharv_map_yx, thisTitle, vmax)
-        
-        ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
-        thisMin = int(np.round(np.min(gdd_map_yx)))
-        thisMax = int(np.round(np.max(gdd_map_yx)))
-        thisTitle = f"{vegtype_str}: New (range {thisMin}–{thisMax})"
-        make_map(ax, gdd_map_yx, thisTitle, vmax)
-
-        outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}.png"
-        plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
-            bbox_inches='tight')
-        plt.close()
-
+        gddharv_maps_ds[thisVar] = gddharv_gridded
+    
 # Add dummy variables for crops not actually simulated
 # Unnecessary?
 template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
@@ -459,9 +435,50 @@ def add_lonlat_attrs(ds):
     return ds
 gdd_maps_ds = add_lonlat_attrs(gdd_maps_ds)
 gdd_fill0_maps_ds = add_lonlat_attrs(gdd_fill0_maps_ds)
+gddharv_maps_ds = add_lonlat_attrs(gddharv_maps_ds)
 
 print("Done.")
 
+
+# %% 
+# Save before/after map figures, if doing so
+
+if save_figs:
+    
+    # Maps
+    ny = 2
+    nx = 1
+    print("Making before/after maps...")
+    for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
+        vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+        thisVar = f"gdd1_{vegtype_int}"
+        print(f"   {vegtype_str} ({vegtype_int})...")
+        
+        gdd_map = gdd_maps_ds[thisVar].isel(time=0, drop=True)
+        gdd_map_yx = gdd_map.where(gdd_map != fillValue)
+        gddharv_map = gddharv_maps_ds[thisVar]
+        gddharv_map_yx = gddharv_map.where(gddharv_map != fillValue)
+                
+        fig = plt.figure(figsize=(12,8))
+        vmax = max(np.max(gdd_map_yx), np.max(gddharv_map_yx))
+        
+        ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
+        thisMin = int(np.round(np.min(gddharv_map_yx)))
+        thisMax = int(np.round(np.max(gddharv_map_yx)))
+        thisTitle = f"{vegtype_str}: Old (range {thisMin}–{thisMax})"
+        make_map(ax, gddharv_map_yx, thisTitle, vmax)
+        
+        ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
+        thisMin = int(np.round(np.min(gdd_map_yx)))
+        thisMax = int(np.round(np.max(gdd_map_yx)))
+        thisTitle = f"{vegtype_str}: New (range {thisMin}–{thisMax})"
+        make_map(ax, gdd_map_yx, thisTitle, vmax)
+
+        outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}.png"
+        plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+            bbox_inches='tight')
+        plt.close()
+    print("Done.")
 
 # %% Check that all cells that had sdates are represented
 
