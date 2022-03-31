@@ -286,7 +286,9 @@ for v, vegtype_str in enumerate(accumGDD_ds.vegtype_str.values):
     del gdds_da.attrs["cell_methods"]
     
     # Add to gdds_ds
-    gdds_ds[newVar] = gdds_da
+    warnings.filterwarnings("ignore", message="Increasing number of chunks by factor of 30")
+    with warnings.catch_warnings():
+        gdds_ds[newVar] = gdds_da
     
 # Fill NAs with dummy values
 dummy_fill = -1
