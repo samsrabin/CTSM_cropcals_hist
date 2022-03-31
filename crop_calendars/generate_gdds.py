@@ -42,17 +42,17 @@ warnings.filterwarnings("ignore", message="Iteration over multi-part geometries 
 def import_rx_dates(s_or_h, date_inFile, dates_ds):
     # Get run info:
     # Max number of growing seasons per year
-    if "mxgrowseas" in dates_ds:
-        mxgrowseas = dates_ds.dims["mxgrowseas"]
+    if "mxsowings" in dates_ds:
+        mxsowings = dates_ds.dims["mxsowings"]
     else:
-        mxgrowseas = 1
+        mxsowings = 1
         
     # Which vegetation types were simulated?
     itype_veg_toImport = np.unique(dates_ds.patches1d_itype_veg)
 
     date_varList = []
     for i in itype_veg_toImport:
-        for g in np.arange(mxgrowseas):
+        for g in np.arange(mxsowings):
             thisVar = f"{s_or_h}date{g+1}_{i}"
             date_varList = date_varList + [thisVar]
 
@@ -465,7 +465,7 @@ for vt_str in vegtypes_included:
     # print(f"{vt_int}: {vt_str}")
     
     map_gdd = gdd_maps_ds[f"gdd1_{vt_int}"].isel(time=0, drop=True)
-    map_sdate = sdates_grid.isel(time=0, mxgrowseas=0, drop=True).sel(ivt_str=vt_str, drop=True)
+    map_sdate = sdates_grid.isel(time=0, mxsowings=0, drop=True).sel(ivt_str=vt_str, drop=True)
     
     ok_gdd = map_gdd.where(map_gdd >= 0).notnull()
     ok_sdate = map_sdate.where(map_sdate > 0).notnull()
