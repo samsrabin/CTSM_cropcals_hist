@@ -18,6 +18,10 @@ indir = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-03-30/"
 
 # Directory to save output netCDF
 outdir = "/Users/Shared/CESM_work/crop_dates/"
+if save_figs:
+    outdir_figs = indir + "figs/"
+    if not os.path.exists(outdir_figs):
+        os.makedirs(outdir_figs)
 
 import numpy as np
 import xarray as xr
@@ -357,21 +361,6 @@ if save_figs:
 # Fill value
 fillValue = -1
 
-# Variable name prefix
-
-def make_map(ax, this_map, this_title, vmax): 
-    im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
-            this_map, shading="auto",
-            vmin=0, vmax=vmax)
-    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
-    ax.coastlines()
-    ax.set_title(this_title)
-    plt.colorbar(im1, orientation="horizontal", pad=0.0)
-if save_figs:
-    outdir_figs = indir + "figs/"
-    if not os.path.exists(outdir_figs):
-        os.makedirs(outdir_figs)
-
 for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
     vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
     thisVar = f"gdd1_{vegtype_int}"
@@ -442,6 +431,15 @@ print("Done.")
 
 # %% 
 # Save before/after map figures, if doing so
+
+def make_map(ax, this_map, this_title, vmax): 
+    im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+            this_map, shading="auto",
+            vmin=0, vmax=vmax)
+    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
+    ax.coastlines()
+    ax.set_title(this_title)
+    plt.colorbar(im1, orientation="horizontal", pad=0.0)
 
 if save_figs:
     
