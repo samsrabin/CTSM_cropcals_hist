@@ -4,6 +4,9 @@
 y1 = 1980
 yN = 2009
 
+# Save map figures to files?
+save_figs = True
+
 # Your path to ctsm_py directory (i.e., where utils.py lives)
 my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
 
@@ -228,12 +231,16 @@ yN_import_str = f"{yN+1}-12-31"
 
 print(f"Importing netCDF time steps {y1_import_str} through {yN_import_str}")
 
-accumGDD_ds = utils.import_ds(glob.glob(indir + "*h1.*"), \
-    myVars=[clm_gdd_var], 
+myVars = [clm_gdd_var]
+if save_figs:
+    myVars = myVars.append("GDDHARV")
+
+h1_ds = utils.import_ds(glob.glob(indir + "*h1.*"), \
+    myVars=myVars, 
     myVegtypes=utils.define_mgdcrop_list(),
     timeSlice=slice(y1_import_str, yN_import_str))
 
-if not np.any(accumGDD_ds[clm_gdd_var].values != 0):
+if not np.any(h1_ds[clm_gdd_var].values != 0):
     raise RuntimeError(f"All {clm_gdd_var} values are zero!")
 
 
@@ -243,10 +250,10 @@ import cftime
 
 # Get day of year for each day in time axis
 # doy = [t.timetuple().tm_yday for t in accumGDD_ds.time.values]
-doy = np.array([t.timetuple().tm_yday for t in accumGDD_ds.time.values])
+doy = np.array([t.timetuple().tm_yday for t in h1_ds.time.values])
 
 # Get standard datetime axis for outputs
-t1 = accumGDD_ds.time.values[0]
+t1 = h1_ds.time.values[0]
 Nyears = yN - y1 + 1
 new_dt_axis = np.array([cftime.datetime(y, 1, 1, 
                                calendar=t1.calendar,
@@ -254,36 +261,21 @@ new_dt_axis = np.array([cftime.datetime(y, 1, 1,
                for y in np.arange(y1, yN+1)])
 time_indsP1 = np.arange(Nyears + 1)
 
-# Set up output Dataset
-gdds_ds = accumGDD_ds.isel(time=np.arange(Nyears))
-gdds_ds = gdds_ds.assign_coords(time=new_dt_axis)
-del gdds_ds[clm_gdd_var]
+# Set up output Dataset(s)
+def setup_output_ds(in_ds, thisVar, Nyears, new_dt_axis):
+    out_ds = in_ds.isel(time=np.arange(Nyears))
+    out_ds = out_ds.assign_coords(time=new_dt_axis)
+    del out_ds[thisVar]
+    return out_ds
+gddaccum_ds = setup_output_ds(h1_ds, clm_gdd_var, Nyears, new_dt_axis)
 longname_prefix = "GDD harvest target for "
-
-incl_vegtype_indices = []
-for v, vegtype_str in enumerate(accumGDD_ds.vegtype_str.values):
-    vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
-    newVar = f"gdd1_{vegtype_int}"
+if save_figs:
+    gddharv_ds = setup_output_ds(h1_ds, "GDDHARV", Nyears, new_dt_axis)
     
-    # Get time series for each patch of this type
-    thisCrop_ds = utils.xr_flexsel(accumGDD_ds, vegtype=vegtype_str)
-    thisCrop_da = thisCrop_ds[clm_gdd_var]
-    if not thisCrop_da.size:
-        continue
-    print(f"{vegtype_str}...")
-    incl_vegtype_indices = incl_vegtype_indices + [v]
-    
-    # Get prescribed harvest dates for these patches
-    lon_points = thisCrop_ds.patches1d_lon.values
-    lat_points = thisCrop_ds.patches1d_lat.values
-    thisCrop_hdates_rx = thisCrop_map_to_patches(lon_points, lat_points, hdates_rx, vegtype_int)
-    # Get "grows across new year?" for these patches
-    thisCrop_gany = thisCrop_map_to_patches(lon_points, lat_points, grows_across_newyear, vegtype_int)
-    
-    # Get the accumulated GDDs at each prescribed harvest date
+def get_values_at_harvest(thisCrop_hdates_rx, in_da, time_indsP1, new_dt_axis, newVar):
     # There's almost certainly a more efficient way to do this than looping through patches!
     for p in np.arange(thisCrop_hdates_rx.size):
-        thisPatch_da = thisCrop_da.isel(patch=p)
+        thisPatch_da = in_da.isel(patch=p)
         
         # Extract time range of interest plus extra year for cells where growing season crosses the new year
         thisCell_gdds_da = thisPatch_da.isel(time=np.where(doy==thisCrop_hdates_rx.sel(patch=p).values)[0])
@@ -299,10 +291,39 @@ for v, vegtype_str in enumerate(accumGDD_ds.vegtype_str.values):
         
         # Add to new DataArray
         if p==0:
-            gdds_da = thisCell_gdds_da
-            gdds_da = gdds_da.rename(newVar)
+            out_da = thisCell_gdds_da
+            out_da = out_da.rename(newVar)
         else:
-            gdds_da = xr.concat([gdds_da, thisCell_gdds_da], dim="patch")
+            out_da = xr.concat([out_da, thisCell_gdds_da], dim="patch")
+        
+    return out_da
+
+incl_vegtype_indices = []
+for v, vegtype_str in enumerate(h1_ds.vegtype_str.values):
+    vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+    newVar = f"gdd1_{vegtype_int}"
+    
+    # Get time series for each patch of this type
+    thisCrop_ds = utils.xr_flexsel(h1_ds, vegtype=vegtype_str)
+    thisCrop_da = thisCrop_ds[clm_gdd_var]
+    if not thisCrop_da.size:
+        continue
+    print(f"{vegtype_str}...")
+    incl_vegtype_indices = incl_vegtype_indices + [v]
+    
+    # Get prescribed harvest dates for these patches
+    lon_points = thisCrop_ds.patches1d_lon.values
+    lat_points = thisCrop_ds.patches1d_lat.values
+    thisCrop_hdates_rx = thisCrop_map_to_patches(lon_points, lat_points, hdates_rx, vegtype_int)
+    # Get "grows across new year?" for these patches
+    thisCrop_gany = thisCrop_map_to_patches(lon_points, lat_points, grows_across_newyear, vegtype_int)
+    
+    # Get the accumulated GDDs at each prescribed harvest date
+    gdds_da = get_values_at_harvest(thisCrop_hdates_rx, thisCrop_da, time_indsP1, new_dt_axis, newVar)
+    
+    # Import previous GDD requirements for harvest
+    if save_figs:
+        gddharv_da = get_values_at_harvest(thisCrop_hdates_rx, thisCrop_ds["GDDHARV"], time_indsP1, new_dt_axis, newVar)
         
     # Change attributes of gdds_da
     gdds_da = gdds_da.assign_attrs({"long_name": f"{longname_prefix}{vegtype_str}"})
@@ -311,36 +332,37 @@ for v, vegtype_str in enumerate(accumGDD_ds.vegtype_str.values):
     # Add to gdds_ds
     warnings.filterwarnings("ignore", message="Increasing number of chunks by factor of 30")
     with warnings.catch_warnings():
-        gdds_ds[newVar] = gdds_da
+        gddaccum_ds[newVar] = gdds_da
+        if save_figs:
+            gddharv_ds[newVar] = gddharv_da
     
 # Fill NAs with dummy values
 dummy_fill = -1
-gdds_fill0_ds = gdds_ds.fillna(0)
-gdds_ds = gdds_ds.fillna(dummy_fill)
+gdds_fill0_ds = gddaccum_ds.fillna(0)
+gddaccum_ds = gddaccum_ds.fillna(dummy_fill)
 
 # Remove unused vegetation types
-gdds_ds = gdds_ds.isel(ivt=incl_vegtype_indices)
+gddaccum_ds = gddaccum_ds.isel(ivt=incl_vegtype_indices)
 gdds_fill0_ds = gdds_fill0_ds.isel(ivt=incl_vegtype_indices)
 
 # Take mean
-gdds_mean_ds = gdds_ds.mean(dim="time", keep_attrs=True)
+gdds_mean_ds = gddaccum_ds.mean(dim="time", keep_attrs=True)
 gdds_fill0_mean_ds = gdds_fill0_ds.mean(dim="time", keep_attrs=True)
+if save_figs:
+    gddharv_mean_ds = gddharv_ds.mean(dim="time", keep_attrs=True)
 
 
 # %% Grid
-
-# Save map figures to files?
-save_figs = True
 
 # Fill value
 fillValue = -1
 
 # Variable name prefix
 
-def make_map(ax, this_map, this_title): 
+def make_map(ax, this_map, this_title, vmax): 
     im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
             this_map, shading="auto",
-            vmin=0)
+            vmin=0, vmax=vmax)
     ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
     ax.coastlines()
     ax.set_title(this_title)
@@ -362,6 +384,9 @@ for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
         vegtype=vegtype_int).squeeze(drop=True)
     thisCrop_fill0_gridded = thisCrop_fill0_gridded.fillna(0)
     thisCrop_fill0_gridded.attrs["_FillValue"] = fillValue
+    if save_figs:
+        gddharv_gridded = utils.grid_one_variable(gddharv_mean_ds, thisVar, \
+            fillValue=fillValue, vegtype=vegtype_int).squeeze(drop=True)
     
     # Add singleton time dimension
     thisCrop_gridded = thisCrop_gridded.expand_dims(time = sdates_rx.time)
@@ -376,10 +401,21 @@ for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
     
     # Make figure
     if save_figs:
-        ax = plt.axes(projection=ccrs.PlateCarree())
-        thisCrop_map = thisCrop_gridded.isel(time=0, drop=True)
-        map_yx = thisCrop_map.where(thisCrop_map != fillValue)
-        make_map(ax, map_yx, vegtype_str)
+        fig = plt.figure(figsize=(12,8))
+        ny = 2
+        nx = 1
+        
+        gdd_map = thisCrop_gridded.isel(time=0, drop=True)
+        gdd_map_yx = gdd_map.where(gdd_map != fillValue)
+        gddharv_map_yx = gddharv_gridded.where(gddharv_gridded != fillValue)
+        vmax = max(np.max(gdd_map_yx), np.max(gddharv_map_yx))
+        
+        ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
+        make_map(ax, gddharv_map_yx, f"{vegtype_str}: Old", vmax)
+        
+        ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
+        make_map(ax, gdd_map_yx, f"{vegtype_str}: New", vmax)
+        
         outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}.png"
         plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
             bbox_inches='tight')
