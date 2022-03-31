@@ -411,11 +411,17 @@ for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
         vmax = max(np.max(gdd_map_yx), np.max(gddharv_map_yx))
         
         ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
-        make_map(ax, gddharv_map_yx, f"{vegtype_str}: Old", vmax)
+        thisMin = int(np.round(np.min(gddharv_map_yx)))
+        thisMax = int(np.round(np.max(gddharv_map_yx)))
+        thisTitle = f"{vegtype_str}: Old (range {thisMin}–{thisMax})"
+        make_map(ax, gddharv_map_yx, thisTitle, vmax)
         
         ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
-        make_map(ax, gdd_map_yx, f"{vegtype_str}: New", vmax)
-        
+        thisMin = int(np.round(np.min(gdd_map_yx)))
+        thisMax = int(np.round(np.max(gdd_map_yx)))
+        thisTitle = f"{vegtype_str}: New (range {thisMin}–{thisMax})"
+        make_map(ax, gdd_map_yx, thisTitle, vmax)
+
         outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}.png"
         plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
             bbox_inches='tight')
