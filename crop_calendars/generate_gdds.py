@@ -439,7 +439,7 @@ def make_map(ax, this_map, this_title, vmax):
     ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
     ax.coastlines()
     ax.set_title(this_title)
-    plt.colorbar(im1, orientation="horizontal", pad=0.0)
+    plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02)
 
 if save_figs:
     
