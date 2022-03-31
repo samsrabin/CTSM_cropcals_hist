@@ -1,6 +1,6 @@
 # %% Setup
 
-# Years of interest
+# Years of interest (do not include extra year needed for finishing last growing season)
 y1 = 1980
 yN = 2009
 
@@ -8,7 +8,10 @@ yN = 2009
 my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
 
 # Directory where input file(s) can be found (figure files will be saved in subdir here)
-indir = "/Users/Shared/CESM_runs/f10_f10_mg37_1850/"
+# indir = "/Users/Shared/CESM_runs/f10_f10_mg37_1850/"
+# indir = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-03-29/"
+# indir = "/Users/Shared/CESM_runs/f10_f10_mg37/tmp/"
+indir = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-03-30/"
 
 # Directory to save output netCDF
 outdir = "/Users/Shared/CESM_work/crop_dates/"
@@ -312,13 +315,16 @@ for v, vegtype_str in enumerate(accumGDD_ds.vegtype_str.values):
     
 # Fill NAs with dummy values
 dummy_fill = -1
+gdds_fill0_ds = gdds_ds.fillna(0)
 gdds_ds = gdds_ds.fillna(dummy_fill)
 
 # Remove unused vegetation types
 gdds_ds = gdds_ds.isel(ivt=incl_vegtype_indices)
+gdds_fill0_ds = gdds_fill0_ds.isel(ivt=incl_vegtype_indices)
 
 # Take mean
 gdds_mean_ds = gdds_ds.mean(dim="time", keep_attrs=True)
+gdds_fill0_mean_ds = gdds_fill0_ds.mean(dim="time", keep_attrs=True)
 
 
 # %% Grid
@@ -328,6 +334,8 @@ save_figs = True
 
 # Fill value
 fillValue = -1
+
+# Variable name prefix
 
 def make_map(ax, this_map, this_title): 
     im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
@@ -345,51 +353,102 @@ if save_figs:
 for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
     vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
     thisVar = f"gdd1_{vegtype_int}"
-    print(f"Gridding {vegtype_str}...")
+    print(f"Gridding {vegtype_str} ({vegtype_int})...")
     
     # Grid
     thisCrop_gridded = utils.grid_one_variable(gdds_mean_ds, thisVar, \
-        fillValue=fillValue, vegtype=vegtype_int)
-    thisCrop_gridded = thisCrop_gridded.squeeze(drop=True)
+        fillValue=fillValue, vegtype=vegtype_int).squeeze(drop=True)
+    thisCrop_fill0_gridded = utils.grid_one_variable(gdds_fill0_mean_ds, thisVar, \
+        vegtype=vegtype_int).squeeze(drop=True)
+    thisCrop_fill0_gridded = thisCrop_fill0_gridded.fillna(0)
+    thisCrop_fill0_gridded.attrs["_FillValue"] = fillValue
+    
+    # Add singleton time dimension
+    thisCrop_gridded = thisCrop_gridded.expand_dims(time = sdates_rx.time)
+    thisCrop_fill0_gridded = thisCrop_fill0_gridded.expand_dims(time = sdates_rx.time)
     
     # Add to Dataset
     if v==0:
         gdd_maps_ds = thisCrop_gridded.to_dataset()
+        gdd_fill0_maps_ds = thisCrop_fill0_gridded.to_dataset()
     gdd_maps_ds[thisVar] = thisCrop_gridded
-    gdd_maps_ds[thisVar] = thisCrop_gridded
+    gdd_fill0_maps_ds[thisVar] = thisCrop_fill0_gridded
     
-    # Make figure    
+    # Make figure
     if save_figs:
         ax = plt.axes(projection=ccrs.PlateCarree())
-        map_yx = thisCrop_gridded.where(thisCrop_gridded != fillValue)
+        thisCrop_map = thisCrop_gridded.isel(time=0, drop=True)
+        map_yx = thisCrop_map.where(thisCrop_map != fillValue)
         make_map(ax, map_yx, vegtype_str)
         outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}.png"
         plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
             bbox_inches='tight')
         plt.close()
-        
+
 # Add dummy variables for crops not actually simulated
 # Unnecessary?
 template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
 all_vars = [v.replace("sdate","gdd") for v in template_ds if "sdate" in v]
 all_longnames = [template_ds[v].attrs["long_name"].replace("Planting day ", longname_prefix) + " (dummy)" for v in template_ds if "sdate" in v]
 dummy_vars = [v for v in all_vars if v not in gdd_maps_ds]
-dummy_gridded = thisCrop_gridded
-dummy_gridded.values = dummy_gridded.values*0 - 1
+def make_dummy(thisCrop_gridded, addend):
+    dummy_gridded = thisCrop_gridded
+    dummy_gridded.values = dummy_gridded.values*0 + addend
+    return dummy_gridded
+dummy_gridded = make_dummy(thisCrop_gridded, -1)
+dummy_gridded0 = make_dummy(thisCrop_fill0_gridded, 0)
+
 for v, thisVar in enumerate(dummy_vars):
     dummy_gridded.name = thisVar
     dummy_gridded.attrs["long_name"] = all_longnames[v]
     gdd_maps_ds[thisVar] = dummy_gridded
+    dummy_gridded0.name = thisVar
+    dummy_gridded0.attrs["long_name"] = all_longnames[v]
+    gdd_fill0_maps_ds[thisVar] = dummy_gridded0
 
 # Add lon/lat attributes
-gdd_maps_ds.lon.attrs = {\
-    "long_name": "coordinate_longitude",
-    "units": "degrees_east"}
-gdd_maps_ds.lat.attrs = {\
-    "long_name": "coordinate_latitude",
-    "units": "degrees_north"}
+def add_lonlat_attrs(ds):
+    ds.lon.attrs = {\
+        "long_name": "coordinate_longitude",
+        "units": "degrees_east"}
+    ds.lat.attrs = {\
+        "long_name": "coordinate_latitude",
+        "units": "degrees_north"}
+    return ds
+gdd_maps_ds = add_lonlat_attrs(gdd_maps_ds)
+gdd_fill0_maps_ds = add_lonlat_attrs(gdd_fill0_maps_ds)
 
 print("Done.")
+
+
+# %% Check that all cells that had sdates are represented
+
+all_ok = True
+for vt_str in vegtypes_included:
+    vt_int = utils.ivt_str2int(vt_str)
+    # print(f"{vt_int}: {vt_str}")
+    
+    map_gdd = gdd_maps_ds[f"gdd1_{vt_int}"].isel(time=0, drop=True)
+    map_sdate = sdates_grid.isel(time=0, mxgrowseas=0, drop=True).sel(ivt_str=vt_str, drop=True)
+    
+    ok_gdd = map_gdd.where(map_gdd >= 0).notnull()
+    ok_sdate = map_sdate.where(map_sdate > 0).notnull()
+    missing_both = np.bitwise_and(np.bitwise_not(ok_gdd), np.bitwise_not(ok_sdate))
+    ok_both = np.bitwise_and(ok_gdd, ok_sdate)
+    ok_both = np.bitwise_or(ok_both, missing_both)
+    if np.any(np.bitwise_not(ok_both)):
+        all_ok = False
+        gdd_butnot_sdate = np.bitwise_and(ok_gdd, np.bitwise_not(ok_sdate))
+        sdate_butnot_gdd = np.bitwise_and(ok_sdate, np.bitwise_not(ok_gdd))
+        if np.any(gdd_butnot_sdate):
+            print(f"{vt_int} {vt_str}: {np.sum(gdd_butnot_sdate)} cells in GDD but not sdate")
+        if np.any(sdate_butnot_gdd):
+            print(f"{vt_int} {vt_str}: {np.sum(sdate_butnot_gdd)} cells in sdate but not GDD")
+
+if not all_ok:
+    print("❌ Mismatch between sdate and GDD outputs")
+else:
+    print("✅ All sdates have GDD and vice versa")
 
 
 # %% Save to netCDF
@@ -397,31 +456,36 @@ print("Done.")
 # Get output file path
 if not os.path.exists(outdir):
     os.makedirs(outdir)
-outfile = outdir + "gdds_" + dt.datetime.now().strftime("%Y%m%d_%H%M%S") + ".nc"
+datestr = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+outfile = outdir + "gdds_" + datestr + ".nc"
+outfile_fill0 = outdir + "gdds_fill0_" + datestr + ".nc"
 
-# Set up output file from template (i.e., prescribed sowing dates).
-template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
-for v in template_ds:
-    if "sdate" in v:
-        template_ds = template_ds.drop(v)
-template_ds.to_netcdf(path=outfile, format="NETCDF3_CLASSIC")
-template_ds.close()
+def save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx):
+    # Set up output file from template (i.e., prescribed sowing dates).
+    template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
+    for v in template_ds:
+        if "sdate" in v:
+            template_ds = template_ds.drop(v)
+    template_ds.to_netcdf(path=outfile, format="NETCDF3_CLASSIC")
+    template_ds.close()
 
-# Add global attributes
-comment = f"Derived from CLM run plus crop calendar input files {os.path.basename(sdate_inFile) and {os.path.basename(hdate_inFile)}}."
-gdd_maps_ds.attrs = {\
-    "author": "Sam Rabin (sam.rabin@gmail.com)",
-    "comment": comment,
-    "created": dt.datetime.now().astimezone().isoformat()
-    }
+    # Add global attributes
+    comment = f"Derived from CLM run plus crop calendar input files {os.path.basename(sdate_inFile) and {os.path.basename(hdate_inFile)}}."
+    gdd_maps_ds.attrs = {\
+        "author": "Sam Rabin (sam.rabin@gmail.com)",
+        "comment": comment,
+        "created": dt.datetime.now().astimezone().isoformat()
+        }
 
-# Add time_bounds
-gdd_maps_ds["time_bounds"] = sdates_rx.time_bounds
+    # Add time_bounds
+    gdd_maps_ds["time_bounds"] = sdates_rx.time_bounds
 
-# Save cultivar GDDs
-gdd_maps_ds.to_netcdf(outfile, mode="a", format="NETCDF3_CLASSIC")
+    # Save cultivar GDDs
+    gdd_maps_ds.to_netcdf(outfile, mode="a", format="NETCDF3_CLASSIC")
 
-    
+save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx)
+save_gdds(sdate_inFile, hdate_inFile, outfile_fill0, gdd_fill0_maps_ds, sdates_rx)
+
 
 # %% Misc.
 
