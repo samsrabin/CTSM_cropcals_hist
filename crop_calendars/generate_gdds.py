@@ -432,7 +432,10 @@ print("Done.")
 # %% 
 # Save before/after map and boxplot figures, if doing so
 
-def make_map(ax, this_map, this_title, vmax): 
+bin_width = 15
+lat_bin_edges = np.arange(0, 91, bin_width)
+
+def make_map(ax, this_map, this_title, vmax, bin_width): 
     im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
             this_map, shading="auto",
             vmin=0, vmax=vmax)
@@ -440,6 +443,13 @@ def make_map(ax, this_map, this_title, vmax):
     ax.coastlines()
     ax.set_title(this_title)
     plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02)
+    
+    ticks = np.arange(-90, 91, bin_width)
+    ticklabels = [str(x) for x in ticks]
+    for i,x in enumerate(ticks):
+        if x%2:
+            ticklabels[i] = ''
+    plt.yticks(np.arange(-90,91,15), labels=ticklabels)
     
 def get_non_nans(in_da, fillValue):
     in_da = in_da.where(in_da != fillValue)
@@ -451,7 +461,6 @@ def set_box_color(bp, color):
     plt.setp(bp['caps'], color=color)
     plt.setp(bp['medians'], color=color)
 
-lat_bin_edges = np.arange(0, 91, 15)
 Nbins = len(lat_bin_edges)-1
 bin_names = ["All"]
 for b in np.arange(Nbins):
@@ -497,13 +506,13 @@ if save_figs:
         thisMin = int(np.round(np.min(gddharv_map_yx)))
         thisMax = int(np.round(np.max(gddharv_map_yx)))
         thisTitle = f"{vegtype_str}: Old (range {thisMin}–{thisMax})"
-        make_map(ax, gddharv_map_yx, thisTitle, vmax)
+        make_map(ax, gddharv_map_yx, thisTitle, vmax, bin_width)
         
         ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
         thisMin = int(np.round(np.min(gdd_map_yx)))
         thisMax = int(np.round(np.max(gdd_map_yx)))
         thisTitle = f"{vegtype_str}: New (range {thisMin}–{thisMax})"
-        make_map(ax, gdd_map_yx, thisTitle, vmax)
+        make_map(ax, gdd_map_yx, thisTitle, vmax, bin_width)
         
         
         # Boxplots #####################
