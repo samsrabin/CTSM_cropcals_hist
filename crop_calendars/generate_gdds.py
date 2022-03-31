@@ -197,6 +197,8 @@ grows_across_newyear = hdates_rx < sdates_rx
 
 # %% Import accumulated GDDs
 
+clm_gdd_var = "GDDACCUM"
+
 # Keep 1 extra year to avoid incomplete final growing season for crops harvested after Dec. 31.
 y1_import_str = f"{y1}-01-01"
 yN_import_str = f"{yN+1}-12-31"
@@ -204,12 +206,12 @@ yN_import_str = f"{yN+1}-12-31"
 print(f"Importing netCDF time steps {y1_import_str} through {yN_import_str}")
 
 accumGDD_ds = utils.import_ds(glob.glob(indir + "*h1.*"), \
-    myVars=["GDDPLANT"], 
+    myVars=[clm_gdd_var], 
     myVegtypes=utils.define_mgdcrop_list(),
     timeSlice=slice(y1_import_str, yN_import_str))
 
-if not np.any(accumGDD_ds.GDDPLANT.values != 0):
-    raise RuntimeError("All GDDPLANT values are zero!")
+if not np.any(accumGDD_ds[clm_gdd_var].values != 0):
+    raise RuntimeError(f"All {clm_gdd_var} values are zero!")
 
 
 # %% Get mean GDDs in GGCMI growing season
@@ -232,7 +234,7 @@ time_indsP1 = np.arange(Nyears + 1)
 # Set up output Dataset
 gdds_ds = accumGDD_ds.isel(time=np.arange(Nyears))
 gdds_ds = gdds_ds.assign_coords(time=new_dt_axis)
-del gdds_ds["GDDPLANT"]
+del gdds_ds[clm_gdd_var]
 longname_prefix = "GDD harvest target for "
 
 incl_vegtype_indices = []
@@ -242,7 +244,7 @@ for v, vegtype_str in enumerate(accumGDD_ds.vegtype_str.values):
     
     # Get time series for each patch of this type
     thisCrop_ds = utils.xr_flexsel(accumGDD_ds, vegtype=vegtype_str)
-    thisCrop_da = thisCrop_ds.GDDPLANT
+    thisCrop_da = thisCrop_ds[clm_gdd_var]
     if not thisCrop_da.size:
         continue
     print(f"{vegtype_str}...")
@@ -403,7 +405,7 @@ gdd_maps_ds.to_netcdf(outfile, mode="a", format="NETCDF3_CLASSIC")
 
 # # %% View GDD for a single crop and cell
 
-# tmp = accumGDD_ds.GDDPLANT.values
+# tmp = accumGDD_ds[clm_gdd_var].values
 # incl = np.bitwise_and(accumGDD_ds.patches1d_lon.values==270, accumGDD_ds.patches1d_lat.values==40)
 # tmp2 = tmp[:,incl]
 # plt.plot(tmp2)
