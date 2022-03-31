@@ -81,16 +81,72 @@ dates_ds = utils.xr_flexsel(dates_ds, \
     time__values=slice(y1_import_str,
                        yN_import_str))
 
+patchList = dates_ds.patch.values
 
-# %% Check that simulated sowing and harvest dates do not vary between years
 
-for v in ["SDATES", "HDATES"]:
-    for t in np.arange(dates_ds.dims["time"]):
-        if t==0:
-            continue
-        if not np.all((dates_ds[v].isel(time=0) == dates_ds[v].isel(time=t)).values):
-            raise RuntimeError(f"{v} timestep {t} does not match timestep 0")
-print("✅ CLM output sowing and harvest dates do not vary between years.")
+# %%
+# Check that, during period of interest, simulated harvest always happens the day before sowing
+# Could vectorize this, but it gets complicated because some cells are sown Jan. 1 and some aren't.
+verbose = True
+
+ok_p = np.full((dates_ds.dims["patch"]), True)
+
+for p, thisPatch in enumerate(patchList):
+    thisLon = dates_ds.patches1d_lon.values[p]
+    thisLat = dates_ds.patches1d_lat.values[p]
+    # thisLon = np.round(dates_ds.patches1d_lon.values[p], decimals=2)
+    # thisLat = np.round(dates_ds.patches1d_lat.values[p], decimals=2)
+    thisCrop = dates_ds.patches1d_itype_veg_str.values[p]
+    thisStr = f"Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop}"
+    sim_sp = dates_ds["SDATES"].sel(patch=thisPatch).values
+    sim_hp = dates_ds["HDATES"].sel(patch=thisPatch).values
+    
+    # There should be no missing sowings
+    if any(sim_sp < 1):
+        ok_p[p] = False
+        if verbose: print(f"{thisStr}: Sowing didn't happen some year(s)")
+        continue
+
+    # Should only need to consider one sowing and one harvest
+    if sim_sp.shape[1] > 1:
+        ok_p[p] = False
+        if verbose: print(f"{thisStr}: Expected mxsowings 1 but found {sim_sp.shape[1]}")
+        continue
+    sim_sp = sim_sp[:,0]
+    if np.any(sim_hp[:,1:] > 0):
+        ok_p[p] = False
+        if verbose: print(f"{thisStr}: More than 1 harvest found in some year(s)")
+        continue
+    sim_hp = sim_hp[:,0]
+
+    # Align
+    if sim_sp[0] > 1:
+        sim_hp = sim_hp[1:]
+    else:
+        sim_hp = sim_hp[0:-1]
+    sim_sp = sim_sp[0:-1]
+
+    # We're going to be comparing each harvest to the sowing that FOLLOWS it.
+    sim_sp = sim_sp[1:]
+    sim_hp = sim_hp[0:-1]
+    
+    # There should no longer be any missing harvests
+    if any(sim_hp < 1):
+        ok_p[p] = False
+        if verbose: print(f"{thisStr}: Harvest didn't happen some year(s)/patch(es)")
+        continue
+
+    # Harvest should always happen the day before the next sowing.
+    exp_hp = ((sim_sp - 2)%365) + 1
+    if not np.array_equal(sim_hp, exp_hp):
+        ok_p[p] = False
+        if verbose: print(f"{thisStr}: Not every harvest happens the day before next sowing")
+        continue
+    
+if np.all(ok_p):
+    print("✅ CLM output sowing and harvest dates look good.")
+else:
+    print(f"❌ {sum(np.bitwise_not(ok_p))} patch(es) had problem(s) with CLM output sowing and/or harvest dates.")
 
 
 # %% Import expected sowing dates. This will be used as our template output file.
