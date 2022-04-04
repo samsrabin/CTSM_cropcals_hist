@@ -437,21 +437,27 @@ layout = "2x2"
 bin_width = 15
 lat_bin_edges = np.arange(0, 91, bin_width)
 
-def make_map(ax, this_map, this_title, vmax, bin_width): 
+fontsize_titles = 16
+fontsize_axislabels = 16
+fontsize_ticklabels = 14
+
+def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles): 
     im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
             this_map, shading="auto",
             vmin=0, vmax=vmax)
     ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
     ax.coastlines()
-    ax.set_title(this_title)
-    plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02)
+    ax.set_title(this_title, fontsize=fontsize_titles)
+    cbar = plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02)
+    cbar.ax.tick_params(labelsize=fontsize_ticklabels)
     
     ticks = np.arange(-90, 91, bin_width)
     ticklabels = [str(x) for x in ticks]
     for i,x in enumerate(ticks):
         if x%2:
             ticklabels[i] = ''
-    plt.yticks(np.arange(-90,91,15), labels=ticklabels)
+    plt.yticks(np.arange(-90,91,15), labels=ticklabels,
+               fontsize=fontsize_ticklabels)
     
 def get_non_nans(in_da, fillValue):
     in_da = in_da.where(in_da != fillValue)
@@ -516,7 +522,8 @@ if save_figs:
         thisMin = int(np.round(np.min(gddharv_map_yx)))
         thisMax = int(np.round(np.max(gddharv_map_yx)))
         thisTitle = f"{vegtype_str}: Old (range {thisMin}–{thisMax})"
-        make_map(ax, gddharv_map_yx, thisTitle, vmax, bin_width)
+        make_map(ax, gddharv_map_yx, thisTitle, vmax, bin_width,
+                 fontsize_ticklabels, fontsize_titles)
         
         if layout == "3x1":
             ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
@@ -527,7 +534,8 @@ if save_figs:
         thisMin = int(np.round(np.min(gdd_map_yx)))
         thisMax = int(np.round(np.max(gdd_map_yx)))
         thisTitle = f"{vegtype_str}: New (range {thisMin}–{thisMax})"
-        make_map(ax, gdd_map_yx, thisTitle, vmax, bin_width)
+        make_map(ax, gdd_map_yx, thisTitle, vmax, bin_width,
+                 fontsize_ticklabels, fontsize_titles)
         
         # Boxplots #####################
         
@@ -562,12 +570,14 @@ if save_figs:
         # draw temporary lines to create a legend
         plt.plot([], c=color_old, label='Old')
         plt.plot([], c=color_new, label='New')
-        plt.legend()
-
-        plt.xticks(range(0, len(bin_names) * 2, 2), bin_names)
-        plt.xlabel("|latitude| zone")
-        plt.ylabel("Growing degree-days")
-        plt.title(vegtype_str)
+        plt.legend(fontsize=fontsize_titles)
+        
+        plt.xticks(range(0, len(bin_names) * 2, 2), bin_names,
+                   fontsize=fontsize_ticklabels)
+        plt.yticks(fontsize=fontsize_ticklabels)
+        plt.xlabel("|latitude| zone", fontsize=fontsize_axislabels)
+        plt.ylabel("Growing degree-days", fontsize=fontsize_axislabels)
+        plt.title(f"Zonal changes: {vegtype_str}", fontsize=fontsize_titles)
         
         outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}.png"
         plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
