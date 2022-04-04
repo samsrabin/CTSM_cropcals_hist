@@ -432,6 +432,8 @@ print("Done.")
 # %% 
 # Save before/after map and boxplot figures, if doing so
 
+# layout = "3x1"
+layout = "2x2"
 bin_width = 15
 lat_bin_edges = np.arange(0, 91, bin_width)
 
@@ -497,23 +499,35 @@ if save_figs:
         gddharv_map = gddharv_maps_ds[thisVar]
         gddharv_map_yx = gddharv_map.where(gddharv_map != fillValue)
                 
-        # fig = plt.figure(figsize=(12,8))
-        # fig = plt.figure(figsize=(18,32))
-        fig = plt.figure(figsize=(7.5,14))
         vmax = max(np.max(gdd_map_yx), np.max(gddharv_map_yx))
         
-        ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
+        # Set up figure and first subplot
+        if layout == "3x1":
+            fig = plt.figure(figsize=(7.5,14))
+            ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
+        elif layout == "2x2":
+            fig = plt.figure(figsize=(15,10))
+            spec = fig.add_gridspec(nrows=2, ncols=2,
+                                    width_ratios=[0.5,0.5])
+            ax = fig.add_subplot(spec[0,0],projection=ccrs.PlateCarree())
+        else:
+            raise RuntimeError(f"layout {layout} not recognized")
+        
         thisMin = int(np.round(np.min(gddharv_map_yx)))
         thisMax = int(np.round(np.max(gddharv_map_yx)))
         thisTitle = f"{vegtype_str}: Old (range {thisMin}–{thisMax})"
         make_map(ax, gddharv_map_yx, thisTitle, vmax, bin_width)
         
-        ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
+        if layout == "3x1":
+            ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
+        elif layout == "2x2":
+            ax = fig.add_subplot(spec[1,0],projection=ccrs.PlateCarree())
+        else:
+            raise RuntimeError(f"layout {layout} not recognized")
         thisMin = int(np.round(np.min(gdd_map_yx)))
         thisMax = int(np.round(np.max(gdd_map_yx)))
         thisTitle = f"{vegtype_str}: New (range {thisMin}–{thisMax})"
         make_map(ax, gdd_map_yx, thisTitle, vmax, bin_width)
-        
         
         # Boxplots #####################
         
@@ -533,7 +547,12 @@ if save_figs:
             gdd_bybin_old.append(gddharv_vector_thisBin)
             gdd_bybin_new.append(gdd_vector_thisBin)
                 
-        ax = fig.add_subplot(ny,nx,3)
+        if layout == "3x1":
+            ax = fig.add_subplot(ny,nx,3)
+        elif layout == "2x2":
+            ax = fig.add_subplot(spec[:,1])
+        else:
+            raise RuntimeError(f"layout {layout} not recognized")
 
         bpl = make_plot(gdd_bybin_old, -1)
         bpr = make_plot(gdd_bybin_new, 1)
