@@ -437,9 +437,9 @@ layout = "2x2"
 bin_width = 15
 lat_bin_edges = np.arange(0, 91, bin_width)
 
-fontsize_titles = 16
-fontsize_axislabels = 16
-fontsize_ticklabels = 14
+fontsize_titles = 8
+fontsize_axislabels = 8
+fontsize_ticklabels = 7
 
 def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles): 
     im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
@@ -512,9 +512,9 @@ if save_figs:
             fig = plt.figure(figsize=(7.5,14))
             ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
         elif layout == "2x2":
-            fig = plt.figure(figsize=(15,10))
+            fig = plt.figure(figsize=(10,5))
             spec = fig.add_gridspec(nrows=2, ncols=2,
-                                    width_ratios=[0.5,0.5])
+                                    width_ratios=[0.4,0.6])
             ax = fig.add_subplot(spec[0,0],projection=ccrs.PlateCarree())
         else:
             raise RuntimeError(f"layout {layout} not recognized")
@@ -578,7 +578,7 @@ if save_figs:
         plt.xlabel("|latitude| zone", fontsize=fontsize_axislabels)
         plt.ylabel("Growing degree-days", fontsize=fontsize_axislabels)
         plt.title(f"Zonal changes: {vegtype_str}", fontsize=fontsize_titles)
-        
+
         outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}.png"
         plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
             bbox_inches='tight')
