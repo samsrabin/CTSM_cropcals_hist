@@ -265,10 +265,162 @@ print("Aligning...")
 sdates_aligned, hdates_aligned, extras_aligned, gs_lengths = \
     align_shdates_looppatches(extra_annual_vars, dates_ds)
     
-sdates_aligned_orig, hdates_aligned_orig, extras_aligned_orig, gs_lengths_orig = \
-    align_shdates_looppatches(extra_annual_vars, dates_ds_orig)
+# sdates_aligned_orig, hdates_aligned_orig, extras_aligned_orig, gs_lengths_orig = \
+#     align_shdates_looppatches(extra_annual_vars, dates_ds_orig)
 
 print("Done.")
+
+
+# %% More quickly (???) align sowing and harvest dates/etc.
+
+def get_Nharv(array_in, these_dims):
+    # Sum over time and mxevents to get number of events in time series for each patch
+    sum_indices = tuple(these_dims.index(x) for x in ["time", "mxharvests"])
+    Nevents_eachPatch = np.sum(array_in > 0, axis=sum_indices)
+    return Nevents_eachPatch
+
+def set_firstharv_nan(this_ds, this_var, firstharv_nan_inds):
+    this_da = this_ds[this_var]
+    this_array = this_da.values
+    this_array[0,0,firstharv_nan_inds] = np.nan
+    this_da.values = this_array
+    this_ds[this_var] = this_da
+    return this_ds
+
+def extract_gs_timeseries(this_ds, this_var, in_da, exclude_these, Npatches, Ngs):
+    this_array = in_da.values
+
+    # Apply exclusion mask
+    this_array[exclude_these] = np.nan
+
+    # Rearrange to (Ngs*mxharvests, Npatches)
+    this_array = this_array.reshape(-1, Npatches)
+
+    # Extract valid harvests
+    this_array = this_array.transpose()
+    print(f"this_array.shape: {this_array.shape}")
+    print(f"Npatches: {Npatches}")
+    print(f"Ngs: {Ngs}")
+    print(f"# >0: {np.sum(this_array > 0)}")
+    this_array = this_array[this_array > 0].reshape(Npatches,Ngs)
+    this_array = this_array.transpose()
+
+    # Set up and fill output DataArray
+    out_da = xr.DataArray(this_array, \
+    coords=this_ds.coords,
+    dims=this_ds.dims)
+
+    # Save output DataArray to Dataset
+    this_ds[this_var] = out_da
+    return this_ds
+
+def time_to_gs(Ngs, this_ds, extra_var_list):
+    
+    #
+    #
+    # Checks
+    #
+    #
+    
+    # Relies on max harvests per year >= 2
+    mxharvests = len(this_ds.mxharvests)
+    if mxharvests < 2:
+        raise RuntimeError(f"get_gs_length_1patch() assumes max harvests per year == 2, not {mxharvests}")
+    
+    # Untested with max harvests per year > 2
+    if mxharvests > 2:
+        print(f"Warning: Untested with max harvests per year ({mxharvests}) > 2")
+    
+    # All sowing dates should be positive
+    if np.any(this_ds["SDATES"] <= 0).values:
+        raise ValueError("All sowing dates should be positive... right?")
+    
+    # Throw an error if harvests happened on the day of planting
+    if (np.any(np.equal(this_ds["SDATES"], this_ds["HDATES"]))):
+        raise RuntimeError("Harvest on day of planting")
+    
+    #
+    #
+    # Setup
+    #
+    #
+    
+    Npatches = this_ds.dims["patch"]
+
+    # Set up empty Dataset with time axis as "gs" (growing season) instead of what CLM puts out
+    gs_years = [t.year-1 for t in this_ds.time.values[:-1]]
+    new_ds_gs = xr.Dataset(coords={
+        "gs": gs_years,
+        "patch": this_ds.patch,
+        })
+    
+    #
+    #
+    # Ignore harvests from the old, non-prescribed sowing date from the year before this run began.
+    #
+    #
+
+    cond1 = this_ds["HDATES"].isel(time=0, mxharvests=0) \
+      < this_ds["SDATES"].isel(time=0, mxsowings=0)
+    firstharv_nan_inds = np.where(cond1)[0]
+    
+    # (Only necessary before "don't allow harvest on day of planting" was working)
+    cond2 = np.bitwise_and( \
+        this_ds["HDATES"].isel(time=0, mxharvests=0) \
+        == this_ds["SDATES"].isel(time=0, mxsowings=0), \
+        this_ds["HDATES"].isel(time=0, mxharvests=1) > 0)
+    firstharv_nan_inds = np.where(np.bitwise_or(cond1, cond2))[0]
+    
+    for v in ["HDATES"] + extra_var_list:
+        this_ds = set_firstharv_nan(this_ds, v, firstharv_nan_inds)
+    
+    #
+    #
+    # In some cells, the last growing season did complete, but we have to ignore it because it's extra. This block determines which members of HDATES (and other mxharvests-dimensioned variables) should be ignored for this reason.
+    #
+    #
+    hdates = this_ds["HDATES"].values
+
+    Nharvests_eachPatch = get_Nharv(hdates, this_ds["HDATES"].dims)
+    if np.max(Nharvests_eachPatch) > Ngs + 1:
+        raise ValueError(f"Expected at most {Ngs+1} harvests in any patch; found at least one patch with {np.max(Nharvests_eachPatch)}")
+    h = mxharvests
+    while np.any(Nharvests_eachPatch > Ngs):
+        h = h - 1
+        if h < 0:
+            raise RuntimeError("Unable to ignore enough harvests")
+        hdates[-1,h,Nharvests_eachPatch > Ngs] = np.nan
+        Nharvests_eachPatch = get_Nharv(hdates, this_ds["HDATES"].dims)
+    
+    # So: Which harvests are we manually excluding?
+    hdate_manually_excluded = np.isnan(hdates)
+
+    #
+    #
+    # Extract the series of harvests
+    #
+    #
+
+    for v in ["HDATES"] + extra_var_list:
+        
+        # if v in ["GDDACCUM_PERHARV", "HUI_PERHARV"]:
+        #     continue
+        
+        print(f"extract_gs_timeseries() on variable {v}")
+        print(f"this_da.shape: {this_ds[v].shape}")
+        print(f"# NaN: {np.sum(np.isnan(this_ds[v].values))}")
+        new_ds_gs = extract_gs_timeseries(new_ds_gs, v, this_ds[v], hdate_manually_excluded, Npatches, Ngs)
+
+    return this_ds
+
+time_to_gs(Ngs, dates_ds, extra_annual_vars)
+
+# %%
+
+tmp = dates_ds["GDDACCUM_PERHARV"].values
+np.unique(tmp[tmp<0])
+
+print(np.unique(dates_ds["HARVEST_REASON_PERHARV"].values[tmp<0]))
 
 
 # %% Look at some random patches
