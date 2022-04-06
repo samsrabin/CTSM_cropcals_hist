@@ -81,7 +81,7 @@ def thisCrop_map_to_patches(lon_points, lat_points, map_ds, vegtype_int):
         lon=xr.DataArray(lon_points, dims="patch"),
         lat=xr.DataArray(lat_points, dims="patch")).squeeze(drop=True)
 
-def align_shdates_1patch(sdates, hdates, verbose=False):
+def align_shdates_1patch(sdates, hdates, extras, verbose=False):
     # Relies on max harvests per year >= 2
     if hdates.shape[1] < 2:
         raise RuntimeError(f"get_gs_length_1patch() assumes max harvests per year == 2, not {hdates.shape[1]}")
@@ -105,6 +105,7 @@ def align_shdates_1patch(sdates, hdates, verbose=False):
     if hdates[0,0] < sdates[0] or (hdates[0,0] == sdates[0] and hdates[0,1] > 0) :
         if verbose: print("Removing first harvest")
         hdates[0,0] = np.nan
+        extras[0,0,:] = np.nan
     
     # Throw an error if any other harvests happened on the day of planting
     if (np.any(np.equal(sdates, hdates))):
@@ -112,6 +113,7 @@ def align_shdates_1patch(sdates, hdates, verbose=False):
     
     # Extract the series of sowings and harvests.
     sdates = sdates[sdates>0] # Since we already checked that all sowing dates are positive, this just has the function of collapsing the array to 1d, if it wasn't already
+    extras = extras[hdates>0]
     hdates = hdates[hdates>0]
     
     # Always ignore last sowing date, because for some cells this growing season will be incomplete.
@@ -120,12 +122,15 @@ def align_shdates_1patch(sdates, hdates, verbose=False):
     # In other cells, the last growing season did complete, but we have to ignore it.
     if hdates.size == sdates.size + 1:
         hdates = hdates[:-1]
+        extras = extras[:-1,:]
     
     # At the end of this, sdates and hdates should be the same shape
     if sdates.shape != hdates.shape:
         raise RuntimeError(f"sdates {sdates.shape} and hdates {hdates.shape} failed to align")
+    elif hdates.shape != extras.shape[:-1]:
+        raise RuntimeError(f"sdates {sdates.shape} and hdates {hdates.shape} failed to align")
     
-    return sdates, hdates
+    return sdates, hdates, extras
 
 def get_gs_length_1patch(sdates, hdates, align=True, verbose=False):
     
@@ -174,6 +179,7 @@ def check_and_trim_years(y1, yN, get_year_from_cftime, ds_in):
 print("Importing CLM output sowing and harvest dates...")
 
 extra_annual_vars = ["GDDACCUM_PERHARV", "GDDHARV_PERHARV", "HARVEST_REASON_PERHARV", "HUI_PERHARV"]
+Nextra_annual_vars = len(extra_annual_vars)
 
 dates_ds = utils.import_ds(glob.glob(indir + "*h2.*"), \
     myVars=["SDATES", "HDATES"] + extra_annual_vars, 
@@ -231,28 +237,39 @@ mxsowings = dates_ds.dims["mxsowings"]
 
 sdates_aligned = np.empty((Ngs, mxsowings, Npatch))
 hdates_aligned = np.empty((Ngs, mxsowings, Npatch))
+extras_aligned = np.empty((Ngs, mxsowings, Npatch, Nextra_annual_vars))
 gs_lengths = np.empty((Ngs, mxsowings, Npatch))
 for p in np.arange(Npatch):
-# for p in [4]:
-    sdates, hdates = align_shdates_1patch( \
+    extras = np.concatenate(tuple(np.expand_dims(dates_ds[v].values[:,:,p], axis=2) for v in extra_annual_vars),
+                            axis=2)
+    sdates, hdates, extras = align_shdates_1patch( \
         dates_ds.SDATES.values[:,:,p],
         dates_ds.HDATES.values[:,:,p],
+        extras,
         verbose = False)
     sdates_aligned[:,:,p] = np.expand_dims(sdates, axis=1)
     hdates_aligned[:,:,p] = np.expand_dims(hdates, axis=1)
+    extras_aligned[:,:,p,:] = np.transpose(np.expand_dims(extras, axis=2),
+                                           (0, 2, 1))
     tmp = get_gs_length_1patch(sdates, hdates, align=False)
     gs_lengths[:,:,p] = np.expand_dims(tmp, axis=1)
-    
+
 sdates_aligned_orig = np.empty((Ngs, mxsowings, Npatch))
 hdates_aligned_orig = np.empty((Ngs, mxsowings, Npatch))
+extras_aligned_orig = np.empty((Ngs, mxsowings, Npatch, Nextra_annual_vars))
 gs_lengths_orig = np.empty((Ngs, mxsowings, Npatch))
 for p in np.arange(Npatch):
-    sdates, hdates = align_shdates_1patch( \
+    extras = np.concatenate(tuple(np.expand_dims(dates_ds_orig[v].values[:,:,p], axis=2) for v in extra_annual_vars),
+                            axis=2)
+    sdates, hdates, extras = align_shdates_1patch( \
         dates_ds_orig.SDATES.values[:,:,p],
         dates_ds_orig.HDATES.values[:,:,p],
+        extras,
         verbose = False)
     sdates_aligned_orig[:,:,p] = np.expand_dims(sdates, axis=1)
     hdates_aligned_orig[:,:,p] = np.expand_dims(hdates, axis=1)
+    extras_aligned_orig[:,:,p,:] = np.transpose(np.expand_dims(extras, axis=2),
+                                           (0, 2, 1))
     tmp = get_gs_length_1patch(sdates, hdates, align=False)
     gs_lengths_orig[:,:,p] = np.expand_dims(tmp, axis=1)
 
