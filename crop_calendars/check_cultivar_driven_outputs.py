@@ -173,13 +173,43 @@ def check_and_trim_years(y1, yN, get_year_from_cftime, ds_in):
     
     return ds_in
 
+def align_shdates_looppatches(extra_annual_vars, dates_ds):
+    ### There's probably a more efficient way to do this than looping through patches!
+    
+    Npatch = dates_ds.dims["patch"]
+    mxsowings = dates_ds.dims["mxsowings"]
+    Nextra_annual_vars = len(extra_annual_vars)
+    Ngs = dates_ds.dims['time'] - 1
+    
+    sdates_aligned = np.empty((Ngs, mxsowings, Npatch))
+    hdates_aligned = np.empty((Ngs, mxsowings, Npatch))
+    extras_aligned = np.empty((Ngs, mxsowings, Npatch, Nextra_annual_vars))
+    gs_lengths = np.empty((Ngs, mxsowings, Npatch))
+    
+    for p in np.arange(Npatch):
+        extras = np.concatenate(tuple(np.expand_dims(dates_ds[v].values[:,:,p], axis=2) for v in extra_annual_vars),
+                            axis=2)
+    
+        sdates, hdates, extras = align_shdates_1patch( \
+        dates_ds.SDATES.values[:,:,p],
+        dates_ds.HDATES.values[:,:,p],
+        extras,
+        verbose = False)
+        sdates_aligned[:,:,p] = np.expand_dims(sdates, axis=1)
+        hdates_aligned[:,:,p] = np.expand_dims(hdates, axis=1)
+        extras_aligned[:,:,p,:] = np.transpose(np.expand_dims(extras, axis=2),
+                                           (0, 2, 1))
+        tmp = get_gs_length_1patch(sdates, hdates, align=False)
+        gs_lengths[:,:,p] = np.expand_dims(tmp, axis=1)
+        
+    return sdates_aligned, hdates_aligned, extras_aligned, gs_lengths
+
 
 # %% Import output sowing and harvest dates, etc.
 
 print("Importing CLM output sowing and harvest dates...")
 
 extra_annual_vars = ["GDDACCUM_PERHARV", "GDDHARV_PERHARV", "HARVEST_REASON_PERHARV", "HUI_PERHARV"]
-Nextra_annual_vars = len(extra_annual_vars)
 
 dates_ds = utils.import_ds(glob.glob(indir + "*h2.*"), \
     myVars=["SDATES", "HDATES"] + extra_annual_vars, 
@@ -229,49 +259,14 @@ if ok:
 
 
 # %% Align sowing and harvest dates
-### There's probably a more efficient way to do this than looping through patches!
 
-# Set up empty arrays
-Npatch = dates_ds.dims["patch"]
-mxsowings = dates_ds.dims["mxsowings"]
+print("Aligning...")
 
-sdates_aligned = np.empty((Ngs, mxsowings, Npatch))
-hdates_aligned = np.empty((Ngs, mxsowings, Npatch))
-extras_aligned = np.empty((Ngs, mxsowings, Npatch, Nextra_annual_vars))
-gs_lengths = np.empty((Ngs, mxsowings, Npatch))
-for p in np.arange(Npatch):
-    extras = np.concatenate(tuple(np.expand_dims(dates_ds[v].values[:,:,p], axis=2) for v in extra_annual_vars),
-                            axis=2)
-    sdates, hdates, extras = align_shdates_1patch( \
-        dates_ds.SDATES.values[:,:,p],
-        dates_ds.HDATES.values[:,:,p],
-        extras,
-        verbose = False)
-    sdates_aligned[:,:,p] = np.expand_dims(sdates, axis=1)
-    hdates_aligned[:,:,p] = np.expand_dims(hdates, axis=1)
-    extras_aligned[:,:,p,:] = np.transpose(np.expand_dims(extras, axis=2),
-                                           (0, 2, 1))
-    tmp = get_gs_length_1patch(sdates, hdates, align=False)
-    gs_lengths[:,:,p] = np.expand_dims(tmp, axis=1)
-
-sdates_aligned_orig = np.empty((Ngs, mxsowings, Npatch))
-hdates_aligned_orig = np.empty((Ngs, mxsowings, Npatch))
-extras_aligned_orig = np.empty((Ngs, mxsowings, Npatch, Nextra_annual_vars))
-gs_lengths_orig = np.empty((Ngs, mxsowings, Npatch))
-for p in np.arange(Npatch):
-    extras = np.concatenate(tuple(np.expand_dims(dates_ds_orig[v].values[:,:,p], axis=2) for v in extra_annual_vars),
-                            axis=2)
-    sdates, hdates, extras = align_shdates_1patch( \
-        dates_ds_orig.SDATES.values[:,:,p],
-        dates_ds_orig.HDATES.values[:,:,p],
-        extras,
-        verbose = False)
-    sdates_aligned_orig[:,:,p] = np.expand_dims(sdates, axis=1)
-    hdates_aligned_orig[:,:,p] = np.expand_dims(hdates, axis=1)
-    extras_aligned_orig[:,:,p,:] = np.transpose(np.expand_dims(extras, axis=2),
-                                           (0, 2, 1))
-    tmp = get_gs_length_1patch(sdates, hdates, align=False)
-    gs_lengths_orig[:,:,p] = np.expand_dims(tmp, axis=1)
+sdates_aligned, hdates_aligned, extras_aligned, gs_lengths = \
+    align_shdates_looppatches(extra_annual_vars, dates_ds)
+    
+sdates_aligned_orig, hdates_aligned_orig, extras_aligned_orig, gs_lengths_orig = \
+    align_shdates_looppatches(extra_annual_vars, dates_ds_orig)
 
 print("Done.")
 
