@@ -287,22 +287,17 @@ def set_firstharv_nan(this_ds, this_var, firstharv_nan_inds):
     this_ds[this_var] = this_da
     return this_ds
 
-def extract_gs_timeseries(this_ds, this_var, in_da, exclude_these, Npatches, Ngs):
+def extract_gs_timeseries(this_ds, this_var, in_da, include_these, Npatches, Ngs):
     this_array = in_da.values
-
-    # Apply exclusion mask
-    this_array[exclude_these] = np.nan
 
     # Rearrange to (Ngs*mxharvests, Npatches)
     this_array = this_array.reshape(-1, Npatches)
+    include_these = include_these.reshape(-1, Npatches)
 
     # Extract valid harvests
     this_array = this_array.transpose()
-    print(f"this_array.shape: {this_array.shape}")
-    print(f"Npatches: {Npatches}")
-    print(f"Ngs: {Ngs}")
-    print(f"# >0: {np.sum(this_array > 0)}")
-    this_array = this_array[this_array > 0].reshape(Npatches,Ngs)
+    include_these = include_these.transpose()
+    this_array = this_array[include_these].reshape(Npatches,Ngs)
     this_array = this_array.transpose()
 
     # Set up and fill output DataArray
@@ -394,6 +389,7 @@ def time_to_gs(Ngs, this_ds, extra_var_list):
     
     # So: Which harvests are we manually excluding?
     hdate_manually_excluded = np.isnan(hdates)
+    hdate_included = np.bitwise_not(np.bitwise_or(hdate_manually_excluded, hdates<=0))
 
     #
     #
@@ -402,16 +398,9 @@ def time_to_gs(Ngs, this_ds, extra_var_list):
     #
 
     for v in ["HDATES"] + extra_var_list:
-        
-        # if v in ["GDDACCUM_PERHARV", "HUI_PERHARV"]:
-        #     continue
-        
-        print(f"extract_gs_timeseries() on variable {v}")
-        print(f"this_da.shape: {this_ds[v].shape}")
-        print(f"# NaN: {np.sum(np.isnan(this_ds[v].values))}")
-        new_ds_gs = extract_gs_timeseries(new_ds_gs, v, this_ds[v], hdate_manually_excluded, Npatches, Ngs)
+        new_ds_gs = extract_gs_timeseries(new_ds_gs, v, this_ds[v], hdate_included, Npatches, Ngs)
 
-    return this_ds
+    return new_ds_gs
 
 time_to_gs(Ngs, dates_ds, extra_annual_vars)
 
