@@ -18,9 +18,12 @@ my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myf
 # indir = "/Users/Shared/CESM_runs/1537-crop-date-outputs3/"
 # indir = "/Users/Shared/CESM_runs/1537-crop-date-outputs3_justmerged_neg1_restart/"
 
-indir_orig = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-03-30/"
-indir = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-03-31/"
+# indir_orig = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-03-30/"
+# indir = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-03-31/"
 # indir = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-04-ts01/"
+
+indir_orig = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/"
+indir = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/"
 
 # Directory to save output figures
 outdir = indir + "figs/"
@@ -166,17 +169,19 @@ def check_and_trim_years(y1, yN, get_year_from_cftime, ds_in):
     return ds_in
 
 
-# %% Import output sowing and harvest dates
+# %% Import output sowing and harvest dates, etc.
 
 print("Importing CLM output sowing and harvest dates...")
 
+extra_annual_vars = ["GDDACCUM_PERHARV", "GDDHARV_PERHARV", "HARVEST_REASON_PERHARV", "HUI_PERHARV"]
+
 dates_ds = utils.import_ds(glob.glob(indir + "*h2.*"), \
-    myVars=["SDATES", "HDATES"], 
+    myVars=["SDATES", "HDATES"] + extra_annual_vars, 
     myVegtypes=utils.define_mgdcrop_list())
 dates_ds = check_and_trim_years(y1, yN, get_year_from_cftime, dates_ds)
 
 dates_ds_orig = utils.import_ds(glob.glob(indir_orig + "*h2.*"), \
-    myVars=["SDATES", "HDATES"], 
+    myVars=["SDATES", "HDATES"] + extra_annual_vars, 
     myVegtypes=utils.define_mgdcrop_list())
 dates_ds_orig = check_and_trim_years(y1, yN, get_year_from_cftime, dates_ds_orig)
 
