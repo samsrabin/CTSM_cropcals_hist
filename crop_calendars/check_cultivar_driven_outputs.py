@@ -122,6 +122,46 @@ def check_and_trim_years(y1, yN, get_year_from_cftime, ds_in):
     
     return ds_in
 
+def get_Nharv(array_in, these_dims):
+    # Sum over time and mxevents to get number of events in time series for each patch
+    sum_indices = tuple(these_dims.index(x) for x in ["time", "mxharvests"])
+    Nevents_eachPatch = np.sum(array_in > 0, axis=sum_indices)
+    return Nevents_eachPatch
+
+def set_firstharv_nan(this_ds, this_var, firstharv_nan_inds):
+    this_da = this_ds[this_var]
+    this_array = this_da.values
+    this_array[0,0,firstharv_nan_inds] = np.nan
+    this_da.values = this_array
+    this_ds[this_var] = this_da
+    return this_ds
+
+def extract_gs_timeseries(this_ds, this_var, in_da, include_these, Npatches, Ngs):
+    this_array = in_da.values
+
+    # Rearrange to (Ngs*mxevents, Npatches)
+    this_array = this_array.reshape(-1, Npatches)
+    include_these = include_these.reshape(-1, Npatches)
+
+    # Extract valid events
+    this_array = this_array.transpose()
+    include_these = include_these.transpose()
+    this_array = this_array[include_these].reshape(Npatches,Ngs)
+    this_array = this_array.transpose()
+    
+    # Always ignore last sowing date, because for some cells this growing season will be incomplete.
+    if this_var == "SDATES":
+        this_array = this_array[:-1,:]
+
+    # Set up and fill output DataArray
+    out_da = xr.DataArray(this_array, \
+        coords=this_ds.coords,
+        dims=this_ds.dims)
+
+    # Save output DataArray to Dataset
+    this_ds[this_var] = out_da
+    return this_ds
+
 
 # %% Import output sowing and harvest dates, etc.
 
@@ -178,45 +218,9 @@ if ok:
 
 # %% More quickly (???) align sowing and harvest dates/etc.
 
-def get_Nharv(array_in, these_dims):
-    # Sum over time and mxevents to get number of events in time series for each patch
-    sum_indices = tuple(these_dims.index(x) for x in ["time", "mxharvests"])
-    Nevents_eachPatch = np.sum(array_in > 0, axis=sum_indices)
-    return Nevents_eachPatch
 
-def set_firstharv_nan(this_ds, this_var, firstharv_nan_inds):
-    this_da = this_ds[this_var]
-    this_array = this_da.values
-    this_array[0,0,firstharv_nan_inds] = np.nan
-    this_da.values = this_array
-    this_ds[this_var] = this_da
-    return this_ds
 
-def extract_gs_timeseries(this_ds, this_var, in_da, include_these, Npatches, Ngs):
-    this_array = in_da.values
 
-    # Rearrange to (Ngs*mxevents, Npatches)
-    this_array = this_array.reshape(-1, Npatches)
-    include_these = include_these.reshape(-1, Npatches)
-
-    # Extract valid events
-    this_array = this_array.transpose()
-    include_these = include_these.transpose()
-    this_array = this_array[include_these].reshape(Npatches,Ngs)
-    this_array = this_array.transpose()
-    
-    # Always ignore last sowing date, because for some cells this growing season will be incomplete.
-    if this_var == "SDATES":
-        this_array = this_array[:-1,:]
-
-    # Set up and fill output DataArray
-    out_da = xr.DataArray(this_array, \
-        coords=this_ds.coords,
-        dims=this_ds.dims)
-
-    # Save output DataArray to Dataset
-    this_ds[this_var] = out_da
-    return this_ds
 
 def time_to_gs(Ngs, this_ds, extra_var_list):
     
