@@ -463,11 +463,12 @@ def get_non_nans(in_da, fillValue):
     in_da = in_da.where(in_da != fillValue)
     return in_da.values[~np.isnan(in_da.values)]
 
-def set_box_color(bp, color):
+def set_boxplot_props(bp, color):
     plt.setp(bp['boxes'], color=color)
     plt.setp(bp['whiskers'], color=color)
     plt.setp(bp['caps'], color=color)
     plt.setp(bp['medians'], color=color)
+    plt.setp(bp['fliers'], markeredgecolor=color, markersize=3)
 
 Nbins = len(lat_bin_edges)-1
 bin_names = ["All"]
@@ -481,9 +482,10 @@ color_new = '#7fc97f'
 def make_plot(data, offset):
     linewidth = 1.5
     offset = 0.4*offset
-    bpl = plt.boxplot(data, positions=np.array(range(len(data)))*2.0+offset, sym='', widths=0.6, 
+    bpl = plt.boxplot(data, positions=np.array(range(len(data)))*2.0+offset, widths=0.6, 
                       boxprops=dict(linewidth=linewidth), whiskerprops=dict(linewidth=linewidth), 
-                      capprops=dict(linewidth=linewidth), medianprops=dict(linewidth=linewidth))
+                      capprops=dict(linewidth=linewidth), medianprops=dict(linewidth=linewidth),
+                      flierprops=dict(markeredgewidth=0.5))
     return bpl
 
 if save_figs:
@@ -564,8 +566,8 @@ if save_figs:
 
         bpl = make_plot(gdd_bybin_old, -1)
         bpr = make_plot(gdd_bybin_new, 1)
-        set_box_color(bpl, color_old)
-        set_box_color(bpr, color_new)
+        set_boxplot_props(bpl, color_old)
+        set_boxplot_props(bpr, color_new)
         
         # draw temporary lines to create a legend
         plt.plot([], c=color_old, label='Old')
