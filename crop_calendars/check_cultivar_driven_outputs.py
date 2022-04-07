@@ -218,43 +218,24 @@ if ok:
 
 # %% More quickly (???) align sowing and harvest dates/etc.
 
-
-
-
-
 def time_to_gs(Ngs, this_ds, extra_var_list):
-    
-    #
-    #
-    # Checks
-    #
-    #
-    
+    ### Checks ###
     # Relies on max harvests per year >= 2
     mxharvests = len(this_ds.mxharvests)
     if mxharvests < 2:
         raise RuntimeError(f"get_gs_length_1patch() assumes max harvests per year == 2, not {mxharvests}")
-    
     # Untested with max harvests per year > 2
     if mxharvests > 2:
         print(f"Warning: Untested with max harvests per year ({mxharvests}) > 2")
-    
     # All sowing dates should be positive
     if np.any(this_ds["SDATES"] <= 0).values:
         raise ValueError("All sowing dates should be positive... right?")
-    
     # Throw an error if harvests happened on the day of planting
     if (np.any(np.equal(this_ds["SDATES"], this_ds["HDATES"]))):
         raise RuntimeError("Harvest on day of planting")
     
-    #
-    #
-    # Setup
-    #
-    #
-    
+    ### Setup ###
     Npatches = this_ds.dims["patch"]
-
     # Set up empty Dataset with time axis as "gs" (growing season) instead of what CLM puts out
     gs_years = [t.year-1 for t in this_ds.time.values[:-1]]
     new_ds_gs = xr.Dataset(coords={
@@ -262,33 +243,21 @@ def time_to_gs(Ngs, this_ds, extra_var_list):
         "patch": this_ds.patch,
         })
     
-    #
-    #
-    # Ignore harvests from the old, non-prescribed sowing date from the year before this run began.
-    #
-    #
-
+    ### Ignore harvests from the old, non-prescribed sowing date from the year before this run began. ###
     cond1 = this_ds["HDATES"].isel(time=0, mxharvests=0) \
       < this_ds["SDATES"].isel(time=0, mxsowings=0)
     firstharv_nan_inds = np.where(cond1)[0]
-    
     # (Only necessary before "don't allow harvest on day of planting" was working)
     cond2 = np.bitwise_and( \
         this_ds["HDATES"].isel(time=0, mxharvests=0) \
         == this_ds["SDATES"].isel(time=0, mxsowings=0), \
         this_ds["HDATES"].isel(time=0, mxharvests=1) > 0)
     firstharv_nan_inds = np.where(np.bitwise_or(cond1, cond2))[0]
-    
     for v in ["HDATES"] + extra_var_list:
         this_ds = set_firstharv_nan(this_ds, v, firstharv_nan_inds)
     
-    #
-    #
-    # In some cells, the last growing season did complete, but we have to ignore it because it's extra. This block determines which members of HDATES (and other mxharvests-dimensioned variables) should be ignored for this reason.
-    #
-    #
+    ### In some cells, the last growing season did complete, but we have to ignore it because it's extra. This block determines which members of HDATES (and other mxharvests-dimensioned variables) should be ignored for this reason. ###
     hdates = this_ds["HDATES"].values
-
     Nharvests_eachPatch = get_Nharv(hdates, this_ds["HDATES"].dims)
     if np.max(Nharvests_eachPatch) > Ngs + 1:
         raise ValueError(f"Expected at most {Ngs+1} harvests in any patch; found at least one patch with {np.max(Nharvests_eachPatch)}")
@@ -305,17 +274,10 @@ def time_to_gs(Ngs, this_ds, extra_var_list):
     hdate_manually_excluded = np.isnan(hdates)
     hdate_included = np.bitwise_not(np.bitwise_or(hdate_manually_excluded, hdates<=0))
 
-    #
-    #
-    # Extract the series of sowings and harvests
-    #
-    #
-    
+    ### Extract the series of sowings and harvests ###
     new_ds_gs = extract_gs_timeseries(new_ds_gs, "SDATES", this_ds["SDATES"], sdate_included, Npatches, Ngs+1)
-
     for v in ["HDATES"] + extra_var_list:
         new_ds_gs = extract_gs_timeseries(new_ds_gs, v, this_ds[v], hdate_included, Npatches, Ngs)
-
     return new_ds_gs
 
 dates_ds_aligned = time_to_gs(Ngs, dates_ds, extra_annual_vars)
