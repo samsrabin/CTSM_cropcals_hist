@@ -26,7 +26,9 @@ indir0 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/"
 indir1 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/"
 
 # Directory to save output figures
-outdir = indir1 + "figs/"
+outdir_figs = indir1 + "figs/"
+if not os.path.exists(outdir_figs):
+    os.makedirs(outdir_figs)
 
 import enum
 from multiprocessing.sharedctypes import Value
@@ -293,5 +295,107 @@ if ok:
     print(f"✅ dates_ds1: CLM output sowing dates do not vary through {dates_ds1.dims['gs'] - t1} growing seasons of output.")
 
 
+# %% Make map of harvest reasons
 
+thisVar = "HARVEST_REASON_PERHARV"
 
+reason_list = np.unique(np.concatenate( \
+    (np.unique(dates_ds0.HARVEST_REASON_PERHARV.values), \
+    np.unique(dates_ds1.HARVEST_REASON_PERHARV.values))))
+ 
+def get_reason_freq_map(Ngs, thisCrop_gridded, reason):
+    map_yx = np.sum(thisCrop_gridded==reason, axis=0, keepdims=False) / Ngs
+    notnan_yx = np.bitwise_not(np.isnan(thisCrop_gridded.isel(gs=0, drop=True)))
+    map_yx = map_yx.where(notnan_yx)
+    return map_yx
+
+fontsize_titles = 8
+fontsize_axislabels = 8
+fontsize_ticklabels = 7
+bin_width = 30
+lat_bin_edges = np.arange(0, 91, bin_width)
+def make_map(ax, this_map, this_title, ylabel, vmax, bin_width, fontsize_ticklabels, fontsize_titles): 
+    im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+            this_map, shading="auto",
+            vmin=0, vmax=vmax)
+    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
+    ax.coastlines(linewidth=0.5, color="white")
+    ax.coastlines(linewidth=0.3)
+    if this_title:
+        ax.set_title(this_title, fontsize=fontsize_titles)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    # cbar = plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02)
+    # cbar.ax.tick_params(labelsize=fontsize_ticklabels)
+    
+    # ax.yaxis.set_tick_params(width=0.2)
+    # ticks = np.arange(-90, 91, bin_width)
+    # ticklabels = [str(x) for x in ticks]
+    # for i,x in enumerate(ticks):
+    #     if x%2:
+    #         ticklabels[i] = ''
+    # # ticklabels = []
+    # plt.yticks(np.arange(-90,91,bin_width), labels=ticklabels,
+    #            fontsize=fontsize_ticklabels,
+    #            fontweight=0.1)
+    return im1
+
+def make_axis(fig, ny, nx, n):
+    ax = fig.add_subplot(ny,nx,n,projection=ccrs.PlateCarree())
+    ax.spines['geo'].set_visible(False) # Turn off box outline
+    return ax
+
+ny = 2
+nx = len(reason_list)
+
+figsize = (8, 4)
+cbar_adj_bottom = 0.15
+cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
+if nx != 2:
+    print(f"Since nx = {nx}, you may need to rework some parameters")
+
+for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
+    if vegtype_str not in dates_ds0.patches1d_itype_veg_str.values:
+        continue
+    vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+    
+    # Grid
+    thisCrop0_gridded = utils.grid_one_variable(dates_ds0, thisVar, \
+        vegtype=vegtype_int).squeeze(drop=True)
+    thisCrop1_gridded = utils.grid_one_variable(dates_ds1, thisVar, \
+        vegtype=vegtype_int).squeeze(drop=True)
+    
+    # Set up figure
+    fig = plt.figure(figsize=figsize)
+    
+    # Map each reason's frequency
+    for f, reason in enumerate(reason_list):
+        reason = int(reason)
+        
+        ylabel = "CLM5-style" if f==0 else None
+        map0_yx = get_reason_freq_map(Ngs, thisCrop0_gridded, reason)
+        ax = make_axis(fig, ny, nx, f+1)
+        im0 = make_map(ax, map0_yx, f"v0: Reason {reason}", ylabel, 1.0, bin_width, fontsize_ticklabels, fontsize_titles)
+        
+        ylabel = "GGCMI-style" if f==0 else None
+        ax = make_axis(fig, ny, nx, f+nx+1)
+        map1_yx = get_reason_freq_map(Ngs, thisCrop1_gridded, reason)
+        im1 = make_map(ax, map1_yx, f"v1: Reason {reason}", ylabel, 1.0, bin_width, fontsize_ticklabels, fontsize_titles)
+        
+    fig.suptitle(vegtype_str)
+    fig.subplots_adjust(bottom=cbar_adj_bottom)
+    cbar_ax = fig.add_axes(cbar_ax_rect)
+    cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
+    cbar_ax.tick_params(labelsize=fontsize_ticklabels)
+    plt.xlabel("Frequency", fontsize=fontsize_titles)
+    
+    # plt.show()
+    
+    # Save
+    outfile = outdir_figs + f"harvest_reason_0vs1_{vegtype_str}.png"
+    plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+            bbox_inches='tight')
+    plt.close()
+    
+
+# %%
