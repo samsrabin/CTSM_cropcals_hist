@@ -225,7 +225,6 @@ def time_to_gs(Ngs, this_ds, extra_var_list):
     return new_ds_gs
 
 
-
 # %% Import output sowing and harvest dates, etc.
 
 print("Importing CLM output sowing and harvest dates...")
@@ -279,9 +278,11 @@ if ok:
     print(f"✅ CLM output sowing dates do not vary through {dates_ds.dims['time'] - t1} years of output.")
 
 
-# %% More quickly (???) align sowing and harvest dates/etc.
+# %% Align sowing and harvest dates/etc.
 
 dates_ds_aligned = time_to_gs(Ngs, dates_ds, extra_annual_vars)
+dates_ds_orig_aligned = time_to_gs(Ngs, dates_ds_orig, extra_annual_vars)
+
 
 # %%
 
