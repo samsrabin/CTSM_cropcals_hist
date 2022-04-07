@@ -51,16 +51,16 @@ import warnings
 warnings.filterwarnings("ignore", message="__len__ for multi-part geometries is deprecated and will be removed in Shapely 2.0. Check the length of the `geoms` property instead to get the  number of parts of a multi-part geometry.")
 warnings.filterwarnings("ignore", message="Iteration over multi-part geometries is deprecated and will be removed in Shapely 2.0. Use the `geoms` property to access the constituent parts of a multi-part geometry.")
 
-def import_rx_dates(s_or_h, date_inFile, dates_ds1):
+def import_rx_dates(s_or_h, date_inFile, dates_ds1_orig):
     # Get run info:
     # Max number of growing seasons per year
-    if "mxsowings" in dates_ds1:
-        mxsowings = dates_ds1.dims["mxsowings"]
+    if "mxsowings" in dates_ds1_orig:
+        mxsowings = dates_ds1_orig.dims["mxsowings"]
     else:
         mxsowings = 1
         
     # Which vegetation types were simulated?
-    itype_veg_toImport = np.unique(dates_ds1.patches1d_itype_veg)
+    itype_veg_toImport = np.unique(dates_ds1_orig.patches1d_itype_veg)
 
     date_varList = []
     for i in itype_veg_toImport:
@@ -231,26 +231,26 @@ print("Importing CLM output sowing and harvest dates...")
 
 extra_annual_vars = ["GDDACCUM_PERHARV", "GDDHARV_PERHARV", "HARVEST_REASON_PERHARV", "HUI_PERHARV"]
 
-dates_ds1 = utils.import_ds(glob.glob(indir1 + "*h2.*"), \
+dates_ds1_orig = utils.import_ds(glob.glob(indir1 + "*h2.*"), \
     myVars=["SDATES", "HDATES"] + extra_annual_vars, 
     myVegtypes=utils.define_mgdcrop_list())
-dates_ds1 = check_and_trim_years(y1, yN, get_year_from_cftime, dates_ds1)
+dates_ds1_orig = check_and_trim_years(y1, yN, get_year_from_cftime, dates_ds1_orig)
 
-dates_ds0 = utils.import_ds(glob.glob(indir0 + "*h2.*"), \
+dates_ds0_orig = utils.import_ds(glob.glob(indir0 + "*h2.*"), \
     myVars=["SDATES", "HDATES"] + extra_annual_vars, 
     myVegtypes=utils.define_mgdcrop_list())
-dates_ds0 = check_and_trim_years(y1, yN, get_year_from_cftime, dates_ds0)
+dates_ds0_orig = check_and_trim_years(y1, yN, get_year_from_cftime, dates_ds0_orig)
 
 # How many growing seasons can we use? Ignore last season because it can be incomplete for some gridcells.
-Ngs = dates_ds1.dims['time'] - 1
+Ngs = dates_ds1_orig.dims['time'] - 1
 
 print("Done.")
 
 
 # %% Align sowing and harvest dates/etc.
 
-dates_ds0_aligned = time_to_gs(Ngs, dates_ds0, extra_annual_vars)
-dates_ds1_aligned = time_to_gs(Ngs, dates_ds1, extra_annual_vars)
+dates_ds0 = time_to_gs(Ngs, dates_ds0_orig, extra_annual_vars)
+dates_ds1 = time_to_gs(Ngs, dates_ds1_orig, extra_annual_vars)
 
 # %% Check that simulated sowing dates do not vary between years
 
@@ -260,27 +260,27 @@ t1 = 0 # 0-indexed
 ok = True
 v = "SDATES"
 
-t1_yr = dates_ds1_aligned.gs.values[t1]
-t1_vals = np.squeeze(dates_ds1_aligned[v].isel(gs=t1).values)
+t1_yr = dates_ds1.gs.values[t1]
+t1_vals = np.squeeze(dates_ds1[v].isel(gs=t1).values)
 
-for t in np.arange(t1+1, dates_ds1_aligned.dims["gs"]):
-    t_yr = dates_ds1_aligned.gs.values[t]
-    t_vals = np.squeeze(dates_ds1_aligned[v].isel(gs=t).values)
+for t in np.arange(t1+1, dates_ds1.dims["gs"]):
+    t_yr = dates_ds1.gs.values[t]
+    t_vals = np.squeeze(dates_ds1[v].isel(gs=t).values)
     ok_p = np.squeeze(t1_vals == t_vals)
     if not np.all(ok_p):
         ok = False
         print(f"{v} timestep {t} does not match timestep {t1}")
         if verbose:
             for thisPatch in np.where(np.bitwise_not(ok_p))[0]:
-                thisLon = dates_ds1_aligned.patches1d_lon.values[thisPatch]
-                thisLat = dates_ds1_aligned.patches1d_lat.values[thisPatch]
-                thisCrop = dates_ds1_aligned.patches1d_itype_veg_str.values[thisPatch]
+                thisLon = dates_ds1.patches1d_lon.values[thisPatch]
+                thisLat = dates_ds1.patches1d_lat.values[thisPatch]
+                thisCrop = dates_ds1.patches1d_itype_veg_str.values[thisPatch]
                 thisStr = f"Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop}"
                 print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
             break
 
 if ok:
-    print(f"✅ dates_ds1_aligned: CLM output sowing dates do not vary through {dates_ds1_aligned.dims['gs'] - t1} growing seasons of output.")
+    print(f"✅ dates_ds1: CLM output sowing dates do not vary through {dates_ds1.dims['gs'] - t1} growing seasons of output.")
 
 
 
