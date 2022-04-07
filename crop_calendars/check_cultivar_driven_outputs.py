@@ -162,62 +162,6 @@ def extract_gs_timeseries(this_ds, this_var, in_da, include_these, Npatches, Ngs
     this_ds[this_var] = out_da
     return this_ds
 
-
-# %% Import output sowing and harvest dates, etc.
-
-print("Importing CLM output sowing and harvest dates...")
-
-extra_annual_vars = ["GDDACCUM_PERHARV", "GDDHARV_PERHARV", "HARVEST_REASON_PERHARV", "HUI_PERHARV"]
-
-dates_ds = utils.import_ds(glob.glob(indir + "*h2.*"), \
-    myVars=["SDATES", "HDATES"] + extra_annual_vars, 
-    myVegtypes=utils.define_mgdcrop_list())
-dates_ds = check_and_trim_years(y1, yN, get_year_from_cftime, dates_ds)
-
-dates_ds_orig = utils.import_ds(glob.glob(indir_orig + "*h2.*"), \
-    myVars=["SDATES", "HDATES"] + extra_annual_vars, 
-    myVegtypes=utils.define_mgdcrop_list())
-dates_ds_orig = check_and_trim_years(y1, yN, get_year_from_cftime, dates_ds_orig)
-
-# How many growing seasons can we use? Ignore last season because it can be incomplete for some gridcells.
-Ngs = dates_ds.dims['time'] - 1
-
-print("Done.")
-
-
-# %% Check that simulated sowing dates do not vary between years
-
-verbose = True
-
-t1 = 0 # 0-indexed
-ok = True
-v = "SDATES"
-
-t1_yr = get_year_from_cftime(dates_ds.time.values[t1])
-t1_vals = np.squeeze(dates_ds[v].isel(time=t1).values)
-
-for t in np.arange(t1+1, dates_ds.dims["time"]):
-    t_yr = get_year_from_cftime(dates_ds.time.values[t])
-    t_vals = np.squeeze(dates_ds[v].isel(time=t).values)
-    ok_p = np.squeeze(t1_vals == t_vals)
-    if not np.all(ok_p):
-        ok = False
-        print(f"{v} timestep {t} does not match timestep {t1}")
-        if verbose:
-            for thisPatch in np.where(np.bitwise_not(ok_p))[0]:
-                thisLon = dates_ds.patches1d_lon.values[thisPatch]
-                thisLat = dates_ds.patches1d_lat.values[thisPatch]
-                thisCrop = dates_ds.patches1d_itype_veg_str.values[thisPatch]
-                thisStr = f"Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop}"
-                print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
-            break
-
-if ok:
-    print(f"✅ CLM output sowing dates do not vary through {dates_ds.dims['time'] - t1} years of output.")
-
-
-# %% More quickly (???) align sowing and harvest dates/etc.
-
 def time_to_gs(Ngs, this_ds, extra_var_list):
     ### Checks ###
     # Relies on max harvests per year >= 2
@@ -279,6 +223,63 @@ def time_to_gs(Ngs, this_ds, extra_var_list):
     for v in ["HDATES"] + extra_var_list:
         new_ds_gs = extract_gs_timeseries(new_ds_gs, v, this_ds[v], hdate_included, Npatches, Ngs)
     return new_ds_gs
+
+
+
+# %% Import output sowing and harvest dates, etc.
+
+print("Importing CLM output sowing and harvest dates...")
+
+extra_annual_vars = ["GDDACCUM_PERHARV", "GDDHARV_PERHARV", "HARVEST_REASON_PERHARV", "HUI_PERHARV"]
+
+dates_ds = utils.import_ds(glob.glob(indir + "*h2.*"), \
+    myVars=["SDATES", "HDATES"] + extra_annual_vars, 
+    myVegtypes=utils.define_mgdcrop_list())
+dates_ds = check_and_trim_years(y1, yN, get_year_from_cftime, dates_ds)
+
+dates_ds_orig = utils.import_ds(glob.glob(indir_orig + "*h2.*"), \
+    myVars=["SDATES", "HDATES"] + extra_annual_vars, 
+    myVegtypes=utils.define_mgdcrop_list())
+dates_ds_orig = check_and_trim_years(y1, yN, get_year_from_cftime, dates_ds_orig)
+
+# How many growing seasons can we use? Ignore last season because it can be incomplete for some gridcells.
+Ngs = dates_ds.dims['time'] - 1
+
+print("Done.")
+
+
+# %% Check that simulated sowing dates do not vary between years
+
+verbose = True
+
+t1 = 0 # 0-indexed
+ok = True
+v = "SDATES"
+
+t1_yr = get_year_from_cftime(dates_ds.time.values[t1])
+t1_vals = np.squeeze(dates_ds[v].isel(time=t1).values)
+
+for t in np.arange(t1+1, dates_ds.dims["time"]):
+    t_yr = get_year_from_cftime(dates_ds.time.values[t])
+    t_vals = np.squeeze(dates_ds[v].isel(time=t).values)
+    ok_p = np.squeeze(t1_vals == t_vals)
+    if not np.all(ok_p):
+        ok = False
+        print(f"{v} timestep {t} does not match timestep {t1}")
+        if verbose:
+            for thisPatch in np.where(np.bitwise_not(ok_p))[0]:
+                thisLon = dates_ds.patches1d_lon.values[thisPatch]
+                thisLat = dates_ds.patches1d_lat.values[thisPatch]
+                thisCrop = dates_ds.patches1d_itype_veg_str.values[thisPatch]
+                thisStr = f"Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop}"
+                print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
+            break
+
+if ok:
+    print(f"✅ CLM output sowing dates do not vary through {dates_ds.dims['time'] - t1} years of output.")
+
+
+# %% More quickly (???) align sowing and harvest dates/etc.
 
 dates_ds_aligned = time_to_gs(Ngs, dates_ds, extra_annual_vars)
 
