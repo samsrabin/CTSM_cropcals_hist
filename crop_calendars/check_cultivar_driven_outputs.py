@@ -182,6 +182,10 @@ def time_to_gs(Ngs, this_ds, extra_var_list):
     Npatches = this_ds.dims["patch"]
     # Set up empty Dataset with time axis as "gs" (growing season) instead of what CLM puts out
     gs_years = [t.year-1 for t in this_ds.time.values[:-1]]
+    data_vars = dict()
+    for v in this_ds.data_vars:
+        if "time" not in this_ds[v].dims:
+            data_vars[v] = this_ds[v]
     new_ds_gs = xr.Dataset(coords={
         "gs": gs_years,
         "patch": this_ds.patch,
@@ -222,6 +226,10 @@ def time_to_gs(Ngs, this_ds, extra_var_list):
     new_ds_gs = extract_gs_timeseries(new_ds_gs, "SDATES", this_ds["SDATES"], sdate_included, Npatches, Ngs+1)
     for v in ["HDATES"] + extra_var_list:
         new_ds_gs = extract_gs_timeseries(new_ds_gs, v, this_ds[v], hdate_included, Npatches, Ngs)
+    
+    ### Save additional variables ###
+    new_ds_gs = new_ds_gs.assign(variables=data_vars)
+    
     return new_ds_gs
 
 
