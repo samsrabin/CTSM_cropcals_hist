@@ -302,8 +302,8 @@ def extract_gs_timeseries(this_ds, this_var, in_da, include_these, Npatches, Ngs
 
     # Set up and fill output DataArray
     out_da = xr.DataArray(this_array, \
-    coords=this_ds.coords,
-    dims=this_ds.dims)
+        coords=this_ds.coords,
+        dims=this_ds.dims)
 
     # Save output DataArray to Dataset
     this_ds[this_var] = out_da
