@@ -229,6 +229,8 @@ def time_to_gs(Ngs, this_ds, extra_var_list):
     
     ### Save additional variables ###
     new_ds_gs = new_ds_gs.assign(variables=data_vars)
+    new_ds_gs.coords["lon"] = this_ds.coords["lon"]
+    new_ds_gs.coords["lat"] = this_ds.coords["lat"]
     
     return new_ds_gs
 
