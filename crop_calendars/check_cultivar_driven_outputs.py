@@ -290,15 +290,19 @@ def set_firstharv_nan(this_ds, this_var, firstharv_nan_inds):
 def extract_gs_timeseries(this_ds, this_var, in_da, include_these, Npatches, Ngs):
     this_array = in_da.values
 
-    # Rearrange to (Ngs*mxharvests, Npatches)
+    # Rearrange to (Ngs*mxevents, Npatches)
     this_array = this_array.reshape(-1, Npatches)
     include_these = include_these.reshape(-1, Npatches)
 
-    # Extract valid harvests
+    # Extract valid events
     this_array = this_array.transpose()
     include_these = include_these.transpose()
     this_array = this_array[include_these].reshape(Npatches,Ngs)
     this_array = this_array.transpose()
+    
+    # Always ignore last sowing date, because for some cells this growing season will be incomplete.
+    if this_var == "SDATES":
+        this_array = this_array[:-1,:]
 
     # Set up and fill output DataArray
     out_da = xr.DataArray(this_array, \
@@ -387,22 +391,25 @@ def time_to_gs(Ngs, this_ds, extra_var_list):
         hdates[-1,h,Nharvests_eachPatch > Ngs] = np.nan
         Nharvests_eachPatch = get_Nharv(hdates, this_ds["HDATES"].dims)
     
-    # So: Which harvests are we manually excluding?
+    # So: Which events are we manually excluding?
+    sdate_included = this_ds["SDATES"].values > 0
     hdate_manually_excluded = np.isnan(hdates)
     hdate_included = np.bitwise_not(np.bitwise_or(hdate_manually_excluded, hdates<=0))
 
     #
     #
-    # Extract the series of harvests
+    # Extract the series of sowings and harvests
     #
     #
+    
+    new_ds_gs = extract_gs_timeseries(new_ds_gs, "SDATES", this_ds["SDATES"], sdate_included, Npatches, Ngs+1)
 
     for v in ["HDATES"] + extra_var_list:
         new_ds_gs = extract_gs_timeseries(new_ds_gs, v, this_ds[v], hdate_included, Npatches, Ngs)
 
     return new_ds_gs
 
-time_to_gs(Ngs, dates_ds, extra_annual_vars)
+dates_ds_aligned = time_to_gs(Ngs, dates_ds, extra_annual_vars)
 
 # %%
 
