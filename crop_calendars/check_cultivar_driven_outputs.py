@@ -307,7 +307,6 @@ constantVars = ["SDATES", "GDDHARV_PERHARV"]
 verbose = True
 
 t1 = 0 # 0-indexed
-
 for v in constantVars:
     ok = True
 
@@ -332,6 +331,19 @@ for v in constantVars:
 
     if ok:
         print(f"✅ dates_ds1: CLM output {v} do not vary through {dates_ds1.dims['gs'] - t1} growing seasons of output.")
+
+
+# %% For both datasets, check that GDDACCUM_PERHARV <= HUI_PERHARV
+
+verbose = True
+
+def check_gddaccum_le_hui(this_ds, which_ds):
+    if np.all(this_ds["GDDACCUM_PERHARV"] <= this_ds["HUI_PERHARV"]):
+        print(f"✅ dates_ds{which_ds}: GDDACCUM_PERHARV always <= HUI_PERHARV")
+    else: print(f"❌ dates_ds{which_ds}: GDDACCUM_PERHARV *not* always <= HUI_PERHARV")
+
+check_gddaccum_le_hui(dates_ds0, 0)
+check_gddaccum_le_hui(dates_ds1, 1)
 
 
 # %% Make map of harvest reasons
