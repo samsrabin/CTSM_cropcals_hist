@@ -236,6 +236,42 @@ def time_to_gs(Ngs, this_ds, extra_var_list):
     
     return new_ds_gs
 
+fontsize_titles = 8
+fontsize_axislabels = 8
+fontsize_ticklabels = 7
+bin_width = 30
+lat_bin_edges = np.arange(0, 91, bin_width)
+def make_map(ax, this_map, this_title, ylabel, vmax, bin_width, fontsize_ticklabels, fontsize_titles): 
+    im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+            this_map, shading="auto",
+            vmin=0, vmax=vmax)
+    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
+    ax.coastlines(linewidth=0.5, color="white")
+    ax.coastlines(linewidth=0.3)
+    if this_title:
+        ax.set_title(this_title, fontsize=fontsize_titles)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    # cbar = plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02)
+    # cbar.ax.tick_params(labelsize=fontsize_ticklabels)
+    
+    # ax.yaxis.set_tick_params(width=0.2)
+    # ticks = np.arange(-90, 91, bin_width)
+    # ticklabels = [str(x) for x in ticks]
+    # for i,x in enumerate(ticks):
+    #     if x%2:
+    #         ticklabels[i] = ''
+    # # ticklabels = []
+    # plt.yticks(np.arange(-90,91,bin_width), labels=ticklabels,
+    #            fontsize=fontsize_ticklabels,
+    #            fontweight=0.1)
+    return im1
+
+def make_axis(fig, ny, nx, n):
+    ax = fig.add_subplot(ny,nx,n,projection=ccrs.PlateCarree())
+    ax.spines['geo'].set_visible(False) # Turn off box outline
+    return ax
+
 
 # %% Import output sowing and harvest dates, etc.
 
@@ -312,42 +348,6 @@ def get_reason_freq_map(Ngs, thisCrop_gridded, reason):
     map_yx = map_yx.where(notnan_yx)
     return map_yx
 
-fontsize_titles = 8
-fontsize_axislabels = 8
-fontsize_ticklabels = 7
-bin_width = 30
-lat_bin_edges = np.arange(0, 91, bin_width)
-def make_map(ax, this_map, this_title, ylabel, vmax, bin_width, fontsize_ticklabels, fontsize_titles): 
-    im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
-            this_map, shading="auto",
-            vmin=0, vmax=vmax)
-    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
-    ax.coastlines(linewidth=0.5, color="white")
-    ax.coastlines(linewidth=0.3)
-    if this_title:
-        ax.set_title(this_title, fontsize=fontsize_titles)
-    if ylabel:
-        ax.set_ylabel(ylabel)
-    # cbar = plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02)
-    # cbar.ax.tick_params(labelsize=fontsize_ticklabels)
-    
-    # ax.yaxis.set_tick_params(width=0.2)
-    # ticks = np.arange(-90, 91, bin_width)
-    # ticklabels = [str(x) for x in ticks]
-    # for i,x in enumerate(ticks):
-    #     if x%2:
-    #         ticklabels[i] = ''
-    # # ticklabels = []
-    # plt.yticks(np.arange(-90,91,bin_width), labels=ticklabels,
-    #            fontsize=fontsize_ticklabels,
-    #            fontweight=0.1)
-    return im1
-
-def make_axis(fig, ny, nx, n):
-    ax = fig.add_subplot(ny,nx,n,projection=ccrs.PlateCarree())
-    ax.spines['geo'].set_visible(False) # Turn off box outline
-    return ax
-
 ny = 2
 nx = len(reason_list)
 
@@ -401,4 +401,58 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
     plt.close()
     
 
-# %%
+# %% Make map of GDD harvest target
+
+thisVar = "GDDHARV_PERHARV"
+
+ny = 2
+nx = 1
+
+figsize = (4, 4)
+cbar_adj_bottom = 0.15
+cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
+if nx != 1:
+    print(f"Since nx = {nx}, you may need to rework some parameters")
+
+for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
+    if vegtype_str not in dates_ds0.patches1d_itype_veg_str.values:
+        continue
+    vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+    
+    # Grid
+    thisCrop0_gridded = utils.grid_one_variable(dates_ds0, thisVar, \
+        vegtype=vegtype_int).squeeze(drop=True)
+    thisCrop1_gridded = utils.grid_one_variable(dates_ds1, thisVar, \
+        vegtype=vegtype_int).squeeze(drop=True)
+    
+    # Set up figure 
+    fig = plt.figure(figsize=figsize)
+    
+    # Get means
+    map0_yx = np.mean(thisCrop0_gridded, axis=0)
+    map1_yx = np.mean(thisCrop1_gridded, axis=0)
+    vmax = max(np.nanmax(map0_yx), np.nanmax(map1_yx))
+    
+    ylabel = "CLM5-style"
+    ax = make_axis(fig, ny, nx, 1)
+    im0 = make_map(ax, map0_yx, "v0", ylabel, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
+    
+    ylabel = "GGCMI-style"
+    ax = make_axis(fig, ny, nx, 2)
+    im1 = make_map(ax, map1_yx, "v1", ylabel, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
+        
+    fig.suptitle(f"Harv. thresh.: {vegtype_str}")
+    fig.subplots_adjust(bottom=cbar_adj_bottom)
+    cbar_ax = fig.add_axes(cbar_ax_rect)
+    cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
+    cbar_ax.tick_params(labelsize=fontsize_ticklabels)
+    plt.xlabel("GDD", fontsize=fontsize_titles)
+    
+    # plt.show()
+    # break
+    
+    # Save
+    outfile = outdir_figs + f"harvest_thresh_0vs1_{vegtype_str}.png"
+    plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+            bbox_inches='tight')
+    plt.close()
