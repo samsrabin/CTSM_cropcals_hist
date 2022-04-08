@@ -413,9 +413,10 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
     plt.close()
     
 
-# %% Make map of GDD harvest target
+# %% Make map of means 
 
-thisVar = "GDDHARV_PERHARV"
+# thisVar = "GDDHARV_PERHARV"
+thisVar = "HUI_PERHARV"
 
 ny = 2
 nx = 1
@@ -425,6 +426,17 @@ cbar_adj_bottom = 0.15
 cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
 if nx != 1:
     print(f"Since nx = {nx}, you may need to rework some parameters")
+
+if thisVar == "GDDHARV_PERHARV":
+    title_prefix = "Harv. thresh."
+    filename_prefix = "harvest_thresh"
+    units = "GDD"
+elif thisVar == "HUI_PERHARV":
+    title_prefix = "HUI"
+    filename_prefix = "hui"
+    units = "GDD"
+else:
+    raise RuntimeError(f"thisVar {thisVar} not recognized")
 
 for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
     if vegtype_str not in dates_ds0.patches1d_itype_veg_str.values:
@@ -453,18 +465,18 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
     ax = make_axis(fig, ny, nx, 2)
     im1 = make_map(ax, map1_yx, "v1", ylabel, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
         
-    fig.suptitle(f"Harv. thresh.: {vegtype_str}")
+    fig.suptitle(f"{title_prefix}: {vegtype_str}")
     fig.subplots_adjust(bottom=cbar_adj_bottom)
     cbar_ax = fig.add_axes(cbar_ax_rect)
     cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
     cbar_ax.tick_params(labelsize=fontsize_ticklabels)
-    plt.xlabel("GDD", fontsize=fontsize_titles)
+    plt.xlabel(units, fontsize=fontsize_titles)
     
     # plt.show()
     # break
     
     # Save
-    outfile = outdir_figs + f"harvest_thresh_0vs1_{vegtype_str}.png"
+    outfile = outdir_figs + f"{filename_prefix}_0vs1_{vegtype_str}.png"
     plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
             bbox_inches='tight')
     plt.close()
