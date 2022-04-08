@@ -264,35 +264,38 @@ print("Done.")
 dates_ds0 = time_to_gs(Ngs, dates_ds0_orig, extra_annual_vars)
 dates_ds1 = time_to_gs(Ngs, dates_ds1_orig, extra_annual_vars)
 
-# %% Check that simulated sowing dates do not vary between years
 
+# %% Check that some things are constant across years for ds1
+
+constantVars = ["SDATES", "GDDHARV_PERHARV"]
 verbose = True
 
 t1 = 0 # 0-indexed
-ok = True
-v = "SDATES"
 
-t1_yr = dates_ds1.gs.values[t1]
-t1_vals = np.squeeze(dates_ds1[v].isel(gs=t1).values)
+for v in constantVars:
+    ok = True
 
-for t in np.arange(t1+1, dates_ds1.dims["gs"]):
-    t_yr = dates_ds1.gs.values[t]
-    t_vals = np.squeeze(dates_ds1[v].isel(gs=t).values)
-    ok_p = np.squeeze(t1_vals == t_vals)
-    if not np.all(ok_p):
-        ok = False
-        print(f"{v} timestep {t} does not match timestep {t1}")
-        if verbose:
-            for thisPatch in np.where(np.bitwise_not(ok_p))[0]:
-                thisLon = dates_ds1.patches1d_lon.values[thisPatch]
-                thisLat = dates_ds1.patches1d_lat.values[thisPatch]
-                thisCrop = dates_ds1.patches1d_itype_veg_str.values[thisPatch]
-                thisStr = f"Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop}"
-                print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
-            break
+    t1_yr = dates_ds1.gs.values[t1]
+    t1_vals = np.squeeze(dates_ds1[v].isel(gs=t1).values)
 
-if ok:
-    print(f"✅ dates_ds1: CLM output sowing dates do not vary through {dates_ds1.dims['gs'] - t1} growing seasons of output.")
+    for t in np.arange(t1+1, dates_ds1.dims["gs"]):
+        t_yr = dates_ds1.gs.values[t]
+        t_vals = np.squeeze(dates_ds1[v].isel(gs=t).values)
+        ok_p = np.squeeze(t1_vals == t_vals)
+        if not np.all(ok_p):
+            ok = False
+            print(f"{v} timestep {t} does not match timestep {t1}")
+            if verbose:
+                for thisPatch in np.where(np.bitwise_not(ok_p))[0]:
+                    thisLon = dates_ds1.patches1d_lon.values[thisPatch]
+                    thisLat = dates_ds1.patches1d_lat.values[thisPatch]
+                    thisCrop = dates_ds1.patches1d_itype_veg_str.values[thisPatch]
+                    thisStr = f"Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop}"
+                    print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
+                break
+
+    if ok:
+        print(f"✅ dates_ds1: CLM output {v} do not vary through {dates_ds1.dims['gs'] - t1} growing seasons of output.")
 
 
 # %% Make map of harvest reasons
