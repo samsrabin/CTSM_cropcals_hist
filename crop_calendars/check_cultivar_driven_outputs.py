@@ -241,10 +241,10 @@ fontsize_axislabels = 8
 fontsize_ticklabels = 7
 bin_width = 30
 lat_bin_edges = np.arange(0, 91, bin_width)
-def make_map(ax, this_map, this_title, ylabel, vmax, bin_width, fontsize_ticklabels, fontsize_titles): 
+def make_map(ax, this_map, this_title, ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles): 
     im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
             this_map, shading="auto",
-            vmin=0, vmax=vmax)
+            vmin=vmin, vmax=vmax)
     ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
     ax.coastlines(linewidth=0.5, color="white")
     ax.coastlines(linewidth=0.3)
@@ -292,13 +292,76 @@ dates_ds0_orig = check_and_trim_years(y1, yN, get_year_from_cftime, dates_ds0_or
 # How many growing seasons can we use? Ignore last season because it can be incomplete for some gridcells.
 Ngs = dates_ds1_orig.dims['time'] - 1
 
+# CLM max growing season length, mxmat, is stored in the following files:
+#   * clm5_1: lnd/clm2/paramdata/ctsm51_params.c211112.nc
+#   * clm5_0: lnd/clm2/paramdata/clm50_params.c211112.nc
+#   * clm4_5: lnd/clm2/paramdata/clm45_params.c211112.nc
+my_clm_ver = 51
+my_clm_subver = "c211112"
+paramfile_dir = "/Users/Shared/CESM_inputdata/lnd/clm2/paramdata/"
+pattern = f"{paramfile_dir}/*{my_clm_ver}_params.{my_clm_subver}.nc"
+paramfile = glob.glob(pattern)
+if len(paramfile) != 1:
+    raise RuntimeError(f"Expected to find 1 match of {pattern}; found {len(paramfile)}")
+paramfile_ds = xr.open_dataset(paramfile[0])
+# Import max growing season length (stored in netCDF as nanoseconds!)
+paramfile_mxmats = paramfile_ds["mxmat"].values / np.timedelta64(1, 'D')
+# Import PFT name list
+paramfile_pftnames = [x.decode("UTF-8").replace(" ", "") for x in paramfile_ds["pftname"].values]
+
 print("Done.")
 
 
-# %% Align sowing and harvest dates/etc.
+# %% Import GGCMI sowing and harvest dates
+
+def import_rx_dates(s_or_h, date_inFile, dates_ds):
+    # Get run info:
+    # Max number of growing seasons per year
+    if "mxsowings" in dates_ds:
+        mxsowings = dates_ds.dims["mxsowings"]
+    else:
+        mxsowings = 1
+        
+    # Which vegetation types were simulated?
+    itype_veg_toImport = np.unique(dates_ds.patches1d_itype_veg)
+
+    date_varList = []
+    for i in itype_veg_toImport:
+        for g in np.arange(mxsowings):
+            thisVar = f"{s_or_h}date{g+1}_{i}"
+            date_varList = date_varList + [thisVar]
+
+    ds = utils.import_ds(date_inFile, myVars=date_varList)
+    
+    for v in ds:
+        ds = ds.rename({v: v.replace(f"{s_or_h}date","gs")})
+    
+    return ds
+
+sdates_rx_ds = import_rx_dates("s", "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc", dates_ds0_orig)
+hdates_rx_ds = import_rx_dates("h", "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc", dates_ds0_orig)
+
+# Get GGCMI growing season lengths
+def get_gs_len_da(this_da):
+    tmp = this_da.values
+    tmp[tmp < 0] = 365 + tmp[tmp < 0]
+    this_da.values = tmp
+    return this_da
+gs_len_rx_ds = hdates_rx_ds.copy()
+for v in gs_len_rx_ds:
+    if v == "time_bounds":
+        continue
+    gs_len_rx_ds[v] = get_gs_len_da(hdates_rx_ds[v] - sdates_rx_ds[v])
+
+
+# %% Align output sowing and harvest dates/etc.
 
 dates_ds0 = time_to_gs(Ngs, dates_ds0_orig, extra_annual_vars)
 dates_ds1 = time_to_gs(Ngs, dates_ds1_orig, extra_annual_vars)
+
+# Get growing season length
+dates_ds0["GSLEN"] = get_gs_len_da(dates_ds0["HDATES"] - dates_ds0["SDATES"])
+dates_ds1["GSLEN"] = get_gs_len_da(dates_ds1["HDATES"] - dates_ds1["SDATES"])
 
 
 # %% Check that some things are constant across years for ds1
@@ -390,12 +453,12 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
         ylabel = "CLM5-style" if f==0 else None
         map0_yx = get_reason_freq_map(Ngs, thisCrop0_gridded, reason)
         ax = make_axis(fig, ny, nx, f+1)
-        im0 = make_map(ax, map0_yx, f"v0: Reason {reason}", ylabel, 1.0, bin_width, fontsize_ticklabels, fontsize_titles)
+        im0 = make_map(ax, map0_yx, f"v0: Reason {reason}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles)
         
         ylabel = "GGCMI-style" if f==0 else None
         ax = make_axis(fig, ny, nx, f+nx+1)
         map1_yx = get_reason_freq_map(Ngs, thisCrop1_gridded, reason)
-        im1 = make_map(ax, map1_yx, f"v1: Reason {reason}", ylabel, 1.0, bin_width, fontsize_ticklabels, fontsize_titles)
+        im1 = make_map(ax, map1_yx, f"v1: Reason {reason}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles)
         
     fig.suptitle(vegtype_str)
     fig.subplots_adjust(bottom=cbar_adj_bottom)
@@ -416,17 +479,12 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
 # %% Make map of means 
 
 # thisVar = "GDDHARV_PERHARV"
-thisVar = "HUI_PERHARV"
+# thisVar = "HUI_PERHARV"
+thisVar = "GSLEN"
 
 ny = 2
 nx = 1
-
-figsize = (4, 4)
-cbar_adj_bottom = 0.15
-cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
-if nx != 1:
-    print(f"Since nx = {nx}, you may need to rework some parameters")
-
+vmin = 0
 if thisVar == "GDDHARV_PERHARV":
     title_prefix = "Harv. thresh."
     filename_prefix = "harvest_thresh"
@@ -435,13 +493,36 @@ elif thisVar == "HUI_PERHARV":
     title_prefix = "HUI"
     filename_prefix = "hui"
     units = "GDD"
+elif thisVar == "GSLEN":
+    title_prefix = "Seas. length"
+    filename_prefix = "seas_length"
+    units = "Days"
+    ny = 3
+    nx = 1
+    vmin = None
 else:
     raise RuntimeError(f"thisVar {thisVar} not recognized")
+
+figsize = (4, 4)
+cbar_adj_bottom = 0.15
+cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
+if nx != 1:
+    print(f"Since nx = {nx}, you may need to rework some parameters")
+if ny == 3:
+    cbar_ax_rect = [0.2, 0.05, 0.6, 0.05]
+elif ny != 2:
+    print(f"Since ny = {ny}, you may need to rework some parameters")
 
 for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
     if vegtype_str not in dates_ds0.patches1d_itype_veg_str.values:
         continue
     vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+    if vegtype_str == "soybean":
+        vegtype_str2 = "temperate_soybean"
+    elif vegtype_str == "irrigated_soybean":
+        vegtype_str2 = "irrigated_temperate_soybean"
+    else:
+        vegtype_str2 = vegtype_str
     
     # Grid
     thisCrop0_gridded = utils.grid_one_variable(dates_ds0, thisVar, \
@@ -455,15 +536,31 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
     # Get means
     map0_yx = np.mean(thisCrop0_gridded, axis=0)
     map1_yx = np.mean(thisCrop1_gridded, axis=0)
-    vmax = max(np.nanmax(map0_yx), np.nanmax(map1_yx))
+    if vmin == None:
+        vmin = int(np.floor(min(np.nanmin(map0_yx), np.nanmin(map1_yx))))
+    if thisVar == "GSLEN":
+        mxmat = int(paramfile_mxmats[paramfile_pftnames.index(vegtype_str2)])
+        if not mxmat > 0:
+            raise RuntimeError(f"Error getting mxmat: {mxmat}")
+        longest_gs = max(np.nanmax(map0_yx), np.nanmax(map1_yx))
+        if longest_gs > mxmat:
+            raise RuntimeError(f"mxmat {mxmat} but max simulated {longest_gs}")
+        ggcmi_yx = gs_len_rx_ds[f"gs1_{vegtype_int}"].isel(time=0, drop=True)
+        ggcmi_yx = ggcmi_yx.where(np.bitwise_not(np.isnan(map1_yx)))
+        ggcmi_max = int(np.nanmax(ggcmi_yx.values))
+        vmax = max(mxmat, ggcmi_max)
     
     ylabel = "CLM5-style"
     ax = make_axis(fig, ny, nx, 1)
-    im0 = make_map(ax, map0_yx, "v0", ylabel, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
+    im0 = make_map(ax, map0_yx, f"v0 (mxmat={mxmat})", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
     
     ylabel = "GGCMI-style"
     ax = make_axis(fig, ny, nx, 2)
-    im1 = make_map(ax, map1_yx, "v1", ylabel, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
+    im1 = make_map(ax, map1_yx, f"v1 (mxmat={mxmat})", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
+    
+    if thisVar == "GSLEN":
+        ax = make_axis(fig, ny, nx, 3)
+        im1 = make_map(ax, ggcmi_yx, f"GGCMI (max={ggcmi_max})", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
         
     fig.suptitle(f"{title_prefix}: {vegtype_str}")
     fig.subplots_adjust(bottom=cbar_adj_bottom)
