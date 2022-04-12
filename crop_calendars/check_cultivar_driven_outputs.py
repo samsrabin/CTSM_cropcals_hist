@@ -548,10 +548,12 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
     
     # Set up figure 
     fig = plt.figure(figsize=figsize)
+    subplot_title_suffix = ""
     
     # Get means
     map0_yx = np.mean(thisCrop0_gridded, axis=0)
     map1_yx = np.mean(thisCrop1_gridded, axis=0)
+    vmax = max(np.nanmax(map0_yx), np.nanmax(map1_yx))
     if vmin == None:
         vmin = int(np.floor(min(np.nanmin(map0_yx), np.nanmin(map1_yx))))
     if thisVar == "GSLEN":
@@ -565,14 +567,15 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
         ggcmi_yx = ggcmi_yx.where(np.bitwise_not(np.isnan(map1_yx)))
         ggcmi_max = int(np.nanmax(ggcmi_yx.values))
         vmax = max(mxmat, ggcmi_max)
+        subplot_title_suffix = f" (mxmat={mxmat}"
     
     ylabel = "CLM5-style"
     ax = make_axis(fig, ny, nx, 1)
-    im0 = make_map(ax, map0_yx, f"v0 (mxmat={mxmat})", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
+    im0 = make_map(ax, map0_yx, f"v0{subplot_title_suffix}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
     
     ylabel = "GGCMI-style"
     ax = make_axis(fig, ny, nx, 2)
-    im1 = make_map(ax, map1_yx, f"v1 (mxmat={mxmat})", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
+    im1 = make_map(ax, map1_yx, f"v1{subplot_title_suffix}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
     
     if thisVar == "GSLEN":
         ax = make_axis(fig, ny, nx, 3)
