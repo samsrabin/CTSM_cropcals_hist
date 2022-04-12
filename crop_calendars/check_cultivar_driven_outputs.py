@@ -539,6 +539,7 @@ varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "GSLEN", "GSLEN.onlyMature"]
 # varList = ["HUI_PERHARV"]
 # varList = ["GSLEN"]
 # varList = ["GSLEN.onlyMature"]
+# varList = ["GSLEN", "GSLEN.onlyMature"]
 
 for thisVar in varList:
     
@@ -578,7 +579,8 @@ for thisVar in varList:
     if nx != 1:
         print(f"Since nx = {nx}, you may need to rework some parameters")
     if ny == 3:
-        cbar_ax_rect = [0.2, 0.05, 0.6, 0.05]
+        cbar_width = 0.46
+        cbar_ax_rect = [(1-cbar_width)/2, 0.05, cbar_width, 0.05]
     elif ny != 2:
         print(f"Since ny = {ny}, you may need to rework some parameters")
 
@@ -660,7 +662,7 @@ for thisVar in varList:
             ax = make_axis(fig, ny, nx, 3)
             im1 = make_map(ax, ggcmi_yx, f"GGCMI (max={ggcmi_max})", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
             
-        fig.suptitle(f"{title_prefix}: {vegtype_str3}")
+        fig.suptitle(f"{title_prefix}:\n{vegtype_str3}", y=1.04)
         fig.subplots_adjust(bottom=cbar_adj_bottom)
         cbar_ax = fig.add_axes(cbar_ax_rect)
         cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
