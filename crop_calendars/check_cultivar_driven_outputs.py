@@ -20,11 +20,15 @@ sdates_rx_file = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_
 hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
 
 # Directory where model output file(s) can be found (figure files will be saved in subdir here)
-indir0 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/"
-# indir1 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/"
-# indir1 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-08-gddforced/"
-# indir1 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-ts01/"
-indir1 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforced/"
+indirs = list()
+indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/"))
+# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/"))
+# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-08-gddforced/"))
+# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-ts01/"))
+indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforced/"))
+
+if len(indirs) != 2:
+    raise RuntimeError(f"For now, indirs must have 2 members (found {len(indirs)}")
 
 import enum
 from multiprocessing.sharedctypes import Value
@@ -50,7 +54,8 @@ warnings.filterwarnings("ignore", message="__len__ for multi-part geometries is 
 warnings.filterwarnings("ignore", message="Iteration over multi-part geometries is deprecated and will be removed in Shapely 2.0. Use the `geoms` property to access the constituent parts of a multi-part geometry.")
 
 # Directory to save output figures
-outdir_figs = os.path.join(indir1, f"figs_comp_{os.path.basename(os.path.dirname(indir0))}")
+indir0 = indirs[0]["path"]
+outdir_figs = os.path.join(indirs[1]["path"], f"figs_comp_{os.path.basename(os.path.dirname(indir0))}")
 if not os.path.exists(outdir_figs):
     os.makedirs(outdir_figs)
 
@@ -280,12 +285,12 @@ print("Importing CLM output sowing and harvest dates...")
 
 extra_annual_vars = ["GDDACCUM_PERHARV", "GDDHARV_PERHARV", "HARVEST_REASON_PERHARV", "HUI_PERHARV"]
 
-dates_ds1_orig = utils.import_ds(glob.glob(indir1 + "*h2.*"), \
+dates_ds1_orig = utils.import_ds(glob.glob(indirs[1]["path"] + "*h2.*"), \
     myVars=["SDATES", "HDATES"] + extra_annual_vars, 
     myVegtypes=utils.define_mgdcrop_list())
 dates_ds1_orig = check_and_trim_years(y1, yN, get_year_from_cftime, dates_ds1_orig)
 
-dates_ds0_orig = utils.import_ds(glob.glob(indir0 + "*h2.*"), \
+dates_ds0_orig = utils.import_ds(glob.glob(indirs[0]["path"] + "*h2.*"), \
     myVars=["SDATES", "HDATES"] + extra_annual_vars, 
     myVegtypes=utils.define_mgdcrop_list())
 dates_ds0_orig = check_and_trim_years(y1, yN, get_year_from_cftime, dates_ds0_orig)
