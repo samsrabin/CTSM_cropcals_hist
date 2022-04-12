@@ -453,6 +453,7 @@ nx = len(reason_list)
 figsize = (8, 4)
 cbar_adj_bottom = 0.15
 cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
+cmap = plt.cm.viridis
 if nx != 2:
     print(f"Since nx = {nx}, you may need to rework some parameters")
 
@@ -477,12 +478,12 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
         ylabel = "CLM5-style" if f==0 else None
         map0_yx = get_reason_freq_map(Ngs, thisCrop0_gridded, reason)
         ax = make_axis(fig, ny, nx, f+1)
-        im0 = make_map(ax, map0_yx, f"v0: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles)
+        im0 = make_map(ax, map0_yx, f"v0: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
         ylabel = "GGCMI-style" if f==0 else None
         ax = make_axis(fig, ny, nx, f+nx+1)
         map1_yx = get_reason_freq_map(Ngs, thisCrop1_gridded, reason)
-        im1 = make_map(ax, map1_yx, f"v1: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles)
+        im1 = make_map(ax, map1_yx, f"v1: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
     fig.suptitle(f"Harvest reason: {vegtype_str}")
     fig.subplots_adjust(bottom=cbar_adj_bottom)
