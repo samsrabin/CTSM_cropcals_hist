@@ -21,11 +21,14 @@ hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_
 
 # Directory where model output file(s) can be found (figure files will be saved in subdir here)
 indirs = list()
-indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/"))
-# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/"))
-# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-08-gddforced/"))
-# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-ts01/"))
-indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforced/"))
+# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/",
+#                    used_clm_mxmat = True))
+indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/",
+                   used_clm_mxmat = True))
+# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-08-gddforced/",
+#                    used_clm_mxmat = True))
+indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforced/",
+                   used_clm_mxmat = False))
 
 if len(indirs) != 2:
     raise RuntimeError(f"For now, indirs must have 2 members (found {len(indirs)}")
@@ -499,105 +502,121 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
 
 # %% Make map of means 
 
-# thisVar = "GDDHARV_PERHARV"
-# thisVar = "HUI_PERHARV"
-thisVar = "GSLEN"
+varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "GSLEN"]
+# varList = ["GDDHARV_PERHARV"]
+# varList = ["HUI_PERHARV"]
+# varList = ["GSLEN"]
 
-ny = 2
-nx = 1
-vmin = 0
-if thisVar == "GDDHARV_PERHARV":
-    title_prefix = "Harv. thresh."
-    filename_prefix = "harvest_thresh"
-    units = "GDD"
-elif thisVar == "HUI_PERHARV":
-    title_prefix = "HUI"
-    filename_prefix = "hui"
-    units = "GDD"
-elif thisVar == "GSLEN":
-    title_prefix = "Seas. length"
-    filename_prefix = "seas_length"
-    units = "Days"
-    ny = 3
+for thisVar in varList:
+
+    ny = 2
     nx = 1
-    vmin = None
-else:
-    raise RuntimeError(f"thisVar {thisVar} not recognized")
-
-figsize = (4, 4)
-cbar_adj_bottom = 0.15
-cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
-if nx != 1:
-    print(f"Since nx = {nx}, you may need to rework some parameters")
-if ny == 3:
-    cbar_ax_rect = [0.2, 0.05, 0.6, 0.05]
-elif ny != 2:
-    print(f"Since ny = {ny}, you may need to rework some parameters")
-
-for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
-    if vegtype_str not in dates_ds0.patches1d_itype_veg_str.values:
-        continue
-    vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
-    if vegtype_str == "soybean":
-        vegtype_str2 = "temperate_soybean"
-    elif vegtype_str == "irrigated_soybean":
-        vegtype_str2 = "irrigated_temperate_soybean"
+    vmin = 0.0
+    if thisVar == "GDDHARV_PERHARV":
+        title_prefix = "Harv. thresh."
+        filename_prefix = "harvest_thresh"
+        units = "GDD"
+    elif thisVar == "HUI_PERHARV":
+        title_prefix = "HUI"
+        filename_prefix = "hui"
+        units = "GDD"
+    elif thisVar == "GSLEN":
+        title_prefix = "Seas. length"
+        filename_prefix = "seas_length"
+        units = "Days"
+        ny = 3
+        nx = 1
+        vmin = None
     else:
-        vegtype_str2 = vegtype_str
-    
-    # Grid
-    thisCrop0_gridded = utils.grid_one_variable(dates_ds0, thisVar, \
-        vegtype=vegtype_int).squeeze(drop=True)
-    thisCrop1_gridded = utils.grid_one_variable(dates_ds1, thisVar, \
-        vegtype=vegtype_int).squeeze(drop=True)
-    
-    # Set up figure 
-    fig = plt.figure(figsize=figsize)
-    subplot_title_suffix = ""
-    
-    # Get means
-    map0_yx = np.mean(thisCrop0_gridded, axis=0)
-    map1_yx = np.mean(thisCrop1_gridded, axis=0)
-    vmax = max(np.nanmax(map0_yx), np.nanmax(map1_yx))
-    if vmin == None:
-        vmin = int(np.floor(min(np.nanmin(map0_yx), np.nanmin(map1_yx))))
-    if thisVar == "GSLEN":
-        mxmat = int(paramfile_mxmats[paramfile_pftnames.index(vegtype_str2)])
-        if not mxmat > 0:
-            raise RuntimeError(f"Error getting mxmat: {mxmat}")
-        longest_gs = max(np.nanmax(map0_yx), np.nanmax(map1_yx))
-        if longest_gs > mxmat:
-            raise RuntimeError(f"mxmat {mxmat} but max simulated {longest_gs}")
-        ggcmi_yx = gs_len_rx_ds[f"gs1_{vegtype_int}"].isel(time=0, drop=True)
-        ggcmi_yx = ggcmi_yx.where(np.bitwise_not(np.isnan(map1_yx)))
-        ggcmi_max = int(np.nanmax(ggcmi_yx.values))
-        vmax = max(mxmat, ggcmi_max)
-        subplot_title_suffix = f" (mxmat={mxmat}"
-    
-    ylabel = "CLM5-style"
-    ax = make_axis(fig, ny, nx, 1)
-    im0 = make_map(ax, map0_yx, f"v0{subplot_title_suffix}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
-    
-    ylabel = "GGCMI-style"
-    ax = make_axis(fig, ny, nx, 2)
-    im1 = make_map(ax, map1_yx, f"v1{subplot_title_suffix}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
-    
-    if thisVar == "GSLEN":
-        ax = make_axis(fig, ny, nx, 3)
-        im1 = make_map(ax, ggcmi_yx, f"GGCMI (max={ggcmi_max})", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
+        raise RuntimeError(f"thisVar {thisVar} not recognized")
+
+    figsize = (4, 4)
+    cbar_adj_bottom = 0.15
+    cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
+    if nx != 1:
+        print(f"Since nx = {nx}, you may need to rework some parameters")
+    if ny == 3:
+        cbar_ax_rect = [0.2, 0.05, 0.6, 0.05]
+    elif ny != 2:
+        print(f"Since ny = {ny}, you may need to rework some parameters")
+
+    for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
+        if vegtype_str not in dates_ds0.patches1d_itype_veg_str.values:
+            continue
+        vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+        if vegtype_str == "soybean":
+            vegtype_str2 = "temperate_soybean"
+        elif vegtype_str == "irrigated_soybean":
+            vegtype_str2 = "irrigated_temperate_soybean"
+        else:
+            vegtype_str2 = vegtype_str
         
-    fig.suptitle(f"{title_prefix}: {vegtype_str}")
-    fig.subplots_adjust(bottom=cbar_adj_bottom)
-    cbar_ax = fig.add_axes(cbar_ax_rect)
-    cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
-    cbar_ax.tick_params(labelsize=fontsize_ticklabels)
-    plt.xlabel(units, fontsize=fontsize_titles)
-    
-    # plt.show()
-    # break
-    
-    # Save
-    outfile = os.path.join(outdir_figs, f"{filename_prefix}_0vs1_{vegtype_str}.png")
-    plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
-            bbox_inches='tight')
-    plt.close()
+        # Grid
+        thisCrop0_gridded = utils.grid_one_variable(dates_ds0, thisVar, \
+            vegtype=vegtype_int).squeeze(drop=True)
+        thisCrop1_gridded = utils.grid_one_variable(dates_ds1, thisVar, \
+            vegtype=vegtype_int).squeeze(drop=True)
+        
+        # Set up figure 
+        fig = plt.figure(figsize=figsize)
+        subplot_title_suffixes = ["", ""]
+        
+        # Get means
+        map0_yx = np.mean(thisCrop0_gridded, axis=0)
+        map1_yx = np.mean(thisCrop1_gridded, axis=0)
+        max0 = int(np.ceil(np.nanmax(map0_yx)))
+        max1 = int(np.ceil(np.nanmax(map1_yx)))
+        vmax = max(max0, max1)
+        if vmin == None:
+            vmin = int(np.floor(min(np.nanmin(map0_yx), np.nanmin(map1_yx))))
+        if thisVar == "GSLEN":
+            mxmat = int(paramfile_mxmats[paramfile_pftnames.index(vegtype_str2)])
+            if not mxmat > 0:
+                raise RuntimeError(f"Error getting mxmat: {mxmat}")
+            
+            longest_gs = max(max0, max1)
+            subplot_title_suffixes = ["", ""]
+            if indirs[0]["used_clm_mxmat"]:
+                if max0 > mxmat:
+                    raise RuntimeError(f"v0: mxmat {mxmat} but max simulated {max0}")
+                subplot_title_suffixes[0] = f" (mxmat={mxmat})"
+            else:
+                subplot_title_suffixes[0] = f" (max={max0})"
+            if indirs[1]["used_clm_mxmat"]:
+                if max1 > mxmat:
+                    raise RuntimeError(f"v1: mxmat {mxmat} but max simulated {max1}")
+                subplot_title_suffixes[1] = f" (mxmat={mxmat})"
+            else:
+                subplot_title_suffixes[1] = f" (max={max1})"
+            ggcmi_yx = gs_len_rx_ds[f"gs1_{vegtype_int}"].isel(time=0, drop=True)
+            ggcmi_yx = ggcmi_yx.where(np.bitwise_not(np.isnan(map1_yx)))
+            ggcmi_max = int(np.nanmax(ggcmi_yx.values))
+            vmax = max(max0, max1, ggcmi_max)
+        
+        ylabel = "CLM5-style"
+        ax = make_axis(fig, ny, nx, 1)
+        im0 = make_map(ax, map0_yx, f"v0{subplot_title_suffixes[0]}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
+        
+        ylabel = "GGCMI-style"
+        ax = make_axis(fig, ny, nx, 2)
+        im1 = make_map(ax, map1_yx, f"v1{subplot_title_suffixes[1]}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
+        
+        if thisVar == "GSLEN":
+            ax = make_axis(fig, ny, nx, 3)
+            im1 = make_map(ax, ggcmi_yx, f"GGCMI (max={ggcmi_max})", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
+            
+        fig.suptitle(f"{title_prefix}: {vegtype_str}")
+        fig.subplots_adjust(bottom=cbar_adj_bottom)
+        cbar_ax = fig.add_axes(cbar_ax_rect)
+        cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
+        cbar_ax.tick_params(labelsize=fontsize_ticklabels)
+        plt.xlabel(units, fontsize=fontsize_titles)
+        
+        # plt.show()
+        # break
+        
+        # Save
+        outfile = os.path.join(outdir_figs, f"{filename_prefix}_0vs1_{vegtype_str}.png")
+        plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+                bbox_inches='tight')
+        plt.close()
