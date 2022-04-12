@@ -414,9 +414,23 @@ check_gddaccum_le_hui(dates_ds1, 1)
 
 thisVar = "HARVEST_REASON_PERHARV"
 
+reason_list_text_all = [ \
+    "???",                 # 0; should never actually be saved
+    "Crop mature",         # 1
+    "Max gs length",       # 2
+    "Bad Dec31 sowing",    # 3
+    "Sowing today",        # 4
+    "Sowing tomorrow",     # 5
+    "Sown a yr ago tmrw.", # 6
+    "Sowing tmrw. (Jan 1)" # 7
+    ]
+
 reason_list = np.unique(np.concatenate( \
     (np.unique(dates_ds0.HARVEST_REASON_PERHARV.values), \
     np.unique(dates_ds1.HARVEST_REASON_PERHARV.values))))
+reason_list = [int(x) for x in reason_list]
+
+reason_list_text = [reason_list_text_all[x] for x in reason_list]
  
 def get_reason_freq_map(Ngs, thisCrop_gridded, reason):
     map_yx = np.sum(thisCrop_gridded==reason, axis=0, keepdims=False) / Ngs
@@ -449,19 +463,19 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
     
     # Map each reason's frequency
     for f, reason in enumerate(reason_list):
-        reason = int(reason)
+        reason_text = reason_list_text[f]
         
         ylabel = "CLM5-style" if f==0 else None
         map0_yx = get_reason_freq_map(Ngs, thisCrop0_gridded, reason)
         ax = make_axis(fig, ny, nx, f+1)
-        im0 = make_map(ax, map0_yx, f"v0: Reason {reason}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles)
+        im0 = make_map(ax, map0_yx, f"v0: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles)
         
         ylabel = "GGCMI-style" if f==0 else None
         ax = make_axis(fig, ny, nx, f+nx+1)
         map1_yx = get_reason_freq_map(Ngs, thisCrop1_gridded, reason)
-        im1 = make_map(ax, map1_yx, f"v1: Reason {reason}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles)
+        im1 = make_map(ax, map1_yx, f"v1: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles)
         
-    fig.suptitle(vegtype_str)
+    fig.suptitle(f"Harvest reason: {vegtype_str}")
     fig.subplots_adjust(bottom=cbar_adj_bottom)
     cbar_ax = fig.add_axes(cbar_ax_rect)
     cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
