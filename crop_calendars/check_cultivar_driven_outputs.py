@@ -282,6 +282,27 @@ def make_axis(fig, ny, nx, n):
     ax.spines['geo'].set_visible(False) # Turn off box outline
     return ax
 
+# Get vegtype str for figure titles
+def get_vegtype_str_for_title(vegtype_str):
+    vegtype_str3 = vegtype_str
+    if "irrigated" in vegtype_str:
+        vegtype_str3 = vegtype_str3.replace("irrigated_", "") + " (ir)"
+    else:
+        vegtype_str3 = vegtype_str3 + " (rf)"
+    if "temperate" in vegtype_str:
+        vegtype_str3 = vegtype_str3.replace("temperate_", "temp. ")
+    if "tropical" in vegtype_str:
+        vegtype_str3 = vegtype_str3.replace("tropical_", "trop. ")
+    elif "soybean" in vegtype_str:
+        vegtype_str3 = "temp. " + vegtype_str3
+    if "soybean" in vegtype_str:
+        vegtype_str3 = vegtype_str3.replace("soybean", "soy")
+    if "spring" in vegtype_str:
+        vegtype_str3 = vegtype_str3.replace("spring_", "spr. ")
+    if "winter" in vegtype_str:
+        vegtype_str3 = vegtype_str3.replace("winter_", "win.")
+    return vegtype_str3
+
 
 # %% Import output sowing and harvest dates, etc.
 
@@ -462,6 +483,9 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
         continue
     vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
     
+    # Get vegtype str for figure titles
+    vegtype_str3 = get_vegtype_str_for_title(vegtype_str)
+    
     # Grid
     thisCrop0_gridded = utils.grid_one_variable(dates_ds0, thisVar, \
         vegtype=vegtype_int).squeeze(drop=True)
@@ -485,7 +509,7 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
         map1_yx = get_reason_freq_map(Ngs, thisCrop1_gridded, reason)
         im1 = make_map(ax, map1_yx, f"v1: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
-    fig.suptitle(f"Harvest reason: {vegtype_str}")
+    fig.suptitle(f"Harvest reason: {vegtype_str3}")
     fig.subplots_adjust(bottom=cbar_adj_bottom)
     cbar_ax = fig.add_axes(cbar_ax_rect)
     cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
@@ -547,12 +571,17 @@ for thisVar in varList:
         if vegtype_str not in dates_ds0.patches1d_itype_veg_str.values:
             continue
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+        
+        # Get vegtype str used in parameter file
         if vegtype_str == "soybean":
             vegtype_str2 = "temperate_soybean"
         elif vegtype_str == "irrigated_soybean":
             vegtype_str2 = "irrigated_temperate_soybean"
         else:
             vegtype_str2 = vegtype_str
+            
+        # Get vegtype str for figure titles
+        vegtype_str3 = get_vegtype_str_for_title(vegtype_str)
         
         # Grid
         thisCrop0_gridded = utils.grid_one_variable(dates_ds0, thisVar, \
@@ -611,7 +640,7 @@ for thisVar in varList:
             ax = make_axis(fig, ny, nx, 3)
             im1 = make_map(ax, ggcmi_yx, f"GGCMI (max={ggcmi_max})", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
             
-        fig.suptitle(f"{title_prefix}: {vegtype_str}")
+        fig.suptitle(f"{title_prefix}: {vegtype_str3}")
         fig.subplots_adjust(bottom=cbar_adj_bottom)
         cbar_ax = fig.add_axes(cbar_ax_rect)
         cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
