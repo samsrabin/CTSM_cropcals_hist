@@ -387,8 +387,11 @@ for v in constantVars:
                     thisLat = dates_ds1.patches1d_lat.values[thisPatch]
                     thisCrop = dates_ds1.patches1d_itype_veg_str.values[thisPatch]
                     thisStr = f"Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop}"
-                    print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
-                break
+                    if v == "SDATES":
+                        print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
+                    else:
+                        print(f"{thisStr}: {t1_yr} {v} {int(t1_vals[thisPatch])}, {t_yr} {v} {int(t_vals[thisPatch])}")
+                    break
 
     if ok:
         print(f"✅ dates_ds1: CLM output {v} do not vary through {dates_ds1.dims['gs'] - t1} growing seasons of output.")
