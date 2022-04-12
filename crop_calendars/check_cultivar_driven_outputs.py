@@ -303,6 +303,12 @@ def get_vegtype_str_for_title(vegtype_str):
         vegtype_str3 = vegtype_str3.replace("winter_", "win.")
     return vegtype_str3
 
+def mask_immature(this_ds, this_vegtype, gridded_da):
+    reason_gridded = utils.grid_one_variable(this_ds, "HARVEST_REASON_PERHARV", \
+                vegtype=this_vegtype).squeeze(drop=True)
+    gridded_da = gridded_da.where(reason_gridded == 1)
+    return gridded_da
+
 
 # %% Import output sowing and harvest dates, etc.
 
@@ -528,12 +534,17 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
 
 # %% Make map of means 
 
-varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "GSLEN"]
+varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "GSLEN", "GSLEN.onlyMature"]
 # varList = ["GDDHARV_PERHARV"]
 # varList = ["HUI_PERHARV"]
 # varList = ["GSLEN"]
+# varList = ["GSLEN.onlyMature"]
 
 for thisVar in varList:
+    
+    onlyMature = "onlyMature" in thisVar
+    if onlyMature:
+        thisVar = thisVar.replace(".onlyMature", "")
 
     ny = 2
     nx = 1
@@ -556,6 +567,10 @@ for thisVar in varList:
         vmin = None
     else:
         raise RuntimeError(f"thisVar {thisVar} not recognized")
+    
+    if onlyMature:
+        title_prefix = title_prefix + " (if mat.)"
+        filename_prefix = filename_prefix + "_ifmature"
 
     figsize = (4, 4)
     cbar_adj_bottom = 0.15
@@ -588,6 +603,11 @@ for thisVar in varList:
             vegtype=vegtype_int).squeeze(drop=True)
         thisCrop1_gridded = utils.grid_one_variable(dates_ds1, thisVar, \
             vegtype=vegtype_int).squeeze(drop=True)
+        
+        # If needed, only include seasons where crop reached maturity
+        if onlyMature:
+            thisCrop0_gridded = mask_immature(dates_ds0, vegtype_int, thisCrop0_gridded)
+            thisCrop1_gridded = mask_immature(dates_ds1, vegtype_int, thisCrop1_gridded)
         
         # Set up figure 
         fig = plt.figure(figsize=figsize)
