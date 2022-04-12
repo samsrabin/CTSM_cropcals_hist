@@ -38,6 +38,7 @@ from multiprocessing.sharedctypes import Value
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import warnings
 import glob
 import cftime
@@ -250,10 +251,10 @@ fontsize_axislabels = 8
 fontsize_ticklabels = 7
 bin_width = 30
 lat_bin_edges = np.arange(0, 91, bin_width)
-def make_map(ax, this_map, this_title, ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles): 
+def make_map(ax, this_map, this_title, ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap): 
     im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
             this_map, shading="auto",
-            vmin=vmin, vmax=vmax)
+            vmin=vmin, vmax=vmax, cmap=cmap)
     ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
     ax.coastlines(linewidth=0.5, color="white")
     ax.coastlines(linewidth=0.3)
@@ -512,6 +513,7 @@ for thisVar in varList:
     ny = 2
     nx = 1
     vmin = 0.0
+    cmap = plt.cm.viridis
     if thisVar == "GDDHARV_PERHARV":
         title_prefix = "Harv. thresh."
         filename_prefix = "harvest_thresh"
@@ -571,39 +573,42 @@ for thisVar in varList:
             vmin = int(np.floor(min(np.nanmin(map0_yx), np.nanmin(map1_yx))))
         if thisVar == "GSLEN":
             mxmat = int(paramfile_mxmats[paramfile_pftnames.index(vegtype_str2)])
+            units = f"Days (mxmat: {mxmat})"
             if not mxmat > 0:
                 raise RuntimeError(f"Error getting mxmat: {mxmat}")
             
             longest_gs = max(max0, max1)
-            subplot_title_suffixes = ["", ""]
+            subplot_title_suffixes = [f" (max={max0})",
+                                      f" (max={max1})"]
             if indirs[0]["used_clm_mxmat"]:
                 if max0 > mxmat:
                     raise RuntimeError(f"v0: mxmat {mxmat} but max simulated {max0}")
-                subplot_title_suffixes[0] = f" (mxmat={mxmat})"
-            else:
-                subplot_title_suffixes[0] = f" (max={max0})"
             if indirs[1]["used_clm_mxmat"]:
                 if max1 > mxmat:
                     raise RuntimeError(f"v1: mxmat {mxmat} but max simulated {max1}")
-                subplot_title_suffixes[1] = f" (mxmat={mxmat})"
-            else:
-                subplot_title_suffixes[1] = f" (max={max1})"
             ggcmi_yx = gs_len_rx_ds[f"gs1_{vegtype_int}"].isel(time=0, drop=True)
             ggcmi_yx = ggcmi_yx.where(np.bitwise_not(np.isnan(map1_yx)))
             ggcmi_max = int(np.nanmax(ggcmi_yx.values))
             vmax = max(max0, max1, ggcmi_max)
+            
+            if vmax > mxmat:
+                Nok = mxmat - vmin + 1
+                Nbad = vmax - mxmat + 1
+                cmap_to_mxmat = plt.cm.viridis(np.linspace(0, 1, num=Nok))
+                cmap_after_mxmat = plt.cm.OrRd(np.linspace(0, 1, num=Nbad))
+                cmap = mcolors.LinearSegmentedColormap.from_list('my_colormap', np.vstack((cmap_to_mxmat, cmap_after_mxmat)))
         
         ylabel = "CLM5-style"
         ax = make_axis(fig, ny, nx, 1)
-        im0 = make_map(ax, map0_yx, f"v0{subplot_title_suffixes[0]}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
+        im0 = make_map(ax, map0_yx, f"v0{subplot_title_suffixes[0]}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
         ylabel = "GGCMI-style"
         ax = make_axis(fig, ny, nx, 2)
-        im1 = make_map(ax, map1_yx, f"v1{subplot_title_suffixes[1]}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
+        im1 = make_map(ax, map1_yx, f"v1{subplot_title_suffixes[1]}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
         if thisVar == "GSLEN":
             ax = make_axis(fig, ny, nx, 3)
-            im1 = make_map(ax, ggcmi_yx, f"GGCMI (max={ggcmi_max})", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles)
+            im1 = make_map(ax, ggcmi_yx, f"GGCMI (max={ggcmi_max})", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
             
         fig.suptitle(f"{title_prefix}: {vegtype_str}")
         fig.subplots_adjust(bottom=cbar_adj_bottom)
