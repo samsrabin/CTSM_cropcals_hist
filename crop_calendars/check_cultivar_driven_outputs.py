@@ -7,28 +7,24 @@ yN = 2009
 # Your path to ctsm_py directory (i.e., where utils.py lives)
 my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
 
+# CLM max growing season length, mxmat, is stored in the following files:
+#   * clm5_1: lnd/clm2/paramdata/ctsm51_params.c211112.nc
+#   * clm5_0: lnd/clm2/paramdata/clm50_params.c211112.nc
+#   * clm4_5: lnd/clm2/paramdata/clm45_params.c211112.nc
+paramfile_dir = "/Users/Shared/CESM_inputdata/lnd/clm2/paramdata/"
+my_clm_ver = 51
+my_clm_subver = "c211112"
+
+# Prescribed sowing and harvest dates
+sdates_rx_file = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
+hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
+
 # Directory where model output file(s) can be found (figure files will be saved in subdir here)
-# indir1 = "/Users/Shared/CESM_runs/f10_f10_mg37_GDDtest/"
-# indir1 = "/Users/Shared/CESM_runs/1537-crop-date-outputs3/"
-# indir0 = "/Users/Shared/CESM_runs/1537-crop-date-outputs3_pre1628/"
-# indir0 = "/Users/Shared/CESM_runs/1537-crop-date-outputs3_justmerged/"
-# indir0 = "/Users/Shared/CESM_runs/1537-crop-date-outputs3_justmerged_neg1/"
-# indir0 = "/Users/Shared/CESM_runs/1537-crop-date-outputs3/"
-# indir1 = "/Users/Shared/CESM_runs/1537-crop-date-outputs3_restart/"
-# indir1 = "/Users/Shared/CESM_runs/1537-crop-date-outputs3/"
-# indir1 = "/Users/Shared/CESM_runs/1537-crop-date-outputs3_justmerged_neg1_restart/"
-
-# indir0 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-03-30/"
-# indir1 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-03-31/"
-# indir1 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-04-ts01/"
-
 indir0 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/"
-indir1 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/"
-
-# Directory to save output figures
-outdir_figs = indir1 + "figs/"
-if not os.path.exists(outdir_figs):
-    os.makedirs(outdir_figs)
+# indir1 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/"
+# indir1 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-08-gddforced/"
+# indir1 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-ts01/"
+indir1 = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforced/"
 
 import enum
 from multiprocessing.sharedctypes import Value
@@ -52,6 +48,11 @@ import utils
 import warnings
 warnings.filterwarnings("ignore", message="__len__ for multi-part geometries is deprecated and will be removed in Shapely 2.0. Check the length of the `geoms` property instead to get the  number of parts of a multi-part geometry.")
 warnings.filterwarnings("ignore", message="Iteration over multi-part geometries is deprecated and will be removed in Shapely 2.0. Use the `geoms` property to access the constituent parts of a multi-part geometry.")
+
+# Directory to save output figures
+outdir_figs = os.path.join(indir1, f"figs_comp_{os.path.basename(os.path.dirname(indir0))}")
+if not os.path.exists(outdir_figs):
+    os.makedirs(outdir_figs)
 
 def import_rx_dates(s_or_h, date_inFile, dates_ds1_orig):
     # Get run info:
@@ -296,10 +297,7 @@ Ngs = dates_ds1_orig.dims['time'] - 1
 #   * clm5_1: lnd/clm2/paramdata/ctsm51_params.c211112.nc
 #   * clm5_0: lnd/clm2/paramdata/clm50_params.c211112.nc
 #   * clm4_5: lnd/clm2/paramdata/clm45_params.c211112.nc
-my_clm_ver = 51
-my_clm_subver = "c211112"
-paramfile_dir = "/Users/Shared/CESM_inputdata/lnd/clm2/paramdata/"
-pattern = f"{paramfile_dir}/*{my_clm_ver}_params.{my_clm_subver}.nc"
+pattern = os.path.join(paramfile_dir,f"*{my_clm_ver}_params.{my_clm_subver}.nc")
 paramfile = glob.glob(pattern)
 if len(paramfile) != 1:
     raise RuntimeError(f"Expected to find 1 match of {pattern}; found {len(paramfile)}")
@@ -338,8 +336,8 @@ def import_rx_dates(s_or_h, date_inFile, dates_ds):
     
     return ds
 
-sdates_rx_ds = import_rx_dates("s", "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc", dates_ds0_orig)
-hdates_rx_ds = import_rx_dates("h", "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc", dates_ds0_orig)
+sdates_rx_ds = import_rx_dates("s", sdates_rx_file, dates_ds0_orig)
+hdates_rx_ds = import_rx_dates("h", hdates_rx_file, dates_ds0_orig)
 
 # Get GGCMI growing season lengths
 def get_gs_len_da(this_da):
@@ -468,9 +466,10 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
     plt.xlabel("Frequency", fontsize=fontsize_titles)
     
     # plt.show()
+    # break
     
     # Save
-    outfile = outdir_figs + f"harvest_reason_0vs1_{vegtype_str}.png"
+    outfile = os.path.join(outdir_figs, f"harvest_reason_0vs1_{vegtype_str}.png")
     plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
             bbox_inches='tight')
     plt.close()
@@ -573,7 +572,7 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
     # break
     
     # Save
-    outfile = outdir_figs + f"{filename_prefix}_0vs1_{vegtype_str}.png"
+    outfile = os.path.join(outdir_figs, f"{filename_prefix}_0vs1_{vegtype_str}.png")
     plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
             bbox_inches='tight')
     plt.close()
