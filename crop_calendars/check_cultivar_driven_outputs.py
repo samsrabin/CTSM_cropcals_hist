@@ -56,6 +56,7 @@ import utils
 import warnings
 warnings.filterwarnings("ignore", message="__len__ for multi-part geometries is deprecated and will be removed in Shapely 2.0. Check the length of the `geoms` property instead to get the  number of parts of a multi-part geometry.")
 warnings.filterwarnings("ignore", message="Iteration over multi-part geometries is deprecated and will be removed in Shapely 2.0. Use the `geoms` property to access the constituent parts of a multi-part geometry.")
+warnings.filterwarnings("ignore", message="All-NaN slice encountered")
 
 # Directory to save output figures
 indir0 = indirs[0]["path"]
@@ -310,6 +311,18 @@ def mask_immature(this_ds, this_vegtype, gridded_da):
     return gridded_da
 
 
+def remove_outliers(gridded_da):
+    gs_axis = gridded_da.dims.index("gs")
+    pctle25 = np.nanpercentile(gridded_da, q=25, axis=gs_axis)
+    pctle75 = np.nanpercentile(gridded_da, q=75, axis=gs_axis)
+    iqr = pctle75 - pctle25
+    outlier_thresh_lo = pctle25 - iqr
+    outlier_thresh_up = pctle75 - iqr
+    not_outlier = np.bitwise_and(gridded_da > outlier_thresh_lo, gridded_da < outlier_thresh_up)
+    gridded_da = gridded_da.where(not_outlier)
+    return gridded_da
+
+
 # %% Import output sowing and harvest dates, etc.
 
 print("Importing CLM output sowing and harvest dates...")
@@ -543,25 +556,36 @@ varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "GSLEN", "GSLEN.onlyMature"]
 
 for thisVar in varList:
     
+    # Processing options
+    title_prefix = ""
+    filename_prefix = ""
     onlyMature = "onlyMature" in thisVar
     if onlyMature:
         thisVar = thisVar.replace(".onlyMature", "")
+        title_prefix = title_prefix + " (if mat.)"
+        filename_prefix = filename_prefix + "_ifmature"
+    noOutliers = "noOutliers" in thisVar
+    if noOutliers:
+        thisVar = thisVar.replace(".noOutliers", "")
+        title_prefix = title_prefix + " (no outl.)"
+        filename_prefix = filename_prefix + "_nooutliers"
+    useMedian = "useMedian" in thisVar
 
     ny = 2
     nx = 1
     vmin = 0.0
     cmap = plt.cm.viridis
     if thisVar == "GDDHARV_PERHARV":
-        title_prefix = "Harv. thresh."
-        filename_prefix = "harvest_thresh"
+        title_prefix = "Harv. thresh." + title_prefix
+        filename_prefix = "harvest_thresh" + filename_prefix
         units = "GDD"
     elif thisVar == "HUI_PERHARV":
-        title_prefix = "HUI"
-        filename_prefix = "hui"
+        title_prefix = "HUI" + title_prefix
+        filename_prefix = "hui" + filename_prefix
         units = "GDD"
     elif thisVar == "GSLEN":
-        title_prefix = "Seas. length"
-        filename_prefix = "seas_length"
+        title_prefix = "Seas. length" + title_prefix
+        filename_prefix = "seas_length" + filename_prefix
         units = "Days"
         ny = 3
         nx = 1
@@ -569,10 +593,6 @@ for thisVar in varList:
     else:
         raise RuntimeError(f"thisVar {thisVar} not recognized")
     
-    if onlyMature:
-        title_prefix = title_prefix + " (if mat.)"
-        filename_prefix = filename_prefix + "_ifmature"
-
     figsize = (4, 4)
     cbar_adj_bottom = 0.15
     cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
@@ -610,6 +630,11 @@ for thisVar in varList:
         if onlyMature:
             thisCrop0_gridded = mask_immature(dates_ds0, vegtype_int, thisCrop0_gridded)
             thisCrop1_gridded = mask_immature(dates_ds1, vegtype_int, thisCrop1_gridded)
+            
+        # If needed, remove outliers
+        if noOutliers:
+            thisCrop0_gridded = remove_outliers(thisCrop0_gridded)
+            thisCrop1_gridded = remove_outliers(thisCrop1_gridded)
         
         # Set up figure 
         fig = plt.figure(figsize=figsize)
@@ -670,6 +695,7 @@ for thisVar in varList:
         plt.xlabel(units, fontsize=fontsize_titles)
         
         # plt.show()
+        # print(os.path.join(outdir_figs, f"{filename_prefix}_0vs1_{vegtype_str}.png"))
         # break
         
         # Save
