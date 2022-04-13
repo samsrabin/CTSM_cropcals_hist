@@ -719,8 +719,8 @@ for thisVar in varList:
 # varList = ["GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.noOutliers", "GSLEN.onlyMature.useMedian"]
 # varList = ["GDDHARV_PERHARV"]
 # varList = ["HUI_PERHARV"]
-varList = ["GSLEN"]
-# varList = ["GSLEN.onlyMature"]
+# varList = ["GSLEN"]
+varList = ["GSLEN.onlyMature"]
 # varList = ["GSLEN", "GSLEN.onlyMature"]
 # varList = ["GSLEN.onlyMature.noOutliers"]
 # varList = ["GSLEN.onlyMature.useMedian"]
@@ -928,18 +928,27 @@ for thisVar in varList:
         else:
             map1_yx = np.mean(thisCrop1_gridded, axis=0)
         
+        # Get "prescribed" growing season length
+        map2_yx = gs_len_rx_ds[f"gs1_{vegtype_int}"].isel(time=0, drop=True)
+        map2_yx = map2_yx.where(np.bitwise_not(np.isnan(map1_yx)))
+        
         # Set up figure 
         fig = plt.figure(figsize=figsize)
         subplot_title_suffixes = ["", ""]
         
         # Set colorbar etc.
         min1 = int(np.ceil(np.nanmin(map1_yx)))
-        vmin = min(min1, np.nanmin(ggcmiDS["matyday"].values))
+        min2 = int(np.ceil(np.nanmin(map2_yx)))
+        vmin = min(min1, min2, np.nanmin(ggcmiDS["matyday"].values))
         max1 = int(np.ceil(np.nanmax(map1_yx)))
-        vmax = max(max1, np.nanmax(ggcmiDS["matyday"].values))
+        max2 = int(np.ceil(np.nanmax(map2_yx)))
+        vmax = max(max1, max2, np.nanmax(ggcmiDS["matyday"].values))
         
         ax = make_axis(fig, ny, nx, 1)
         im1 = make_map(ax, map1_yx, "CLM", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
+        
+        ax = make_axis(fig, ny, nx, 2)
+        im1 = make_map(ax, map2_yx, "CLM expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
         
         for g in np.arange(Nggcmi_models):
             thisGGCMI_gridded = ggcmiDS["matyday"].isel(model=g, drop=True)
@@ -947,10 +956,8 @@ for thisVar in varList:
                 ggcmi_yx = thisGGCMI_gridded.median(axis=0)
             else:
                 ggcmi_yx = np.mean(thisGGCMI_gridded, axis=0)
-            ax = make_axis(fig, ny, nx, 1+g+1)
+            ax = make_axis(fig, ny, nx, 2+g+1)
             im1 = make_map(ax, ggcmi_yx, ggcmi_models[g], "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
-        #     omerieabr
-        # eruinerien
             
         fig.suptitle(f"{title_prefix}:\n{vegtype_str3}", y=1.04)
         fig.subplots_adjust(bottom=cbar_adj_bottom)
@@ -961,9 +968,9 @@ for thisVar in varList:
         
         plt.subplots_adjust(wspace=0, hspace=0.3)
         
-        plt.show()
-        print(os.path.join(outdir_figs, f"{filename_prefix}_{vegtype_str}.png"))
-        break
+        # plt.show()
+        # print(os.path.join(outdir_figs, f"{filename_prefix}_{vegtype_str}.png"))
+        # break
         
         # Save
         outfile = os.path.join(outdir_figs, f"{filename_prefix}_{vegtype_str}.png")
