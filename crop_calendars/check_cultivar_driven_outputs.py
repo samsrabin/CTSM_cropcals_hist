@@ -18,6 +18,7 @@ my_clm_subver = "c211112"
 # Prescribed sowing and harvest dates
 sdates_rx_file = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
 hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
+gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220331_144207.nc"
 
 # Directory where model output file(s) can be found (figure files will be saved in subdir here)
 indirs = list()
@@ -64,27 +65,27 @@ outdir_figs = os.path.join(indirs[1]["path"], f"figs_comp_{os.path.basename(os.p
 if not os.path.exists(outdir_figs):
     os.makedirs(outdir_figs)
 
-def import_rx_dates(s_or_h, date_inFile, dates_ds1_orig):
+def import_rx_dates(var_prefix, date_inFile, dates_ds):
     # Get run info:
     # Max number of growing seasons per year
-    if "mxsowings" in dates_ds1_orig:
-        mxsowings = dates_ds1_orig.dims["mxsowings"]
+    if "mxsowings" in dates_ds:
+        mxsowings = dates_ds.dims["mxsowings"]
     else:
         mxsowings = 1
         
     # Which vegetation types were simulated?
-    itype_veg_toImport = np.unique(dates_ds1_orig.patches1d_itype_veg)
+    itype_veg_toImport = np.unique(dates_ds.patches1d_itype_veg)
 
     date_varList = []
     for i in itype_veg_toImport:
         for g in np.arange(mxsowings):
-            thisVar = f"{s_or_h}date{g+1}_{i}"
+            thisVar = f"{var_prefix}{g+1}_{i}"
             date_varList = date_varList + [thisVar]
 
     ds = utils.import_ds(date_inFile, myVars=date_varList)
     
     for v in ds:
-        ds = ds.rename({v: v.replace(f"{s_or_h}date","gs")})
+        ds = ds.rename({v: v.replace(var_prefix,"gs")})
     
     return ds
 
@@ -361,32 +362,9 @@ print("Done.")
 
 # %% Import GGCMI sowing and harvest dates
 
-def import_rx_dates(s_or_h, date_inFile, dates_ds):
-    # Get run info:
-    # Max number of growing seasons per year
-    if "mxsowings" in dates_ds:
-        mxsowings = dates_ds.dims["mxsowings"]
-    else:
-        mxsowings = 1
-        
-    # Which vegetation types were simulated?
-    itype_veg_toImport = np.unique(dates_ds.patches1d_itype_veg)
-
-    date_varList = []
-    for i in itype_veg_toImport:
-        for g in np.arange(mxsowings):
-            thisVar = f"{s_or_h}date{g+1}_{i}"
-            date_varList = date_varList + [thisVar]
-
-    ds = utils.import_ds(date_inFile, myVars=date_varList)
-    
-    for v in ds:
-        ds = ds.rename({v: v.replace(f"{s_or_h}date","gs")})
-    
-    return ds
-
-sdates_rx_ds = import_rx_dates("s", sdates_rx_file, dates_ds0_orig)
-hdates_rx_ds = import_rx_dates("h", hdates_rx_file, dates_ds0_orig)
+sdates_rx_ds = import_rx_dates("sdate", sdates_rx_file, dates_ds0_orig)
+hdates_rx_ds = import_rx_dates("hdate", hdates_rx_file, dates_ds0_orig)
+gdds_rx_ds = import_rx_dates("gdd", gdds_rx_file, dates_ds0_orig)
 
 # Get GGCMI growing season lengths
 def get_gs_len_da(this_da):
@@ -547,7 +525,7 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
 
 # %% Make map of means 
 
-varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.noOutliers", "GSLEN.onlyMature.useMedian"]
+varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "HUI_PERHARV.onlyMature", "GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.noOutliers", "GSLEN.onlyMature.useMedian"]
 # varList = ["GDDHARV_PERHARV"]
 # varList = ["HUI_PERHARV"]
 # varList = ["GSLEN"]
@@ -584,17 +562,18 @@ for thisVar in varList:
     if thisVar == "GDDHARV_PERHARV":
         title_prefix = "Harv. thresh." + title_prefix
         filename_prefix = "harvest_thresh" + filename_prefix
+        ny = 3
         units = "GDD"
     elif thisVar == "HUI_PERHARV":
-        title_prefix = "HUI" + title_prefix
+        title_prefix = "HUI @harv." + title_prefix
         filename_prefix = "hui" + filename_prefix
+        ny = 3
         units = "GDD"
     elif thisVar == "GSLEN":
         title_prefix = "Seas. length" + title_prefix
         filename_prefix = "seas_length" + filename_prefix
         units = "Days"
         ny = 3
-        nx = 1
         vmin = None
     else:
         raise RuntimeError(f"thisVar {thisVar} not recognized")
@@ -660,32 +639,40 @@ for thisVar in varList:
         vmax = max(max0, max1)
         if vmin == None:
             vmin = int(np.floor(min(np.nanmin(map0_yx), np.nanmin(map1_yx))))
-        if thisVar == "GSLEN":
-            mxmat = int(paramfile_mxmats[paramfile_pftnames.index(vegtype_str2)])
-            units = f"Days (mxmat: {mxmat})"
-            if not mxmat > 0:
-                raise RuntimeError(f"Error getting mxmat: {mxmat}")
-            
-            longest_gs = max(max0, max1)
-            subplot_title_suffixes = [f" (max={max0})",
-                                      f" (max={max1})"]
-            if indirs[0]["used_clm_mxmat"]:
-                if max0 > mxmat:
-                    raise RuntimeError(f"v0: mxmat {mxmat} but max simulated {max0}")
-            if indirs[1]["used_clm_mxmat"]:
-                if max1 > mxmat:
-                    raise RuntimeError(f"v1: mxmat {mxmat} but max simulated {max1}")
-            ggcmi_yx = gs_len_rx_ds[f"gs1_{vegtype_int}"].isel(time=0, drop=True)
-            ggcmi_yx = ggcmi_yx.where(np.bitwise_not(np.isnan(map1_yx)))
-            ggcmi_max = int(np.nanmax(ggcmi_yx.values))
-            vmax = max(max0, max1, ggcmi_max)
-            
-            if vmax > mxmat:
-                Nok = mxmat - vmin + 1
-                Nbad = vmax - mxmat + 1
-                cmap_to_mxmat = plt.cm.viridis(np.linspace(0, 1, num=Nok))
-                cmap_after_mxmat = plt.cm.OrRd(np.linspace(0, 1, num=Nbad))
-                cmap = mcolors.LinearSegmentedColormap.from_list('my_colormap', np.vstack((cmap_to_mxmat, cmap_after_mxmat)))
+        if ny == 3:
+            if thisVar == "GSLEN":
+                mxmat = int(paramfile_mxmats[paramfile_pftnames.index(vegtype_str2)])
+                units = f"Days (mxmat: {mxmat})"
+                if not mxmat > 0:
+                    raise RuntimeError(f"Error getting mxmat: {mxmat}")
+                
+                longest_gs = max(max0, max1)
+                subplot_title_suffixes = [f" (max={max0})",
+                                        f" (max={max1})"]
+                if indirs[0]["used_clm_mxmat"]:
+                    if max0 > mxmat:
+                        raise RuntimeError(f"v0: mxmat {mxmat} but max simulated {max0}")
+                if indirs[1]["used_clm_mxmat"]:
+                    if max1 > mxmat:
+                        raise RuntimeError(f"v1: mxmat {mxmat} but max simulated {max1}")
+                map2_yx = gs_len_rx_ds[f"gs1_{vegtype_int}"].isel(time=0, drop=True)
+                map2_yx = map2_yx.where(np.bitwise_not(np.isnan(map1_yx)))
+                max2 = int(np.nanmax(map2_yx.values))
+                vmax = max(max0, max1, max2)
+                
+                if vmax > mxmat:
+                    Nok = mxmat - vmin + 1
+                    Nbad = vmax - mxmat + 1
+                    cmap_to_mxmat = plt.cm.viridis(np.linspace(0, 1, num=Nok))
+                    cmap_after_mxmat = plt.cm.OrRd(np.linspace(0, 1, num=Nbad))
+                    cmap = mcolors.LinearSegmentedColormap.from_list('my_colormap', np.vstack((cmap_to_mxmat, cmap_after_mxmat)))
+            elif thisVar == "HUI_PERHARV" or thisVar == "GDDHARV_PERHARV":
+                map2_yx = gdds_rx_ds[f"gs1_{vegtype_int}"].isel(time=0, drop=True)
+                map2_yx = map2_yx.where(np.bitwise_not(np.isnan(map1_yx)))
+                max2 = int(np.nanmax(map2_yx.values))
+                vmax = max(max0, max1, max2)
+            else:
+                raise RuntimeError(f"thisVar {thisVar} not recognized: Setting up third plot")
         
         ylabel = "CLM5-style"
         ax = make_axis(fig, ny, nx, 1)
@@ -695,9 +682,15 @@ for thisVar in varList:
         ax = make_axis(fig, ny, nx, 2)
         im1 = make_map(ax, map1_yx, f"v1{subplot_title_suffixes[1]}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
-        if thisVar == "GSLEN":
+        if ny == 3:
             ax = make_axis(fig, ny, nx, 3)
-            im1 = make_map(ax, ggcmi_yx, f"GGCMI (max={ggcmi_max})", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
+            if thisVar == "GSLEN":
+                tmp_title = f"GGCMI (max={max2})"
+            elif thisVar == "HUI_PERHARV" or thisVar == "GDDHARV_PERHARV":
+                tmp_title = "Prescribed"
+            else:
+                raise RuntimeError(f"thisVar {thisVar} not recognized: Getting title of third plot")
+            im1 = make_map(ax, map2_yx, tmp_title, ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
             
         fig.suptitle(f"{title_prefix}:\n{vegtype_str3}", y=1.04)
         fig.subplots_adjust(bottom=cbar_adj_bottom)
