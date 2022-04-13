@@ -32,6 +32,7 @@ indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforc
                    used_clm_mxmat = False))
 
 ggcmi_out_topdir = "/Users/Shared/GGCMI/AgMIP.output"
+ggcmi_cropcal_dir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar"
 
 if len(indirs) != 2:
     raise RuntimeError(f"For now, indirs must have 2 members (found {len(indirs)}")
@@ -910,6 +911,15 @@ for thisVar in varList:
                 matyday_da[:,:,:,g] = this_matyday_array
             ggcmiDS["matyday"] = matyday_da
         
+        # Get GGCMI expected
+        if irrtype_str_ggcmi=="noirr":
+            tmp_rfir_token = "rf"
+        else:
+            tmp_rfir_token = "ir"
+        thisFile = os.path.join(ggcmi_cropcal_dir, f"{vegtype_str_ggcmi}_{tmp_rfir_token}_ggcmi_crop_calendar_phase3_v1.01.nc4")
+        ggcmiExpDS = xr.open_dataset(thisFile)
+        map3_yx = ggcmiExpDS["growing_season_length"] / np.timedelta64(1, 'D')
+        
         # Grid
         thisCrop1_gridded = utils.grid_one_variable(dates_ds1, thisVar, \
             vegtype=vegtype_int).squeeze(drop=True)
@@ -939,10 +949,12 @@ for thisVar in varList:
         # Set colorbar etc.
         min1 = int(np.ceil(np.nanmin(map1_yx)))
         min2 = int(np.ceil(np.nanmin(map2_yx)))
-        vmin = min(min1, min2, np.nanmin(ggcmiDS["matyday"].values))
+        min3 = int(np.ceil(np.nanmin(map3_yx)))
+        vmin = min(min1, min2, min3, np.nanmin(ggcmiDS["matyday"].values))
         max1 = int(np.ceil(np.nanmax(map1_yx)))
         max2 = int(np.ceil(np.nanmax(map2_yx)))
-        vmax = max(max1, max2, np.nanmax(ggcmiDS["matyday"].values))
+        max3 = int(np.ceil(np.nanmax(map3_yx)))
+        vmax = max(max1, max2, max3, np.nanmax(ggcmiDS["matyday"].values))
         
         ax = make_axis(fig, ny, nx, 1)
         im1 = make_map(ax, map1_yx, "CLM", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
@@ -950,13 +962,16 @@ for thisVar in varList:
         ax = make_axis(fig, ny, nx, 2)
         im1 = make_map(ax, map2_yx, "CLM expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
         
+        ax = make_axis(fig, ny, nx, 3)
+        im1 = make_map(ax, map3_yx, "GGCMI expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
+        
         for g in np.arange(Nggcmi_models):
             thisGGCMI_gridded = ggcmiDS["matyday"].isel(model=g, drop=True)
             if useMedian:
                 ggcmi_yx = thisGGCMI_gridded.median(axis=0)
             else:
                 ggcmi_yx = np.mean(thisGGCMI_gridded, axis=0)
-            ax = make_axis(fig, ny, nx, 2+g+1)
+            ax = make_axis(fig, ny, nx, 3+g+1)
             im1 = make_map(ax, ggcmi_yx, ggcmi_models[g], "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
             
         fig.suptitle(f"{title_prefix}:\n{vegtype_str3}", y=1.04)
