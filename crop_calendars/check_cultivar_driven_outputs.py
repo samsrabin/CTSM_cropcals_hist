@@ -901,9 +901,21 @@ for thisVar in varList:
                     if thisMax > 366:
                         print(f"Warning: {thisModel}: Max {ncvar} {thisMax} {filter_str}; setting values > 364 to NaN")
                         thisDA.values[np.where(thisDA.values > 364)] = np.nan
+                        
+                # Only include cell-seasons with positive yield
+                filterVar = "yield"
+                thisFile = get_new_filename(pattern.replace("matyday", filterVar))
+                if thisFile:
+                    filterDS = xr.open_dataset(thisFile[0], decode_times=False)
+                    filterDS = trim_years(y1, yN, Ngs, filterDS)
+                    filter_str = f"(after filtering by {filterVar} > 0)"
+                    thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] > 0)
+                    
+                # Don't include cell-years with growing season length < 50 (how Jonas does his: https://ebi-forecast.igb.illinois.edu/ggcmi/issues/421#note-5)
+                this_matyday_array = thisDA.values
+                this_matyday_array[np.where(this_matyday_array < 50)] = np.nan
                 
                 # Rework time axis
-                this_matyday_array = thisDA.values
                 thisMin = np.nanmin(this_matyday_array)
                 if thisMin < 0:
                     print(f"{thisModel}: Setting negative matyday values (min = {thisMin}) to NaN")
