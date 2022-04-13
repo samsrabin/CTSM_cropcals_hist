@@ -570,6 +570,10 @@ for thisVar in varList:
         title_prefix = title_prefix + " (no outl.)"
         filename_prefix = filename_prefix + "_nooutliers"
     useMedian = "useMedian" in thisVar
+    if useMedian:
+        thisVar = thisVar.replace(".useMedian", "")
+        title_prefix = title_prefix + " (median)"
+        filename_prefix = filename_prefix + "_median"
 
     ny = 2
     nx = 1
@@ -635,14 +639,20 @@ for thisVar in varList:
         if noOutliers:
             thisCrop0_gridded = remove_outliers(thisCrop0_gridded)
             thisCrop1_gridded = remove_outliers(thisCrop1_gridded)
+            
+        # Get summary statistic
+        if useMedian:
+            map0_yx = thisCrop0_gridded.median(axis=0)
+            map1_yx = thisCrop1_gridded.median(axis=0)
+        else:
+            map0_yx = np.mean(thisCrop0_gridded, axis=0)
+            map1_yx = np.mean(thisCrop1_gridded, axis=0)
         
         # Set up figure 
         fig = plt.figure(figsize=figsize)
         subplot_title_suffixes = ["", ""]
         
-        # Get means
-        map0_yx = np.mean(thisCrop0_gridded, axis=0)
-        map1_yx = np.mean(thisCrop1_gridded, axis=0)
+        # Set colorbar etc.
         max0 = int(np.ceil(np.nanmax(map0_yx)))
         max1 = int(np.ceil(np.nanmax(map1_yx)))
         vmax = max(max0, max1)
