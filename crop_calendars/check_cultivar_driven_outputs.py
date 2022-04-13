@@ -21,10 +21,10 @@ hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_
 
 # Directory where model output file(s) can be found (figure files will be saved in subdir here)
 indirs = list()
-# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/",
-#                    used_clm_mxmat = True))
-indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/",
+indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/",
                    used_clm_mxmat = True))
+# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/",
+#                    used_clm_mxmat = True))
 # indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-08-gddforced/",
 #                    used_clm_mxmat = True))
 indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforced/",
@@ -547,12 +547,14 @@ for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
 
 # %% Make map of means 
 
-varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "GSLEN", "GSLEN.onlyMature"]
+varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.noOutliers", "GSLEN.onlyMature.useMedian"]
 # varList = ["GDDHARV_PERHARV"]
 # varList = ["HUI_PERHARV"]
 # varList = ["GSLEN"]
 # varList = ["GSLEN.onlyMature"]
 # varList = ["GSLEN", "GSLEN.onlyMature"]
+# varList = ["GSLEN.onlyMature.noOutliers"]
+# varList = ["GSLEN.onlyMature.useMedian"]
 
 for thisVar in varList:
     
