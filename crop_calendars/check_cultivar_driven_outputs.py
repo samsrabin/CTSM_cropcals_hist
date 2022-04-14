@@ -42,6 +42,7 @@ if len(indirs) != 2:
     raise RuntimeError(f"For now, indirs must have 2 members (found {len(indirs)}")
 
 import numpy as np
+from scipy import stats
 import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -623,7 +624,7 @@ for v, vegtype_str in enumerate(vegtype_list):
 
 # %% Make map of means 
 
-varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "HUI_PERHARV.onlyMature", "GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.useMedian"]
+varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "HUI_PERHARV.onlyMature", "GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.useMedian", "SDATES", "HDATES.onlyMature"]
 # varList = ["GDDHARV_PERHARV"]
 # varList = ["HUI_PERHARV"]
 # varList = ["GSLEN"]
@@ -631,6 +632,7 @@ varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "HUI_PERHARV.onlyMature", "GSLEN", 
 # varList = ["GSLEN", "GSLEN.onlyMature"]
 # varList = ["GSLEN.onlyMature.noOutliers"]
 # varList = ["GSLEN.onlyMature.useMedian"]
+# varList = ["SDATES"]
 
 vertical = False
 
@@ -673,6 +675,18 @@ for thisVar in varList:
         title_prefix = "Seas. length" + title_prefix
         filename_prefix = "seas_length" + filename_prefix
         units = "Days"
+        ny = 3
+        vmin = None
+    elif thisVar == "SDATES":
+        title_prefix = "Sowing date" + title_prefix
+        filename_prefix = "sdate" + filename_prefix
+        units = "Day of year"
+        ny = 3
+        vmin = None
+    elif thisVar == "HDATES":
+        title_prefix = "Harvest date" + title_prefix
+        filename_prefix = "hdate" + filename_prefix
+        units = "Day of year"
         ny = 3
         vmin = None
     else:
@@ -735,11 +749,17 @@ for thisVar in varList:
             
         # Get summary statistic
         if useMedian:
+            if thisVar in ["SDATES", "HDATES"]:
+                raise RuntimeError(f"Median of {thisVar} not yet supported")
             map0_yx = thisCrop0_gridded.median(axis=0)
             map1_yx = thisCrop1_gridded.median(axis=0)
         else:
             map0_yx = np.mean(thisCrop0_gridded, axis=0)
             map1_yx = np.mean(thisCrop1_gridded, axis=0)
+            if thisVar in ["SDATES", "HDATES"]:
+                map0_yx.values = stats.circmean(thisCrop0_gridded, high=365, axis=0)
+                map1_yx.values = stats.circmean(thisCrop1_gridded, high=365, axis=0)
+                
         
         # Set up figure 
         fig = plt.figure(figsize=figsize)
@@ -778,13 +798,25 @@ for thisVar in varList:
                     cmap_to_mxmat = plt.cm.viridis(np.linspace(0, 1, num=Nok))
                     cmap_after_mxmat = plt.cm.OrRd(np.linspace(0, 1, num=Nbad))
                     cmap = mcolors.LinearSegmentedColormap.from_list('my_colormap', np.vstack((cmap_to_mxmat, cmap_after_mxmat)))
-            elif thisVar == "HUI_PERHARV" or thisVar == "GDDHARV_PERHARV":
-                map2_yx = gdds_rx_ds[f"gs1_{vegtype_int}"]
+            elif thisVar in ["HUI_PERHARV", "GDDHARV_PERHARV", "SDATES", "HDATES"]:
+                thisVar_rx = f"gs1_{vegtype_int}"
+                if thisVar in ["HUI_PERHARV", "GDDHARV_PERHARV"]:
+                    this_rx_ds = gdds_rx_ds
+                elif thisVar == "SDATES":
+                    this_rx_ds = sdates_rx_ds
+                elif thisVar == "HDATES":
+                    this_rx_ds = hdates_rx_ds
+                else:
+                    raise RuntimeError(f"thisVar {thisVar} not recognized: Choosing rx DataSet")
+                map2_yx = this_rx_ds[thisVar_rx]
                 if "time" in map2_yx.dims:
                     map2_yx = map2_yx.isel(time=0, drop=True)
                 map2_yx = map2_yx.where(np.bitwise_not(np.isnan(map1_yx)))
                 max2 = int(np.nanmax(map2_yx.values))
-                vmax = max(max0, max1, max2)
+                if thisVar in ["SDATES", "HDATES"]:
+                    vmax = 365
+                else:
+                    vmax = max(max0, max1, max2)
             else:
                 raise RuntimeError(f"thisVar {thisVar} not recognized: Setting up third plot")
         
@@ -800,8 +832,10 @@ for thisVar in varList:
             ax = make_axis(fig, ny, nx, 3)
             if thisVar == "GSLEN":
                 tmp_title = f"GGCMI (max={max2})"
-            elif thisVar == "HUI_PERHARV" or thisVar == "GDDHARV_PERHARV":
+            elif thisVar in ["HUI_PERHARV", "GDDHARV_PERHARV", "SDATES"]:
                 tmp_title = "Prescribed"
+            elif thisVar == "HDATES":
+                tmp_title = "GGCMI"
             else:
                 raise RuntimeError(f"thisVar {thisVar} not recognized: Getting title of third plot")
             im1 = make_map(ax, map2_yx, tmp_title, ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
