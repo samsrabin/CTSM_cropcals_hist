@@ -348,6 +348,9 @@ dates_ds0_orig = check_and_trim_years(y1, yN, get_year_from_cftime, dates_ds0_or
 # How many growing seasons can we use? Ignore last season because it can be incomplete for some gridcells.
 Ngs = dates_ds1_orig.dims['time'] - 1
 
+# What vegetation types are included?
+vegtype_list = [x for x in dates_ds0_orig.vegtype_str.values if x in dates_ds0_orig.patches1d_itype_veg_str.values]
+
 # CLM max growing season length, mxmat, is stored in the following files:
 #   * clm5_1: lnd/clm2/paramdata/ctsm51_params.c211112.nc
 #   * clm5_0: lnd/clm2/paramdata/clm50_params.c211112.nc
@@ -480,9 +483,7 @@ cmap = plt.cm.viridis
 if nx != 2:
     print(f"Since nx = {nx}, you may need to rework some parameters")
 
-for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
-    if vegtype_str not in dates_ds0.patches1d_itype_veg_str.values:
-        continue
+for v, vegtype_str in enumerate(vegtype_list):
     vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
     
     # Get vegtype str for figure titles
@@ -594,9 +595,7 @@ for thisVar in varList:
     elif ny != 2:
         print(f"Since ny = {ny}, you may need to rework some parameters")
 
-    for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
-        if vegtype_str not in dates_ds0.patches1d_itype_veg_str.values:
-            continue
+    for v, vegtype_str in enumerate(vegtype_list):
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         
         # Get vegtype str used in parameter file
@@ -726,8 +725,8 @@ varList = ["GSLEN.onlyMature.diffExpected"]
 # varList = ["GSLEN.onlyMature.noOutliers"]
 # varList = ["GSLEN.onlyMature.useMedian"]
 
-ggcmi_models = ["ACEA", "CROVER", "CYGMA1p74", "DSSAT-Pythia", "EPIC-IIASA", "ISAM", "LDNDC", "LPJ-GUESS", "LPJmL", "pDSSAT", "PEPIC", "PROMET", "SIMPLACE-LINTUL5"]
-Nggcmi_models = len(ggcmi_models)
+ggcmi_models_orig = ["ACEA", "CROVER", "CYGMA1p74", "DSSAT-Pythia", "EPIC-IIASA", "ISAM", "LDNDC", "LPJ-GUESS", "LPJmL", "pDSSAT", "PEPIC", "PROMET", "SIMPLACE-LINTUL5"]
+Nggcmi_models_orig = len(ggcmi_models_orig)
 
 def get_new_filename(pattern):
     thisFile = glob.glob(pattern)
@@ -748,7 +747,10 @@ def trim_years(y1, yN, Ngs, ds_in):
         raise RuntimeError(f"Expected {Ngs} matching growing seasons in GGCMI dataset; found {tmp}")
     return ds_in
 
-for thisVar in varList:
+ggcmiDS_started = False
+
+for thisVar_orig in varList:
+    thisVar = thisVar_orig
     
     # Processing options
     title_prefix = ""
@@ -775,8 +777,8 @@ for thisVar in varList:
 
     ny = 4
     nx = 4
-    if Nggcmi_models > ny*nx + 3:
-        raise RuntimeError(f"{Nggcmi_models} GGCMI models + 3 other maps > ny*nx ({ny*nx})")
+    if Nggcmi_models_orig > ny*nx + 3:
+        raise RuntimeError(f"{Nggcmi_models_orig} GGCMI models + 3 other maps > ny*nx ({ny*nx})")
     vmin = 0.0
     title_prefix = "Seas. length" + title_prefix
     filename_prefix = "seas_length_compGGCMI" + filename_prefix
@@ -791,19 +793,12 @@ for thisVar in varList:
     figsize = (16, 8)
     cbar_adj_bottom = 0.15
     cbar_ax_rect = [0.15, 0.05, 0.7, 0.025]
-    if nx != 1:
-        print(f"Since nx = {nx}, you may need to rework some parameters")
-    if ny == 3:
-        cbar_width = 0.46
-        cbar_ax_rect = [(1-cbar_width)/2, 0.05, cbar_width, 0.05]
-    elif ny != 2:
-        print(f"Since ny = {ny}, you may need to rework some parameters")
+    if nx != 4 or ny != 4:
+        print(f"Since (nx,ny) = ({nx},{ny}), you may need to rework some parameters")
 
-    for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
-        ggcmiDS_started = False
-        if vegtype_str not in dates_ds0.patches1d_itype_veg_str.values:
-            continue
-        elif "corn" in vegtype_str:
+    for v, vegtype_str in enumerate(vegtype_list):
+        
+        if "corn" in vegtype_str:
             vegtype_str_ggcmi = "mai"
         elif "rice" in vegtype_str:
             vegtype_str_ggcmi = "ri1" # Ignoring ri2, which isn't simulated in CLM yet
@@ -819,6 +814,7 @@ for thisVar in varList:
             irrtype_str_ggcmi = "firr"
         else:
             irrtype_str_ggcmi = "noirr"
+        ncvar = f"matyday-{vegtype_str_ggcmi}-{irrtype_str_ggcmi}"
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         
         # Get vegtype str used in parameter file
@@ -833,10 +829,16 @@ for thisVar in varList:
         vegtype_str3 = get_vegtype_str_for_title(vegtype_str)
         
         # Import GGCMI outputs
-        for g, thisModel in enumerate(ggcmi_models):
+        ggcmi_models_bool = np.full((Nggcmi_models_orig,), False)
+        for g, thisModel in enumerate(ggcmi_models_orig):
             
-            # Import file
-            ncvar = f"matyday-{vegtype_str_ggcmi}-{irrtype_str_ggcmi}"
+            # Only need to import each variable once
+            if ggcmiDS_started and ncvar in ggcmiDS:
+                did_read = False
+                break
+            did_read = True
+            
+            # Open file
             pattern = os.path.join(ggcmi_out_topdir, thisModel, "phase3a", "gswp3-w5e5", "obsclim", vegtype_str_ggcmi, f"*{ncvar}*")
             thisFile = glob.glob(pattern)
             if not thisFile:
@@ -845,22 +847,27 @@ for thisVar in varList:
             elif len(thisFile) != 1:
                 raise RuntimeError(f"Expected 1 match of {pattern}; found {len(thisFile)}")
             thisDS = xr.open_dataset(thisFile[0], decode_times=False)
+            ggcmi_models_bool[g] = True
             
             # Set up GGCMI Dataset
             if not ggcmiDS_started:
                 ggcmiDS = xr.Dataset(coords={"gs": dates_ds1.gs.values,
                                             "lat": thisDS.lat,
                                             "lon": thisDS.lon,
-                                            "model": np.arange(Nggcmi_models)})
+                                            "model": ggcmi_models_orig,
+                                            "cft": vegtype_list})
                 ggcmiDS_started = True
+            
+            # Set up DataArray for this crop-irr
+            if g==0:
                 matyday_da = xr.DataArray(data=np.full((Ngs,
                                                         thisDS.dims["lat"],
                                                         thisDS.dims["lon"],
-                                                        Nggcmi_models
+                                                        Nggcmi_models_orig
                                                     ),
                                                     fill_value=np.nan),
-                                                coords=ggcmiDS.coords)
-                
+                                                coords=[ggcmiDS.coords[x] for x in ["gs","lat","lon","model"]])
+            
             # Get just the seasons you need
             thisDS = trim_years(y1, yN, Ngs, thisDS)
             thisDA = thisDS[ncvar]
@@ -927,8 +934,18 @@ for thisVar in varList:
                 print(f"{thisModel}: Setting negative matyday values (min = {thisMin}) to NaN")
                 this_matyday_array[np.where(this_matyday_array < 0)] = np.nan
             matyday_da[:,:,:,g] = this_matyday_array
-        ggcmiDS["matyday"] = matyday_da
-        ggcmiDA = ggcmiDS["matyday"].copy()
+        
+        if did_read:
+            ggcmiDS[ncvar] = matyday_da
+            ggcmiDS[f"{ncvar}-inclmodels"] = matyday_da = xr.DataArray( \
+                data=ggcmi_models_bool,
+                coords={"model": ggcmiDS.coords["model"]})
+        ggcmiDA = ggcmiDS[ncvar].copy()
+        
+        # If you want to remove models that didn't actually simulate this crop-irr, do that here.
+        # For now, it just uses the entire list.
+        Nggcmi_models = Nggcmi_models_orig
+        ggcmi_models = ggcmi_models_orig
         
         # Get GGCMI expected
         if irrtype_str_ggcmi=="noirr":
