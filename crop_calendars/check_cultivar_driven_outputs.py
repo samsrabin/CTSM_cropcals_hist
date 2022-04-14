@@ -718,11 +718,10 @@ for thisVar in varList:
 # %% Compare mean growing season length (v1 only) to GGCMI models
 
 # varList = ["GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.noOutliers", "GSLEN.onlyMature.useMedian"]
-# varList = ["GDDHARV_PERHARV"]
-# varList = ["HUI_PERHARV"]
 # varList = ["GSLEN"]
-varList = ["GSLEN.onlyMature"]
+# varList = ["GSLEN.onlyMature"]
 varList = ["GSLEN.onlyMature.diffExpected"]
+# varList = ["GSLEN.onlyMature.diffExpected.noOutliers"]
 # varList = ["GSLEN", "GSLEN.onlyMature"]
 # varList = ["GSLEN.onlyMature.noOutliers"]
 # varList = ["GSLEN.onlyMature.useMedian"]
@@ -951,6 +950,7 @@ for thisVar in varList:
         # If needed, remove outliers
         if noOutliers:
             thisCrop1_gridded = remove_outliers(thisCrop1_gridded)
+            ggcmiDA = remove_outliers(ggcmiDA)
             
         # Get summary statistic
         if useMedian:
