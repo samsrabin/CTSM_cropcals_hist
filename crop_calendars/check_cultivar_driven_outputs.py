@@ -291,25 +291,25 @@ def make_axis(fig, ny, nx, n):
     return ax
 
 # Get vegtype str for figure titles
-def get_vegtype_str_for_title(vegtype_str):
-    vegtype_str3 = vegtype_str
-    if "irrigated" in vegtype_str:
-        vegtype_str3 = vegtype_str3.replace("irrigated_", "") + " (ir)"
+def get_vegtype_str_for_title(vegtype_str_in):
+    vegtype_str_out = vegtype_str_in
+    if "irrigated" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("irrigated_", "") + " (ir)"
     else:
-        vegtype_str3 = vegtype_str3 + " (rf)"
-    if "temperate" in vegtype_str:
-        vegtype_str3 = vegtype_str3.replace("temperate_", "temp. ")
-    if "tropical" in vegtype_str:
-        vegtype_str3 = vegtype_str3.replace("tropical_", "trop. ")
-    elif "soybean" in vegtype_str:
-        vegtype_str3 = "temp. " + vegtype_str3
-    if "soybean" in vegtype_str:
-        vegtype_str3 = vegtype_str3.replace("soybean", "soy")
-    if "spring" in vegtype_str:
-        vegtype_str3 = vegtype_str3.replace("spring_", "spr. ")
-    if "winter" in vegtype_str:
-        vegtype_str3 = vegtype_str3.replace("winter_", "win.")
-    return vegtype_str3
+        vegtype_str_out = vegtype_str_out + " (rf)"
+    if "temperate" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("temperate_", "temp. ")
+    if "tropical" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("tropical_", "trop. ")
+    elif "soybean" in vegtype_str_in:
+        vegtype_str_out = "temp. " + vegtype_str_out
+    if "soybean" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("soybean", "soy")
+    if "spring" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("spring_", "spr. ")
+    if "winter" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("winter_", "win.")
+    return vegtype_str_out
 
 def mask_immature(this_ds, this_vegtype, gridded_da):
     reason_gridded = utils.grid_one_variable(this_ds, "HARVEST_REASON_PERHARV", \
@@ -329,15 +329,15 @@ def remove_outliers(gridded_da):
     gridded_da = gridded_da.where(not_outlier)
     return gridded_da
 
-def get_vegtype_str_paramfile(vegtype_str):
+def get_vegtype_str_paramfile(vegtype_str_in):
     # Get vegtype str used in parameter file
-    if vegtype_str == "soybean":
-        vegtype_str2 = "temperate_soybean"
-    elif vegtype_str == "irrigated_soybean":
-        vegtype_str2 = "irrigated_temperate_soybean"
+    if vegtype_str_in == "soybean":
+        vegtype_str_out = "temperate_soybean"
+    elif vegtype_str_in == "irrigated_soybean":
+        vegtype_str_out = "irrigated_temperate_soybean"
     else:
-        vegtype_str2 = vegtype_str
-    return vegtype_str2
+        vegtype_str_out = vegtype_str_in
+    return vegtype_str_out
 
 
 # %% Import output sowing and harvest dates, etc.
@@ -535,7 +535,7 @@ for v, vegtype_str in enumerate(vegtype_list):
     vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
     
     # Get vegtype str for figure titles
-    vegtype_str3 = get_vegtype_str_for_title(vegtype_str)
+    vegtype_str_title = get_vegtype_str_for_title(vegtype_str)
     
     # Grid
     thisCrop0_gridded = utils.grid_one_variable(dates_ds0, thisVar, \
@@ -560,7 +560,7 @@ for v, vegtype_str in enumerate(vegtype_list):
         map1_yx = get_reason_freq_map(Ngs, thisCrop1_gridded, reason)
         im1 = make_map(ax, map1_yx, f"v1: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
-    fig.suptitle(f"Harvest reason: {vegtype_str3}")
+    fig.suptitle(f"Harvest reason: {vegtype_str_title}")
     fig.subplots_adjust(bottom=cbar_adj_bottom)
     cbar_ax = fig.add_axes(cbar_ax_rect)
     cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
@@ -646,10 +646,10 @@ for thisVar in varList:
     for v, vegtype_str in enumerate(vegtype_list):
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         
-        vegtype_str2 = get_vegtype_str_paramfile(vegtype_str)
+        vegtype_str_paramfile = get_vegtype_str_paramfile(vegtype_str)
             
         # Get vegtype str for figure titles
-        vegtype_str3 = get_vegtype_str_for_title(vegtype_str)
+        vegtype_str_title = get_vegtype_str_for_title(vegtype_str)
         
         # Grid
         thisCrop0_gridded = utils.grid_one_variable(dates_ds0, thisVar, \
@@ -687,7 +687,7 @@ for thisVar in varList:
             vmin = int(np.floor(min(np.nanmin(map0_yx), np.nanmin(map1_yx))))
         if ny == 3:
             if thisVar == "GSLEN":
-                mxmat = int(paramfile_mxmats[paramfile_pftnames.index(vegtype_str2)])
+                mxmat = int(paramfile_mxmats[paramfile_pftnames.index(vegtype_str_paramfile)])
                 units = f"Days (mxmat: {mxmat})"
                 if not mxmat > 0:
                     raise RuntimeError(f"Error getting mxmat: {mxmat}")
@@ -738,7 +738,7 @@ for thisVar in varList:
                 raise RuntimeError(f"thisVar {thisVar} not recognized: Getting title of third plot")
             im1 = make_map(ax, map2_yx, tmp_title, ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
             
-        fig.suptitle(f"{title_prefix}:\n{vegtype_str3}", y=1.04)
+        fig.suptitle(f"{title_prefix}:\n{vegtype_str_title}", y=1.04)
         fig.subplots_adjust(bottom=cbar_adj_bottom)
         cbar_ax = fig.add_axes(cbar_ax_rect)
         cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
@@ -860,10 +860,10 @@ for thisVar_orig in varList:
         ncvar = f"matyday-{vegtype_str_ggcmi}-{irrtype_str_ggcmi}"
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         
-        vegtype_str2 = get_vegtype_str_paramfile(vegtype_str)
+        vegtype_str_paramfile = get_vegtype_str_paramfile(vegtype_str)
             
         # Get vegtype str for figure titles
-        vegtype_str3 = get_vegtype_str_for_title(vegtype_str)
+        vegtype_str_title = get_vegtype_str_for_title(vegtype_str)
         
         # Import GGCMI outputs
         ggcmi_models_bool = np.full((Nggcmi_models_orig,), False)
@@ -1056,7 +1056,7 @@ for thisVar_orig in varList:
             ax = make_axis(fig, ny, nx, 3+g+1)
             im1 = make_map(ax, ggcmi_yx, ggcmi_models[g], "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
             
-        fig.suptitle(f"{title_prefix}:\n{vegtype_str3}", y=1.04)
+        fig.suptitle(f"{title_prefix}:\n{vegtype_str_title}", y=1.04)
         fig.subplots_adjust(bottom=cbar_adj_bottom)
         cbar_ax = fig.add_axes(cbar_ax_rect)
         cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
