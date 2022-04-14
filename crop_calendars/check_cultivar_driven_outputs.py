@@ -325,6 +325,16 @@ def remove_outliers(gridded_da):
     gridded_da = gridded_da.where(not_outlier)
     return gridded_da
 
+def get_vegtype_str_paramfile(vegtype_str):
+    # Get vegtype str used in parameter file
+    if vegtype_str == "soybean":
+        vegtype_str2 = "temperate_soybean"
+    elif vegtype_str == "irrigated_soybean":
+        vegtype_str2 = "irrigated_temperate_soybean"
+    else:
+        vegtype_str2 = vegtype_str
+    return vegtype_str2
+
 
 # %% Import output sowing and harvest dates, etc.
 
@@ -595,13 +605,7 @@ for thisVar in varList:
     for v, vegtype_str in enumerate(vegtype_list):
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         
-        # Get vegtype str used in parameter file
-        if vegtype_str == "soybean":
-            vegtype_str2 = "temperate_soybean"
-        elif vegtype_str == "irrigated_soybean":
-            vegtype_str2 = "irrigated_temperate_soybean"
-        else:
-            vegtype_str2 = vegtype_str
+        vegtype_str2 = get_vegtype_str_paramfile(vegtype_str)
             
         # Get vegtype str for figure titles
         vegtype_str3 = get_vegtype_str_for_title(vegtype_str)
@@ -716,7 +720,8 @@ for thisVar in varList:
 # varList = ["GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.noOutliers", "GSLEN.onlyMature.useMedian"]
 # varList = ["GSLEN"]
 # varList = ["GSLEN.onlyMature"]
-varList = ["GSLEN.onlyMature.diffExpected"]
+# varList = ["GSLEN.onlyMature.diffExpected"]
+varList = ["GSLEN.onlyMature.diffExpected.useMedian"]
 # varList = ["GSLEN.onlyMature.diffExpected.noOutliers"]
 # varList = ["GSLEN", "GSLEN.onlyMature"]
 # varList = ["GSLEN.onlyMature.noOutliers"]
@@ -814,13 +819,7 @@ for thisVar_orig in varList:
         ncvar = f"matyday-{vegtype_str_ggcmi}-{irrtype_str_ggcmi}"
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         
-        # Get vegtype str used in parameter file
-        if vegtype_str == "soybean":
-            vegtype_str2 = "temperate_soybean"
-        elif vegtype_str == "irrigated_soybean":
-            vegtype_str2 = "irrigated_temperate_soybean"
-        else:
-            vegtype_str2 = vegtype_str
+        vegtype_str2 = get_vegtype_str_paramfile(vegtype_str)
             
         # Get vegtype str for figure titles
         vegtype_str3 = get_vegtype_str_for_title(vegtype_str)
