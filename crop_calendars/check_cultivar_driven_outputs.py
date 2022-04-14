@@ -748,8 +748,6 @@ def trim_years(y1, yN, Ngs, ds_in):
         raise RuntimeError(f"Expected {Ngs} matching growing seasons in GGCMI dataset; found {tmp}")
     return ds_in
 
-# ggcmiDS_started = False
-
 for thisVar in varList:
     
     # Processing options
@@ -794,6 +792,7 @@ for thisVar in varList:
         print(f"Since ny = {ny}, you may need to rework some parameters")
 
     for v, vegtype_str in enumerate(dates_ds0.vegtype_str.values):
+        ggcmiDS_started = False
         if vegtype_str not in dates_ds0.patches1d_itype_veg_str.values:
             continue
         elif "corn" in vegtype_str:
@@ -826,102 +825,101 @@ for thisVar in varList:
         vegtype_str3 = get_vegtype_str_for_title(vegtype_str)
         
         # Import GGCMI outputs
-        if not ggcmiDS_started:
-            for g, thisModel in enumerate(ggcmi_models):
+        for g, thisModel in enumerate(ggcmi_models):
+            
+            # Import file
+            ncvar = f"matyday-{vegtype_str_ggcmi}-{irrtype_str_ggcmi}"
+            pattern = os.path.join(ggcmi_out_topdir, thisModel, "phase3a", "gswp3-w5e5", "obsclim", vegtype_str_ggcmi, f"*{ncvar}*")
+            thisFile = glob.glob(pattern)
+            if not thisFile:
+                print(f"Skipping {thisModel}")
+                continue
+            elif len(thisFile) != 1:
+                raise RuntimeError(f"Expected 1 match of {pattern}; found {len(thisFile)}")
+            thisDS = xr.open_dataset(thisFile[0], decode_times=False)
+            
+            # Set up GGCMI Dataset
+            if not ggcmiDS_started:
+                ggcmiDS = xr.Dataset(coords={"gs": dates_ds1.gs.values,
+                                            "lat": thisDS.lat,
+                                            "lon": thisDS.lon,
+                                            "model": np.arange(Nggcmi_models)})
+                ggcmiDS_started = True
+                matyday_da = xr.DataArray(data=np.full((Ngs,
+                                                        thisDS.dims["lat"],
+                                                        thisDS.dims["lon"],
+                                                        Nggcmi_models
+                                                    ),
+                                                    fill_value=np.nan),
+                                                coords=ggcmiDS.coords)
                 
-                # Import file
-                ncvar = f"matyday-{vegtype_str_ggcmi}-{irrtype_str_ggcmi}"
-                pattern = os.path.join(ggcmi_out_topdir, thisModel, "phase3a", "gswp3-w5e5", "obsclim", vegtype_str_ggcmi, f"*{ncvar}*")
-                thisFile = glob.glob(pattern)
-                if not thisFile:
-                    print(f"Skipping {thisModel}")
-                    continue
-                elif len(thisFile) != 1:
-                    raise RuntimeError(f"Expected 1 match of {pattern}; found {len(thisFile)}")
-                thisDS = xr.open_dataset(thisFile[0], decode_times=False)
-                
-                # Set up GGCMI Dataset
-                if not ggcmiDS_started:
-                    ggcmiDS = xr.Dataset(coords={"gs": dates_ds1.gs.values,
-                                                "lat": thisDS.lat,
-                                                "lon": thisDS.lon,
-                                                "model": np.arange(Nggcmi_models)})
-                    ggcmiDS_started = True
-                    matyday_da = xr.DataArray(data=np.full((Ngs,
-                                                            thisDS.dims["lat"],
-                                                            thisDS.dims["lon"],
-                                                            Nggcmi_models
-                                                        ),
-                                                        fill_value=np.nan),
-                                                    coords=ggcmiDS.coords)
-                    
-                # Get just the seasons you need
-                thisDS = trim_years(y1, yN, Ngs, thisDS)
-                thisDA = thisDS[ncvar]
-                
-                # Pre-filtering
-                thisMax = np.nanmax(thisDA.values)
-                if thisMax > 10**19:
-                    print(f"Warning: {thisModel}: Max {ncvar} {thisMax} (before filtering); setting values >1e19 to NaN")
-                    thisDA.values[np.where(thisDA.values > 10**19)] = np.nan
-                thisMax = np.nanmax(thisDA.values)
-                highMax = thisMax > 366
-                if highMax:
-                    print(f"Warning: {thisModel}: Max {ncvar} {thisMax} (before filtering)")
-                
-                # Figure out which seasons to include
-                if highMax:
-                    filterVar = "maturityindex"
+            # Get just the seasons you need
+            thisDS = trim_years(y1, yN, Ngs, thisDS)
+            thisDA = thisDS[ncvar]
+            
+            # Pre-filtering
+            thisMax = np.nanmax(thisDA.values)
+            if thisMax > 10**19:
+                print(f"Warning: {thisModel}: Max {ncvar} {thisMax} (before filtering); setting values >1e19 to NaN")
+                thisDA.values[np.where(thisDA.values > 10**19)] = np.nan
+            thisMax = np.nanmax(thisDA.values)
+            highMax = thisMax > 366
+            if highMax:
+                print(f"Warning: {thisModel}: Max {ncvar} {thisMax} (before filtering)")
+            
+            # Figure out which seasons to include
+            if highMax:
+                filterVar = "maturityindex"
+                thisFile = get_new_filename(pattern.replace("matyday", filterVar))
+                filter_str = None
+                if thisFile:
+                    filterDS = xr.open_dataset(thisFile[0], decode_times=False)
+                    filterDS = trim_years(y1, yN, Ngs, filterDS)
+                    filter_str = f"(after filtering by {filterVar} == 1)"
+                    thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] == 1)
+                else:
+                    filterVar = "maturitystatus"
                     thisFile = get_new_filename(pattern.replace("matyday", filterVar))
-                    filter_str = None
                     if thisFile:
                         filterDS = xr.open_dataset(thisFile[0], decode_times=False)
                         filterDS = trim_years(y1, yN, Ngs, filterDS)
-                        filter_str = f"(after filtering by {filterVar} == 1)"
-                        thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] == 1)
+                        filter_str = f"(after filtering by {filterVar} >= 1)"
+                        thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] >= 1)
                     else:
-                        filterVar = "maturitystatus"
+                        filterVar = "yield"
                         thisFile = get_new_filename(pattern.replace("matyday", filterVar))
                         if thisFile:
                             filterDS = xr.open_dataset(thisFile[0], decode_times=False)
                             filterDS = trim_years(y1, yN, Ngs, filterDS)
-                            filter_str = f"(after filtering by {filterVar} >= 1)"
-                            thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] >= 1)
-                        else:
-                            filterVar = "yield"
-                            thisFile = get_new_filename(pattern.replace("matyday", filterVar))
-                            if thisFile:
-                                filterDS = xr.open_dataset(thisFile[0], decode_times=False)
-                                filterDS = trim_years(y1, yN, Ngs, filterDS)
-                                filter_str = f"(after filtering by {filterVar} > 0)"
-                                thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] > 0)
-                    if not filter_str:
-                        filter_str = "(after no filtering)"
-                    thisMax = np.nanmax(thisDA.values)
-                    if thisMax > 366:
-                        print(f"Warning: {thisModel}: Max {ncvar} {thisMax} {filter_str}; setting values > 364 to NaN")
-                        thisDA.values[np.where(thisDA.values > 364)] = np.nan
-                        
-                # Only include cell-seasons with positive yield
-                filterVar = "yield"
-                thisFile = get_new_filename(pattern.replace("matyday", filterVar))
-                if thisFile:
-                    filterDS = xr.open_dataset(thisFile[0], decode_times=False)
-                    filterDS = trim_years(y1, yN, Ngs, filterDS)
-                    filter_str = f"(after filtering by {filterVar} > 0)"
-                    thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] > 0)
+                            filter_str = f"(after filtering by {filterVar} > 0)"
+                            thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] > 0)
+                if not filter_str:
+                    filter_str = "(after no filtering)"
+                thisMax = np.nanmax(thisDA.values)
+                if thisMax > 366:
+                    print(f"Warning: {thisModel}: Max {ncvar} {thisMax} {filter_str}; setting values > 364 to NaN")
+                    thisDA.values[np.where(thisDA.values > 364)] = np.nan
                     
-                # Don't include cell-years with growing season length < 50 (how Jonas does his: https://ebi-forecast.igb.illinois.edu/ggcmi/issues/421#note-5)
-                this_matyday_array = thisDA.values
-                this_matyday_array[np.where(this_matyday_array < 50)] = np.nan
+            # Only include cell-seasons with positive yield
+            filterVar = "yield"
+            thisFile = get_new_filename(pattern.replace("matyday", filterVar))
+            if thisFile:
+                filterDS = xr.open_dataset(thisFile[0], decode_times=False)
+                filterDS = trim_years(y1, yN, Ngs, filterDS)
+                filter_str = f"(after filtering by {filterVar} > 0)"
+                thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] > 0)
                 
-                # Rework time axis
-                thisMin = np.nanmin(this_matyday_array)
-                if thisMin < 0:
-                    print(f"{thisModel}: Setting negative matyday values (min = {thisMin}) to NaN")
-                    this_matyday_array[np.where(this_matyday_array < 0)] = np.nan
-                matyday_da[:,:,:,g] = this_matyday_array
-            ggcmiDS["matyday"] = matyday_da
+            # Don't include cell-years with growing season length < 50 (how Jonas does his: https://ebi-forecast.igb.illinois.edu/ggcmi/issues/421#note-5)
+            this_matyday_array = thisDA.values
+            this_matyday_array[np.where(this_matyday_array < 50)] = np.nan
+            
+            # Rework time axis
+            thisMin = np.nanmin(this_matyday_array)
+            if thisMin < 0:
+                print(f"{thisModel}: Setting negative matyday values (min = {thisMin}) to NaN")
+                this_matyday_array[np.where(this_matyday_array < 0)] = np.nan
+            matyday_da[:,:,:,g] = this_matyday_array
+        ggcmiDS["matyday"] = matyday_da
         
         # Get GGCMI expected
         if irrtype_str_ggcmi=="noirr":
