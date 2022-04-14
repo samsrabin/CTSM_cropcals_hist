@@ -23,13 +23,17 @@ gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220331_144207.nc"
 # Directory where model output file(s) can be found (figure files will be saved in subdir here)
 indirs = list()
 indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/",
-                   used_clm_mxmat = True))
+                   used_clm_mxmat = True,
+                   used_rx_sdate = False))
 # indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/",
-#                    used_clm_mxmat = True))
+#                    used_clm_mxmat = True,
+                #    used_rx_sdate = True))
 # indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-08-gddforced/",
-#                    used_clm_mxmat = True))
+#                    used_clm_mxmat = True,
+                #    used_rx_sdate = True))
 indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforced/",
-                   used_clm_mxmat = False))
+                   used_clm_mxmat = False,
+                   used_rx_sdate = True))
 
 ggcmi_out_topdir = "/Users/Shared/GGCMI/AgMIP.output"
 ggcmi_cropcal_dir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar"
@@ -451,6 +455,43 @@ def check_gddaccum_le_hui(this_ds, which_ds):
 check_gddaccum_le_hui(dates_ds0, 0)
 check_gddaccum_le_hui(dates_ds1, 1)
 
+
+# Check that prescribed sowing dates were obeyed
+
+if "time" in sdates_rx_ds.dims:
+    if sdates_rx_ds.dims["time"] > 1:
+        Ntime = sdates_rx_ds.dims["time"]
+        raise RuntimeError(f"Expected time dimension length 1; found length {Ntime}")
+    sdates_rx_ds = sdates_rx_ds.isel(time=0, drop=True)
+    hdates_rx_ds = hdates_rx_ds.isel(time=0, drop=True)
+    gdds_rx_ds = gdds_rx_ds.isel(time=0, drop=True)
+
+def check_rx_sdates_obeyed(vegtype_list, sdates_rx_ds, dates_ds, which_ds):
+    all_ok = True
+    for vegtype_str in vegtype_list:
+        ds_thisVeg = dates_ds.isel(patch=np.where(dates_ds.patches1d_itype_veg_str == vegtype_str)[0])
+        patch_inds_lon_thisVeg = ds_thisVeg.patches1d_ixy.values.astype(int) - 1
+        patch_inds_lat_thisVeg = ds_thisVeg.patches1d_jxy.values.astype(int) - 1
+    
+        vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+        rx_da = sdates_rx_ds[f"gs1_{vegtype_int}"]
+        rx_array = rx_da.values[patch_inds_lat_thisVeg,patch_inds_lon_thisVeg]
+        sim_array = ds_thisVeg["SDATES"].values
+    
+        if np.any(sim_array != rx_array):
+            all_ok = False
+            break
+    
+    if all_ok:
+        print(f"✅ dates_ds{which_ds}: Prescribed sowing dates always obeyed")
+    else:
+        print(f"❌ dates_ds{which_ds}: Prescribed sowing dates *not* always obeyed (e.g., {vegtype_str}")
+
+if indirs[0]["used_rx_sdate"]:
+    check_rx_sdates_obeyed(vegtype_list, sdates_rx_ds, dates_ds0, 0)
+if indirs[1]["used_rx_sdate"]:
+    check_rx_sdates_obeyed(vegtype_list, sdates_rx_ds, dates_ds1, 1)
+    
 
 # %% Make map of harvest reasons
 
