@@ -545,6 +545,7 @@ if nx != 2:
     print(f"Since nx = {nx}, you may need to rework some parameters")
 
 for v, vegtype_str in enumerate(vegtype_list):
+    print(f"{thisVar}: {vegtype_str}...")
     vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
     
     # Get variations on vegtype string
@@ -658,6 +659,7 @@ for thisVar in varList:
         print(f"Since ny = {ny}, you may need to rework some parameters")
 
     for v, vegtype_str in enumerate(vegtype_list):
+        print(f"{thisVar}: {vegtype_str}...")
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         
         # Get variations on vegtype string
@@ -784,6 +786,8 @@ varList = ["GSLEN.onlyMature.diffExpected.useMedian"]
 # varList = ["GSLEN.onlyMature.noOutliers"]
 # varList = ["GSLEN.onlyMature.useMedian"]
 
+verbose = False
+
 ggcmi_models_orig = ["ACEA", "CROVER", "CYGMA1p74", "DSSAT-Pythia", "EPIC-IIASA", "ISAM", "LDNDC", "LPJ-GUESS", "LPJmL", "pDSSAT", "PEPIC", "PROMET", "SIMPLACE-LINTUL5"]
 Nggcmi_models_orig = len(ggcmi_models_orig)
 
@@ -869,6 +873,7 @@ for thisVar_orig in varList:
             vegtype_str_ggcmi = "wwh"
         else:
             continue
+        print(f"{thisVar}: {vegtype_str}...")
         if "irrigated" in vegtype_str:
             irrtype_str_ggcmi = "firr"
         else:
@@ -895,7 +900,8 @@ for thisVar_orig in varList:
             pattern = os.path.join(ggcmi_out_topdir, thisModel, "phase3a", "gswp3-w5e5", "obsclim", vegtype_str_ggcmi, f"*{ncvar}*")
             thisFile = glob.glob(pattern)
             if not thisFile:
-                print(f"Skipping {thisModel}")
+                if verbose:
+                    print(f"{ncvar}: Skipping {thisModel}")
                 continue
             elif len(thisFile) != 1:
                 raise RuntimeError(f"Expected 1 match of {pattern}; found {len(thisFile)}")
@@ -928,12 +934,13 @@ for thisVar_orig in varList:
             # Pre-filtering
             thisMax = np.nanmax(thisDA.values)
             if thisMax > 10**19:
-                print(f"Warning: {thisModel}: Max {ncvar} {thisMax} (before filtering); setting values >1e19 to NaN")
+                if verbose:
+                    print(f"Warning: {ncvar}: {thisModel}: Max {thisMax} (before filtering); setting values >1e19 to NaN")
                 thisDA.values[np.where(thisDA.values > 10**19)] = np.nan
             thisMax = np.nanmax(thisDA.values)
             highMax = thisMax > 366
-            if highMax:
-                print(f"Warning: {thisModel}: Max {ncvar} {thisMax} (before filtering)")
+            if highMax and verbose:
+                print(f"Warning: {ncvar}: {thisModel}: Max {thisMax} (before filtering)")
             
             # Figure out which seasons to include
             if highMax:
@@ -965,7 +972,8 @@ for thisVar_orig in varList:
                     filter_str = "(after no filtering)"
                 thisMax = np.nanmax(thisDA.values)
                 if thisMax > 366:
-                    print(f"Warning: {thisModel}: Max {ncvar} {thisMax} {filter_str}; setting values > 364 to NaN")
+                    if verbose:
+                        print(f"Warning: {ncvar}: {thisModel}: Max {thisMax} {filter_str}; setting values > 364 to NaN")
                     thisDA.values[np.where(thisDA.values > 364)] = np.nan
                     
             # Only include cell-seasons with positive yield
@@ -974,7 +982,6 @@ for thisVar_orig in varList:
             if thisFile:
                 filterDS = xr.open_dataset(thisFile[0], decode_times=False)
                 filterDS = trim_years(y1, yN, Ngs, filterDS)
-                filter_str = f"(after filtering by {filterVar} > 0)"
                 thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] > 0)
                 
             # Don't include cell-years with growing season length < 50 (how Jonas does his: https://ebi-forecast.igb.illinois.edu/ggcmi/issues/421#note-5)
@@ -984,7 +991,8 @@ for thisVar_orig in varList:
             # Rework time axis
             thisMin = np.nanmin(this_matyday_array)
             if thisMin < 0:
-                print(f"{thisModel}: Setting negative matyday values (min = {thisMin}) to NaN")
+                if verbose:
+                    print(f"{thisModel}: {ncvar}: Setting negative matyday values (min = {thisMin}) to NaN")
                 this_matyday_array[np.where(this_matyday_array < 0)] = np.nan
             matyday_da[:,:,:,g] = this_matyday_array
         
@@ -1082,7 +1090,6 @@ for thisVar_orig in varList:
         plt.subplots_adjust(wspace=0, hspace=0.3)
         
         # plt.show()
-        # print(os.path.join(outdir_figs, f"{filename_prefix}_{vegtype_str}.png"))
         # break
         
         # Save
