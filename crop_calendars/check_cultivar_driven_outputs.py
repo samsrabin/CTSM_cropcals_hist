@@ -365,7 +365,7 @@ paramfile_pftnames = [x.decode("UTF-8").replace(" ", "") for x in paramfile_ds["
 print("Done.")
 
 
-# %% Import GGCMI sowing and harvest dates
+# Import GGCMI sowing and harvest dates
 
 sdates_rx_ds = import_rx_dates("sdate", sdates_rx_file, dates_ds0_orig)
 hdates_rx_ds = import_rx_dates("hdate", hdates_rx_file, dates_ds0_orig)
@@ -384,7 +384,7 @@ for v in gs_len_rx_ds:
     gs_len_rx_ds[v] = get_gs_len_da(hdates_rx_ds[v] - sdates_rx_ds[v])
 
 
-# %% Align output sowing and harvest dates/etc.
+# Align output sowing and harvest dates/etc.
 
 dates_ds0 = time_to_gs(Ngs, dates_ds0_orig, extra_annual_vars)
 dates_ds1 = time_to_gs(Ngs, dates_ds1_orig, extra_annual_vars)
@@ -394,7 +394,7 @@ dates_ds0["GSLEN"] = get_gs_len_da(dates_ds0["HDATES"] - dates_ds0["SDATES"])
 dates_ds1["GSLEN"] = get_gs_len_da(dates_ds1["HDATES"] - dates_ds1["SDATES"])
 
 
-# %% Check that some things are constant across years for ds1
+# Check that some things are constant across years for ds1
 
 constantVars = ["SDATES", "GDDHARV_PERHARV"]
 verbose = True
@@ -429,7 +429,7 @@ for v in constantVars:
         print(f"✅ dates_ds1: CLM output {v} do not vary through {dates_ds1.dims['gs'] - t1} growing seasons of output.")
 
 
-# %% For both datasets, check that GDDACCUM_PERHARV <= HUI_PERHARV
+# For both datasets, check that GDDACCUM_PERHARV <= HUI_PERHARV
 
 verbose = True
 
