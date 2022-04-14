@@ -616,6 +616,8 @@ varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "HUI_PERHARV.onlyMature", "GSLEN", 
 # varList = ["GSLEN.onlyMature.noOutliers"]
 # varList = ["GSLEN.onlyMature.useMedian"]
 
+vertical = False
+
 for thisVar in varList:
     
     # Processing options
@@ -660,16 +662,35 @@ for thisVar in varList:
     else:
         raise RuntimeError(f"thisVar {thisVar} not recognized")
     
-    figsize = (4, 4)
-    cbar_adj_bottom = 0.15
-    cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
-    if nx != 1:
-        print(f"Since nx = {nx}, you may need to rework some parameters")
-    if ny == 3:
-        cbar_width = 0.46
-        cbar_ax_rect = [(1-cbar_width)/2, 0.05, cbar_width, 0.05]
-    elif ny != 2:
-        print(f"Since ny = {ny}, you may need to rework some parameters")
+    if not vertical:
+        tmp = nx
+        nx = ny
+        ny = tmp
+        figsize = (8, 1.9)
+        cbar_adj_bottom = 0
+        cbar_ax_rect = [0.3, 0.05, 0.4, 0.07]
+        suptitle_y_adj = 0.9
+        wspace = 0.1
+        hspace = 0
+        if ny != 1:
+            print(f"Since ny = {ny}, you may need to rework some parameters")
+        if nx != 3:
+            print(f"Since nx = {nx}, you may need to rework some parameters")
+    else:
+        figsize = (4, 4)
+        cbar_adj_bottom = 0.15
+        cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
+        suptitle_y_adj = 1.04
+        wspace = None
+        hspace = None
+        if nx != 1:
+            print(f"Since nx = {nx}, you may need to rework some parameters")
+        if ny == 3:
+            cbar_width = 0.46
+            cbar_ax_rect = [(1-cbar_width)/2, 0.05, cbar_width, 0.05]
+        elif ny != 2:
+            print(f"Since ny = {ny}, you may need to rework some parameters")
+    nplots = nx*ny
 
     for v, vegtype_str in enumerate(vegtype_list):
         print(f"{thisVar}: {vegtype_str}...")
@@ -714,7 +735,7 @@ for thisVar in varList:
         vmax = max(max0, max1)
         if vmin == None:
             vmin = int(np.floor(min(np.nanmin(map0_yx), np.nanmin(map1_yx))))
-        if ny == 3:
+        if nplots == 3:
             if thisVar == "GSLEN":
                 mxmat = int(paramfile_mxmats[paramfile_pftnames.index(vegtype_str_paramfile)])
                 units = f"Days (mxmat: {mxmat})"
@@ -759,7 +780,7 @@ for thisVar in varList:
         ax = make_axis(fig, ny, nx, 2)
         im1 = make_map(ax, map1_yx, f"v1{subplot_title_suffixes[1]}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
-        if ny == 3:
+        if nplots == 3:
             ax = make_axis(fig, ny, nx, 3)
             if thisVar == "GSLEN":
                 tmp_title = f"GGCMI (max={max2})"
@@ -768,16 +789,22 @@ for thisVar in varList:
             else:
                 raise RuntimeError(f"thisVar {thisVar} not recognized: Getting title of third plot")
             im1 = make_map(ax, map2_yx, tmp_title, ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
-            
-        fig.suptitle(f"{title_prefix}:\n{vegtype_str_title}", y=1.04)
+        
+        this_title = f"{title_prefix}:\n{vegtype_str_title}"
+        if not vertical:
+            this_title = this_title.replace("\n", " ")
+        fig.suptitle(this_title, y=suptitle_y_adj)
         fig.subplots_adjust(bottom=cbar_adj_bottom)
         cbar_ax = fig.add_axes(cbar_ax_rect)
         cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
         cbar_ax.tick_params(labelsize=fontsize_ticklabels)
         plt.xlabel(units, fontsize=fontsize_titles)
+        if wspace != None:
+            plt.subplots_adjust(wspace=wspace)
+        if hspace != None:
+            plt.subplots_adjust(hspace=hspace)
         
         # plt.show()
-        # print(os.path.join(outdir_figs, f"{filename_prefix}_0vs1_{vegtype_str}.png"))
         # break
         
         # Save
