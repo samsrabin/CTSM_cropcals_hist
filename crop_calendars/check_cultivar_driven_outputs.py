@@ -339,6 +339,19 @@ def get_vegtype_str_paramfile(vegtype_str_in):
         vegtype_str_out = vegtype_str_in
     return vegtype_str_out
 
+def get_vegtype_str_figfile(vegtype_str_in):
+    vegtype_str_out = vegtype_str_in
+    if "soybean" in vegtype_str_in and "tropical" not in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("soybean", "temperate_soybean")
+    for t in ["winter", "spring", "temperate", "tropical"]:
+        if t in vegtype_str_out:
+            vegtype_str_out = vegtype_str_out.replace(f"{t}_", "") + f"_{t}"
+    if "irrigated" in vegtype_str_out:
+        vegtype_str_out = vegtype_str_out.replace("irrigated_", "") + "_ir"
+    else:
+        vegtype_str_out = vegtype_str_out + "_rf"
+    return vegtype_str_out
+
 
 # %% Import output sowing and harvest dates, etc.
 
@@ -534,8 +547,9 @@ if nx != 2:
 for v, vegtype_str in enumerate(vegtype_list):
     vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
     
-    # Get vegtype str for figure titles
+    # Get variations on vegtype string
     vegtype_str_title = get_vegtype_str_for_title(vegtype_str)
+    vegtype_str_figfile = get_vegtype_str_figfile(vegtype_str)
     
     # Grid
     thisCrop0_gridded = utils.grid_one_variable(dates_ds0, thisVar, \
@@ -571,7 +585,7 @@ for v, vegtype_str in enumerate(vegtype_list):
     # break
     
     # Save
-    outfile = os.path.join(outdir_figs, f"harvest_reason_0vs1_{vegtype_str}.png")
+    outfile = os.path.join(outdir_figs, f"harvest_reason_0vs1_{vegtype_str_figfile}.png")
     plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
             bbox_inches='tight')
     plt.close()
@@ -579,7 +593,7 @@ for v, vegtype_str in enumerate(vegtype_list):
 
 # %% Make map of means 
 
-varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "HUI_PERHARV.onlyMature", "GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.noOutliers", "GSLEN.onlyMature.useMedian"]
+varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "HUI_PERHARV.onlyMature", "GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.useMedian"]
 # varList = ["GDDHARV_PERHARV"]
 # varList = ["HUI_PERHARV"]
 # varList = ["GSLEN"]
@@ -646,10 +660,10 @@ for thisVar in varList:
     for v, vegtype_str in enumerate(vegtype_list):
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         
+        # Get variations on vegtype string
         vegtype_str_paramfile = get_vegtype_str_paramfile(vegtype_str)
-            
-        # Get vegtype str for figure titles
         vegtype_str_title = get_vegtype_str_for_title(vegtype_str)
+        vegtype_str_figfile = get_vegtype_str_figfile(vegtype_str)
         
         # Grid
         thisCrop0_gridded = utils.grid_one_variable(dates_ds0, thisVar, \
@@ -713,7 +727,9 @@ for thisVar in varList:
                     cmap_after_mxmat = plt.cm.OrRd(np.linspace(0, 1, num=Nbad))
                     cmap = mcolors.LinearSegmentedColormap.from_list('my_colormap', np.vstack((cmap_to_mxmat, cmap_after_mxmat)))
             elif thisVar == "HUI_PERHARV" or thisVar == "GDDHARV_PERHARV":
-                map2_yx = gdds_rx_ds[f"gs1_{vegtype_int}"].isel(time=0, drop=True)
+                map2_yx = gdds_rx_ds[f"gs1_{vegtype_int}"]
+                if "time" in map2_yx.dims:
+                    map2_yx = map2_yx.isel(time=0, drop=True)
                 map2_yx = map2_yx.where(np.bitwise_not(np.isnan(map1_yx)))
                 max2 = int(np.nanmax(map2_yx.values))
                 vmax = max(max0, max1, max2)
@@ -750,7 +766,7 @@ for thisVar in varList:
         # break
         
         # Save
-        outfile = os.path.join(outdir_figs, f"{filename_prefix}_0vs1_{vegtype_str}.png")
+        outfile = os.path.join(outdir_figs, f"{filename_prefix}_0vs1_{vegtype_str_figfile}.png")
         plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
                 bbox_inches='tight')
         plt.close()
@@ -860,10 +876,10 @@ for thisVar_orig in varList:
         ncvar = f"matyday-{vegtype_str_ggcmi}-{irrtype_str_ggcmi}"
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         
+        # Get variations on vegtype string
         vegtype_str_paramfile = get_vegtype_str_paramfile(vegtype_str)
-            
-        # Get vegtype str for figure titles
         vegtype_str_title = get_vegtype_str_for_title(vegtype_str)
+        vegtype_str_figfile = get_vegtype_str_figfile(vegtype_str)
         
         # Import GGCMI outputs
         ggcmi_models_bool = np.full((Nggcmi_models_orig,), False)
@@ -1070,7 +1086,7 @@ for thisVar_orig in varList:
         # break
         
         # Save
-        outfile = os.path.join(outdir_figs, f"{filename_prefix}_{vegtype_str}.png")
+        outfile = os.path.join(outdir_figs, f"{filename_prefix}_{vegtype_str_figfile}.png")
         plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
                 bbox_inches='tight')
         plt.close()
