@@ -722,6 +722,7 @@ for thisVar in varList:
 # varList = ["HUI_PERHARV"]
 # varList = ["GSLEN"]
 varList = ["GSLEN.onlyMature"]
+varList = ["GSLEN.onlyMature.diffExpected"]
 # varList = ["GSLEN", "GSLEN.onlyMature"]
 # varList = ["GSLEN.onlyMature.noOutliers"]
 # varList = ["GSLEN.onlyMature.useMedian"]
@@ -768,16 +769,24 @@ for thisVar in varList:
         thisVar = thisVar.replace(".useMedian", "")
         title_prefix = title_prefix + " (median)"
         filename_prefix = filename_prefix + "_median"
+    diffExpected = "diffExpected" in thisVar
+    if diffExpected:
+        thisVar = thisVar.replace(".diffExpected", "")
+        filename_prefix = filename_prefix + "_diffExpected"
 
     ny = 4
     nx = 4
     if Nggcmi_models > ny*nx + 3:
         raise RuntimeError(f"{Nggcmi_models} GGCMI models + 3 other maps > ny*nx ({ny*nx})")
     vmin = 0.0
-    cmap = plt.cm.viridis
     title_prefix = "Seas. length" + title_prefix
     filename_prefix = "seas_length_compGGCMI" + filename_prefix
-    units = "Days"
+    if diffExpected:
+        units = "Season length minus expected"
+        cmap = plt.cm.RdBu
+    else:
+        units = "Days"
+        cmap = plt.cm.viridis
     vmin = None
     
     figsize = (16, 8)
@@ -920,6 +929,7 @@ for thisVar in varList:
                 this_matyday_array[np.where(this_matyday_array < 0)] = np.nan
             matyday_da[:,:,:,g] = this_matyday_array
         ggcmiDS["matyday"] = matyday_da
+        ggcmiDA = ggcmiDS["matyday"].copy()
         
         # Get GGCMI expected
         if irrtype_str_ggcmi=="noirr":
@@ -945,8 +955,10 @@ for thisVar in varList:
         # Get summary statistic
         if useMedian:
             map1_yx = thisCrop1_gridded.median(axis=0)
+            ggcmiDA_mn = ggcmiDA.median(axis=0)
         else:
             map1_yx = np.mean(thisCrop1_gridded, axis=0)
+            ggcmiDA_mn = np.mean(ggcmiDA, axis=0)
         
         # Get "prescribed" growing season length
         map2_yx = gs_len_rx_ds[f"gs1_{vegtype_int}"].isel(time=0, drop=True)
@@ -957,30 +969,36 @@ for thisVar in varList:
         subplot_title_suffixes = ["", ""]
         
         # Set colorbar etc.
-        min1 = int(np.ceil(np.nanmin(map1_yx)))
-        min2 = int(np.ceil(np.nanmin(map2_yx)))
-        min3 = int(np.ceil(np.nanmin(map3_yx)))
-        vmin = min(min1, min2, min3, np.nanmin(ggcmiDS["matyday"].values))
-        max1 = int(np.ceil(np.nanmax(map1_yx)))
-        max2 = int(np.ceil(np.nanmax(map2_yx)))
-        max3 = int(np.ceil(np.nanmax(map3_yx)))
-        vmax = max(max1, max2, max3, np.nanmax(ggcmiDS["matyday"].values))
+        if diffExpected:
+            map1_yx = map1_yx - map2_yx
+            ggcmiDA_mn = ggcmiDA_mn - map3_yx
+            tmp1 = int(np.nanmax(abs(map1_yx)))
+            tmpG = int(np.nanmax(abs(ggcmiDA_mn.values)))
+            tmp = max(tmp1, tmpG)
+            vmin = -tmp
+            vmax = tmp
+        else:
+            min1 = int(np.ceil(np.nanmin(map1_yx)))
+            min2 = int(np.ceil(np.nanmin(map2_yx)))
+            min3 = int(np.ceil(np.nanmin(map3_yx)))
+            vmin = min(min1, min2, min3, np.nanmin(ggcmiDA_mn.values))
+            max1 = int(np.ceil(np.nanmax(map1_yx)))
+            max2 = int(np.ceil(np.nanmax(map2_yx)))
+            max3 = int(np.ceil(np.nanmax(map3_yx)))
+            vmax = max(max1, max2, max3, np.nanmax(ggcmiDA_mn.values))
         
         ax = make_axis(fig, ny, nx, 1)
         im1 = make_map(ax, map1_yx, "CLM", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
         
-        ax = make_axis(fig, ny, nx, 2)
-        im1 = make_map(ax, map2_yx, "CLM expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
-        
-        ax = make_axis(fig, ny, nx, 3)
-        im1 = make_map(ax, map3_yx, "GGCMI expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
+        if not diffExpected:
+            ax = make_axis(fig, ny, nx, 2)
+            im1 = make_map(ax, map2_yx, "CLM expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
+            
+            ax = make_axis(fig, ny, nx, 3)
+            im1 = make_map(ax, map3_yx, "GGCMI expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
         
         for g in np.arange(Nggcmi_models):
-            thisGGCMI_gridded = ggcmiDS["matyday"].isel(model=g, drop=True)
-            if useMedian:
-                ggcmi_yx = thisGGCMI_gridded.median(axis=0)
-            else:
-                ggcmi_yx = np.mean(thisGGCMI_gridded, axis=0)
+            ggcmi_yx = ggcmiDA_mn.isel(model=g, drop=True)
             ax = make_axis(fig, ny, nx, 3+g+1)
             im1 = make_map(ax, ggcmi_yx, ggcmi_models[g], "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
             
