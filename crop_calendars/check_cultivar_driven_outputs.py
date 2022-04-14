@@ -541,7 +541,16 @@ figsize = (8, 4)
 cbar_adj_bottom = 0.15
 cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
 cmap = plt.cm.viridis
-if nx != 2:
+wspace = None
+hspace = None
+if nx == 3:
+    figsize = (8, 3)
+    cbar_adj_bottom = 0.15
+    cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
+    cmap = plt.cm.viridis
+    wspace = 0.1
+    hspace = 0
+elif nx != 2:
     print(f"Since nx = {nx}, you may need to rework some parameters")
 
 for v, vegtype_str in enumerate(vegtype_list):
@@ -581,6 +590,10 @@ for v, vegtype_str in enumerate(vegtype_list):
     cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
     cbar_ax.tick_params(labelsize=fontsize_ticklabels)
     plt.xlabel("Frequency", fontsize=fontsize_titles)
+    if wspace != None:
+        plt.subplots_adjust(wspace=wspace)
+    if hspace != None:
+        plt.subplots_adjust(hspace=hspace)
     
     # plt.show()
     # break
