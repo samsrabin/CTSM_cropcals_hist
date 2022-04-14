@@ -37,9 +37,6 @@ ggcmi_cropcal_dir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calenda
 if len(indirs) != 2:
     raise RuntimeError(f"For now, indirs must have 2 members (found {len(indirs)}")
 
-import enum
-from multiprocessing.sharedctypes import Value
-from xml.dom.pulldom import PROCESSING_INSTRUCTION
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
