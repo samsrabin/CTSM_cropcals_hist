@@ -24,16 +24,16 @@ gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220331_144207.nc"
 indirs = list()
 indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/",
                    used_clm_mxmat = True,
-                   used_rx_sdate = False))
-# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/",
-#                    used_clm_mxmat = True,
-                #    used_rx_sdate = True))
-# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-08-gddforced/",
-#                    used_clm_mxmat = True,
-                #    used_rx_sdate = True))
-indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforced/",
-                   used_clm_mxmat = False,
-                   used_rx_sdate = True))
+                   used_rx_sdate = False,
+                   used_rx_harvthresh = False))
+indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/",
+                   used_clm_mxmat = True,
+                   used_rx_sdate = True,
+                   used_rx_harvthresh = True))
+# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforced/",
+#                    used_clm_mxmat = False,
+#                    used_rx_sdate = True,
+#                    used_rx_harvthresh = True))
 
 ggcmi_out_topdir = "/Users/Shared/GGCMI/AgMIP.output"
 ggcmi_cropcal_dir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar"
@@ -479,31 +479,47 @@ if "time" in sdates_rx_ds.dims:
     hdates_rx_ds = hdates_rx_ds.isel(time=0, drop=True)
     gdds_rx_ds = gdds_rx_ds.isel(time=0, drop=True)
 
-def check_rx_sdates_obeyed(vegtype_list, sdates_rx_ds, dates_ds, which_ds):
-    all_ok = True
+def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var):
+    all_ok = 2
+    diff_str_list = []
     for vegtype_str in vegtype_list:
         ds_thisVeg = dates_ds.isel(patch=np.where(dates_ds.patches1d_itype_veg_str == vegtype_str)[0])
         patch_inds_lon_thisVeg = ds_thisVeg.patches1d_ixy.values.astype(int) - 1
         patch_inds_lat_thisVeg = ds_thisVeg.patches1d_jxy.values.astype(int) - 1
     
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
-        rx_da = sdates_rx_ds[f"gs1_{vegtype_int}"]
+        rx_da = rx_ds[f"gs1_{vegtype_int}"]
         rx_array = rx_da.values[patch_inds_lat_thisVeg,patch_inds_lon_thisVeg]
-        sim_array = ds_thisVeg["SDATES"].values
+        sim_array = ds_thisVeg[output_var].values
     
         if np.any(sim_array != rx_array):
-            all_ok = False
-            break
+            diff_array = sim_array - rx_array
+            min_diff = round(min(diff_array[abs(diff_array) > 0]), 3)
+            max_diff = round(max(diff_array[abs(diff_array) > 0]), 3)
+            if "GDDHARV_PERHARV" and np.max(abs(diff_array)) <= 1:
+                all_ok = 1
+                diff_str_list.append(f"   {vegtype_str}: diffs range {min_diff} to {max_diff}")
+            else:
+                all_ok = 0
+                break
     
-    if all_ok:
-        print(f"✅ dates_ds{which_ds}: Prescribed sowing dates always obeyed")
+    if all_ok == 2:
+        print(f"✅ dates_ds{which_ds}: Prescribed {output_var} always obeyed")
+    elif all_ok == 1:
+        # print(f"🟨 dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable:")
+        # for x in diff_str_list: print(x)
+        print(f"🟨 dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable (diffs <= 1)")
     else:
-        print(f"❌ dates_ds{which_ds}: Prescribed sowing dates *not* always obeyed (e.g., {vegtype_str}")
+        print(f"❌ dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed (e.g., {vegtype_str}: diffs range {min_diff} to {max_diff})")
 
 if indirs[0]["used_rx_sdate"]:
-    check_rx_sdates_obeyed(vegtype_list, sdates_rx_ds, dates_ds0, 0)
+    check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds0, 0, "SDATES")
 if indirs[1]["used_rx_sdate"]:
-    check_rx_sdates_obeyed(vegtype_list, sdates_rx_ds, dates_ds1, 1)
+    check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds1, 1, "SDATES")
+if indirs[0]["used_rx_harvthresh"]:
+    check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds0, 0, "GDDHARV_PERHARV")
+if indirs[1]["used_rx_harvthresh"]:
+    check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds1, 1, "GDDHARV_PERHARV")
     
 
 # %% Make map of harvest reasons
