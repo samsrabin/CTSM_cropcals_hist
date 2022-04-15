@@ -632,7 +632,7 @@ varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "HUI_PERHARV.onlyMature", "GSLEN", 
 # varList = ["GSLEN", "GSLEN.onlyMature"]
 # varList = ["GSLEN.onlyMature.noOutliers"]
 # varList = ["GSLEN.onlyMature.useMedian"]
-# varList = ["SDATES"]
+# varList = ["SDATES", "HDATES.onlyMature"]
 
 vertical = False
 
@@ -682,13 +682,13 @@ for thisVar in varList:
         filename_prefix = "sdate" + filename_prefix
         units = "Day of year"
         ny = 3
-        vmin = None
+        cmap = plt.cm.twilight
     elif thisVar == "HDATES":
         title_prefix = "Harvest date" + title_prefix
         filename_prefix = "hdate" + filename_prefix
         units = "Day of year"
         ny = 3
-        vmin = None
+        cmap = plt.cm.twilight
     else:
         raise RuntimeError(f"thisVar {thisVar} not recognized")
     
