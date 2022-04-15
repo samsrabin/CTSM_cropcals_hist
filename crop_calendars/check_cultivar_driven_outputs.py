@@ -26,14 +26,14 @@ indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/",
                    used_clm_mxmat = True,
                    used_rx_sdate = False,
                    used_rx_harvthresh = False))
-indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/",
-                   used_clm_mxmat = True,
-                   used_rx_sdate = True,
-                   used_rx_harvthresh = True))
-# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforced/",
-#                    used_clm_mxmat = False,
+# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/",
+#                    used_clm_mxmat = True,
 #                    used_rx_sdate = True,
 #                    used_rx_harvthresh = True))
+indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforced/",
+                   used_clm_mxmat = False,
+                   used_rx_sdate = True,
+                   used_rx_harvthresh = True))
 
 ggcmi_out_topdir = "/Users/Shared/GGCMI/AgMIP.output"
 ggcmi_cropcal_dir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar"
@@ -870,7 +870,7 @@ for thisVar in varList:
 # varList = ["GSLEN"]
 # varList = ["GSLEN.onlyMature"]
 # varList = ["GSLEN.onlyMature.diffExpected"]
-varList = ["GSLEN.onlyMature.diffExpected.useMedian"]
+varList = ["GSLEN.onlyMature.diffExpected"]
 # varList = ["GSLEN.onlyMature.diffExpected.noOutliers"]
 # varList = ["GSLEN", "GSLEN.onlyMature"]
 # varList = ["GSLEN.onlyMature.noOutliers"]
@@ -1170,7 +1170,7 @@ for thisVar_orig in varList:
             ax = make_axis(fig, ny, nx, 3+g+1)
             im1 = make_map(ax, ggcmi_yx, ggcmi_models[g], "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
             
-        fig.suptitle(f"{title_prefix}:\n{vegtype_str_title}", y=1.04)
+        fig.suptitle(f"{title_prefix}: {vegtype_str_title}", y=0.95, fontsize=fontsize_titles*2.2)
         fig.subplots_adjust(bottom=cbar_adj_bottom)
         cbar_ax = fig.add_axes(cbar_ax_rect)
         cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
