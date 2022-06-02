@@ -123,7 +123,11 @@ for p, thisPatch in enumerate(patchList):
     # There should be no missing sowings
     if any(sim_sp < 1):
         ok_p[p] = False
-        if verbose: print(f"{thisStr}: Sowing didn't happen some year(s)")
+        if verbose:
+            if np.all(sim_sp < 1):
+                print(f"{thisStr}: Sowing never happened")
+            else:
+                print(f"{thisStr}: Sowing didn't happen some year(s); first {y1+int(np.argwhere(sim_sp < 1)[0])}")
         continue
 
     # Should only need to consider one sowing and one harvest
@@ -152,7 +156,11 @@ for p, thisPatch in enumerate(patchList):
     # There should no longer be any missing harvests
     if any(sim_hp < 1):
         ok_p[p] = False
-        if verbose: print(f"{thisStr}: Harvest didn't happen some year(s)/patch(es)")
+        if verbose:
+            if np.all(sim_hp < 1):
+                print(f"{thisStr}: Harvest never happened")
+            else:
+                print(f"{thisStr}: Harvest didn't happen some growing season(s); first {y1+int(np.argwhere(sim_hp < 1)[0])}")
         continue
 
     # Harvest should always happen the day before the next sowing.
