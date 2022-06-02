@@ -14,7 +14,8 @@ my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myf
 # indir = "/Users/Shared/CESM_runs/f10_f10_mg37_1850/"
 # indir = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-03-29/"
 # indir = "/Users/Shared/CESM_runs/f10_f10_mg37/tmp/"
-indir = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-03-30/"
+# indir = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-03-30/"
+indir = "/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220601"
 
 # Directory to save output netCDF
 outdir = "/Users/Shared/CESM_work/crop_dates/"
@@ -83,7 +84,15 @@ yN_import_str = f"{yN+2}-01-01"
 
 print(f"Importing netCDF time steps {y1_import_str} through {yN_import_str}")
 
-dates_ds = utils.import_ds(glob.glob(indir + "*h2.*"), \
+# Get file list
+if indir[-1] != os.path.sep:
+    indir = indir + os.path.sep
+h2_pattern = indir + "*h2.*"
+h2_filelist = glob.glob(h2_pattern)
+if not h2_filelist:
+    raise RuntimeError(f"No files found matching pattern: {h2_pattern}")
+
+dates_ds = utils.import_ds(h2_filelist, \
     myVars=["SDATES", "HDATES"], 
     myVegtypes=utils.define_mgdcrop_list())
 
