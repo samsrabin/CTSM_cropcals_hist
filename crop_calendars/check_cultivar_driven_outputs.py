@@ -484,6 +484,24 @@ if "time" in sdates_rx_ds.dims:
     sdates_rx_ds = sdates_rx_ds.isel(time=0, drop=True)
     hdates_rx_ds = hdates_rx_ds.isel(time=0, drop=True)
     gdds_rx_ds = gdds_rx_ds.isel(time=0, drop=True)
+    
+def get_extreme_info(diff_array, mxn, dims, gs, patches1d_lon, patches1d_lat):
+    if mxn == np.min:
+        diff_array = np.ma.masked_array(diff_array, mask=(np.abs(diff_array) == 0))
+    themxn = mxn(diff_array)
+    
+    # Find the first patch-gs that has the mxn value
+    matching_indices = np.where(diff_array == themxn)
+    first_indices = [x[0] for x in matching_indices]
+    
+    # Get the lon, lat, and growing season of that patch-gs
+    p = first_indices[dims.index("patch")]
+    thisLon = patches1d_lon.values[p]
+    thisLat = patches1d_lat.values[p]
+    s = first_indices[dims.index("gs")]
+    thisGS = gs.values[s]
+    
+    return round(themxn, 3), round(thisLon, 3), round(thisLat,3), thisGS
 
 def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min=None):
     all_ok = 2
@@ -493,28 +511,41 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
         ds_thisVeg = dates_ds.isel(patch=np.where(dates_ds.patches1d_itype_veg_str == vegtype_str)[0])
         patch_inds_lon_thisVeg = ds_thisVeg.patches1d_ixy.values.astype(int) - 1
         patch_inds_lat_thisVeg = ds_thisVeg.patches1d_jxy.values.astype(int) - 1
+        patch_lons_thisVeg = ds_thisVeg.patches1d_lon
+        patch_lats_thisVeg = ds_thisVeg.patches1d_lat
     
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         rx_da = rx_ds[f"gs1_{vegtype_int}"]
         rx_array = rx_da.values[patch_inds_lat_thisVeg,patch_inds_lon_thisVeg]
         sim_array = ds_thisVeg[output_var].values
+        sim_array_dims = ds_thisVeg[output_var].dims
         
         # Account for GDD harvest threshold minimum set in PlantCrop()
         if output_var=="GDDHARV_PERHARV":
             if gdd_min == None:
                 raise RuntimeError(f"gdd_min must be provided when doing check_rx_obeyed() for GDDHARV_PERHARV")
             rx_array[rx_array < gdd_min] = gdd_min
-    
+        
         if np.any(sim_array != rx_array):
             diff_array = sim_array - rx_array
-            min_diff = round(min(diff_array[abs(diff_array) > 0]), 3)
-            max_diff = round(max(diff_array[abs(diff_array) > 0]), 3)
-            if output_var=="GDDHARV_PERHARV" and np.max(abs(diff_array)) <= gdd_tolerance:
-                all_ok = 1
-                diff_str_list.append(f"   {vegtype_str}: diffs range {min_diff} to {max_diff}")
-            else:
-                all_ok = 0
-                break
+            
+            # Allow negative GDDHARV values when harvest occurred because sowing was scheduled for the next day
+            if output_var=="GDDHARV_PERHARV":
+                diff_array = np.ma.masked_array(diff_array, mask= \
+                    (diff_array < 0) & 
+                    (ds_thisVeg["HARVEST_REASON_PERHARV"].values==5))
+    
+            if np.any(np.abs(diff_array[abs(diff_array) > 0]) > 0):
+                min_diff, minLon, minLat, minGS = get_extreme_info(diff_array, np.min, sim_array_dims, dates_ds.gs, patch_lons_thisVeg, patch_lats_thisVeg)
+                max_diff, maxLon, maxLat, maxGS = get_extreme_info(diff_array, np.max, sim_array_dims, dates_ds.gs, patch_lons_thisVeg, patch_lats_thisVeg)
+                
+                diffs_range_txt = f"diffs range {min_diff} (lon {minLon}, lat {minLat}, year {minGS}) to {max_diff} (lon {maxLon}, lat {maxLat}, gs {maxGS})"
+                if output_var=="GDDHARV_PERHARV" and np.max(abs(diff_array)) <= gdd_tolerance:
+                    all_ok = 1
+                    diff_str_list.append(f"   {vegtype_str}: {diffs_range_txt}")
+                else:
+                    all_ok = 0
+                    break
     
     if all_ok == 2:
         print(f"✅ dates_ds{which_ds}: Prescribed {output_var} always obeyed")
@@ -523,7 +554,7 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
         # for x in diff_str_list: print(x)
         print(f"🟨 dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable (diffs <= {gdd_tolerance})")
     else:
-        print(f"❌ dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed (e.g., {vegtype_str}: diffs range {min_diff} to {max_diff})")
+        print(f"❌ dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed (e.g., {vegtype_str}: {diffs_range_txt}")
 
 if indirs[0]["used_rx_sdate"]:
     check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds0, 0, "SDATES")
