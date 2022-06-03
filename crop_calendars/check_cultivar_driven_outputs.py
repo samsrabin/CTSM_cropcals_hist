@@ -488,6 +488,7 @@ if "time" in sdates_rx_ds.dims:
 def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min=None):
     all_ok = 2
     diff_str_list = []
+    gdd_tolerance = 0
     for vegtype_str in vegtype_list:
         ds_thisVeg = dates_ds.isel(patch=np.where(dates_ds.patches1d_itype_veg_str == vegtype_str)[0])
         patch_inds_lon_thisVeg = ds_thisVeg.patches1d_ixy.values.astype(int) - 1
@@ -508,7 +509,7 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
             diff_array = sim_array - rx_array
             min_diff = round(min(diff_array[abs(diff_array) > 0]), 3)
             max_diff = round(max(diff_array[abs(diff_array) > 0]), 3)
-            if "GDDHARV_PERHARV" and np.max(abs(diff_array)) <= 1:
+            if output_var=="GDDHARV_PERHARV" and np.max(abs(diff_array)) <= gdd_tolerance:
                 all_ok = 1
                 diff_str_list.append(f"   {vegtype_str}: diffs range {min_diff} to {max_diff}")
             else:
@@ -520,7 +521,7 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
     elif all_ok == 1:
         # print(f"🟨 dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable:")
         # for x in diff_str_list: print(x)
-        print(f"🟨 dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable (diffs <= 1)")
+        print(f"🟨 dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable (diffs <= {gdd_tolerance})")
     else:
         print(f"❌ dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed (e.g., {vegtype_str}: diffs range {min_diff} to {max_diff})")
 
