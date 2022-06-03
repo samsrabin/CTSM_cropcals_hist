@@ -4,6 +4,9 @@
 y1 = 1980
 yN = 2009
 
+# Minimum harvest threshold allowed in PlantCrop()
+gdd_min = 50
+
 # Your path to ctsm_py directory (i.e., where utils.py lives)
 my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
 
@@ -17,8 +20,10 @@ my_clm_subver = "c211112"
 
 # Prescribed sowing and harvest dates
 sdates_rx_file = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
-hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
-gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220331_144207.nc"
+# hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
+# gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220331_144207.nc"
+hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.20220602_230029.nc"
+gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220602_231239.nc"
 
 # Directory where model output file(s) can be found (figure files will be saved in subdir here)
 indirs = list()
@@ -480,7 +485,7 @@ if "time" in sdates_rx_ds.dims:
     hdates_rx_ds = hdates_rx_ds.isel(time=0, drop=True)
     gdds_rx_ds = gdds_rx_ds.isel(time=0, drop=True)
 
-def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var):
+def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min=None):
     all_ok = 2
     diff_str_list = []
     for vegtype_str in vegtype_list:
@@ -492,6 +497,12 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var):
         rx_da = rx_ds[f"gs1_{vegtype_int}"]
         rx_array = rx_da.values[patch_inds_lat_thisVeg,patch_inds_lon_thisVeg]
         sim_array = ds_thisVeg[output_var].values
+        
+        # Account for GDD harvest threshold minimum set in PlantCrop()
+        if output_var=="GDDHARV_PERHARV":
+            if gdd_min == None:
+                raise RuntimeError(f"gdd_min must be provided when doing check_rx_obeyed() for GDDHARV_PERHARV")
+            rx_array[rx_array < gdd_min] = gdd_min
     
         if np.any(sim_array != rx_array):
             diff_array = sim_array - rx_array
@@ -518,9 +529,9 @@ if indirs[0]["used_rx_sdate"]:
 if indirs[1]["used_rx_sdate"]:
     check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds1, 1, "SDATES")
 if indirs[0]["used_rx_harvthresh"]:
-    check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds0, 0, "GDDHARV_PERHARV")
+    check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds0, 0, "GDDHARV_PERHARV", gdd_min=gdd_min)
 if indirs[1]["used_rx_harvthresh"]:
-    check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds1, 1, "GDDHARV_PERHARV")
+    check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds1, 1, "GDDHARV_PERHARV", gdd_min=gdd_min)
     
 
 # %% Make map of harvest reasons
