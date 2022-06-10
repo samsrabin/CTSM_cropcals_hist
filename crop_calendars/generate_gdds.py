@@ -2,7 +2,7 @@
 
 # Years of interest (do not include extra year needed for finishing last growing season)
 y1 = 1980
-yN = 2009
+yN = 2009 # 2009
 
 # Save map figures to files?
 save_figs = True
@@ -15,7 +15,9 @@ my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myf
 # indir = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-03-29/"
 # indir = "/Users/Shared/CESM_runs/f10_f10_mg37/tmp/"
 # indir = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-03-30/"
-indir = "/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220601"
+# indir = "/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220601"
+# indir = "/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220601.02.72441c4e"
+indir = "/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220601.03.ba902039"
 
 # Directory to save output netCDF
 outdir = "/Users/Shared/CESM_work/crop_dates/"
@@ -111,12 +113,14 @@ verbose = True
 ok_p = np.full((dates_ds.dims["patch"]), True)
 
 for p, thisPatch in enumerate(patchList):
+        
     thisLon = dates_ds.patches1d_lon.values[p]
     thisLat = dates_ds.patches1d_lat.values[p]
     # thisLon = np.round(dates_ds.patches1d_lon.values[p], decimals=2)
     # thisLat = np.round(dates_ds.patches1d_lat.values[p], decimals=2)
     thisCrop = dates_ds.patches1d_itype_veg_str.values[p]
-    thisStr = f"Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop}"
+    thisIVT = dates_ds.patches1d_itype_veg.values[p]
+    thisStr = f"Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop} ({thisIVT})"
     sim_sp = dates_ds["SDATES"].sel(patch=thisPatch).values
     sim_hp = dates_ds["HDATES"].sel(patch=thisPatch).values
     
@@ -152,7 +156,7 @@ for p, thisPatch in enumerate(patchList):
     # We're going to be comparing each harvest to the sowing that FOLLOWS it.
     sim_sp = sim_sp[1:]
     sim_hp = sim_hp[0:-1]
-    
+        
     # There should no longer be any missing harvests
     if any(sim_hp < 1):
         ok_p[p] = False
@@ -234,7 +238,8 @@ if all_ok:
 
 # %% Import prescribed harvest dates
 
-hdate_inFile = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
+# hdate_inFile = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
+hdate_inFile = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.20220602_230029.nc"
 
 hdates_rx = import_rx_dates("h", hdate_inFile, dates_ds)
 
@@ -371,6 +376,8 @@ gdds_mean_ds = gddaccum_ds.mean(dim="time", keep_attrs=True)
 gdds_fill0_mean_ds = gdds_fill0_ds.mean(dim="time", keep_attrs=True)
 if save_figs:
     gddharv_mean_ds = gddharv_ds.mean(dim="time", keep_attrs=True)
+    
+print("Done getting means")
 
 
 # %% Grid
