@@ -35,7 +35,9 @@ indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/",
 #                    used_clm_mxmat = True,
 #                    used_rx_sdate = True,
 #                    used_rx_harvthresh = True))
-indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforced/",
+# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforced/",
+# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220601.03.ba902039.gddforced/",
+indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220606.4d9cfa0e.gddforced/",
                    used_clm_mxmat = False,
                    used_rx_sdate = True,
                    used_rx_harvthresh = True))
@@ -444,19 +446,22 @@ for v in constantVars:
         t_vals = np.squeeze(dates_ds1[v].isel(gs=t).values)
         ok_p = np.squeeze(t1_vals == t_vals)
         if not np.all(ok_p):
+            if ok:
+                print(f"❌ dates_ds1: CLM output {v} unexpectedly vary over time:")
             ok = False
-            print(f"{v} timestep {t} does not match timestep {t1}")
             if verbose:
                 for thisPatch in np.where(np.bitwise_not(ok_p))[0]:
                     thisLon = dates_ds1.patches1d_lon.values[thisPatch]
                     thisLat = dates_ds1.patches1d_lat.values[thisPatch]
                     thisCrop = dates_ds1.patches1d_itype_veg_str.values[thisPatch]
-                    thisStr = f"Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop}"
+                    thisCrop_int = dates_ds1.patches1d_itype_veg.values[thisPatch]
+                    thisStr = f"   Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop} ({thisCrop_int})"
                     if v == "SDATES":
                         print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
                     else:
                         print(f"{thisStr}: {t1_yr} {v} {int(t1_vals[thisPatch])}, {t_yr} {v} {int(t_vals[thisPatch])}")
-                    break
+            else:
+                print(f"{v} timestep {t} does not match timestep {t1}")
 
     if ok:
         print(f"✅ dates_ds1: CLM output {v} do not vary through {dates_ds1.dims['gs'] - t1} growing seasons of output.")
@@ -485,7 +490,7 @@ if "time" in sdates_rx_ds.dims:
     hdates_rx_ds = hdates_rx_ds.isel(time=0, drop=True)
     gdds_rx_ds = gdds_rx_ds.isel(time=0, drop=True)
     
-def get_extreme_info(diff_array, mxn, dims, gs, patches1d_lon, patches1d_lat):
+def get_extreme_info(diff_array, rx_array, mxn, dims, gs, patches1d_lon, patches1d_lat):
     if mxn == np.min:
         diff_array = np.ma.masked_array(diff_array, mask=(np.abs(diff_array) == 0))
     themxn = mxn(diff_array)
@@ -500,6 +505,11 @@ def get_extreme_info(diff_array, mxn, dims, gs, patches1d_lon, patches1d_lat):
     thisLat = patches1d_lat.values[p]
     s = first_indices[dims.index("gs")]
     thisGS = gs.values[s]
+    
+    # Get the prescribed value for this patch-gs
+    rx_array = rx_array.sel(lon=thisLon, lat=thisLat)
+    if "gs" in rx_array.dims:
+        rx_array
     
     return round(themxn, 3), round(thisLon, 3), round(thisLat,3), thisGS
 
@@ -539,10 +549,10 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
                 min_diff, minLon, minLat, minGS = get_extreme_info(diff_array, np.min, sim_array_dims, dates_ds.gs, patch_lons_thisVeg, patch_lats_thisVeg)
                 max_diff, maxLon, maxLat, maxGS = get_extreme_info(diff_array, np.max, sim_array_dims, dates_ds.gs, patch_lons_thisVeg, patch_lats_thisVeg)
                 
-                diffs_range_txt = f"diffs range {min_diff} (lon {minLon}, lat {minLat}, year {minGS}) to {max_diff} (lon {maxLon}, lat {maxLat}, gs {maxGS})"
+                diffs_eg_txt = f"{vegtype_str} ({vegtype_int}): diffs range {min_diff} (lon {minLon}, lat {minLat}, year {minGS}) to {max_diff} (lon {maxLon}, lat {maxLat}, gs {maxGS})"
                 if output_var=="GDDHARV_PERHARV" and np.max(abs(diff_array)) <= gdd_tolerance:
                     all_ok = 1
-                    diff_str_list.append(f"   {vegtype_str}: {diffs_range_txt}")
+                    diff_str_list.append(f"   {diffs_eg_txt}")
                 else:
                     all_ok = 0
                     break
@@ -554,7 +564,7 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
         # for x in diff_str_list: print(x)
         print(f"🟨 dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable (diffs <= {gdd_tolerance})")
     else:
-        print(f"❌ dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed (e.g., {vegtype_str}: {diffs_range_txt}")
+        print(f"❌ dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed. E.g., {diffs_eg_txt}")
 
 if indirs[0]["used_rx_sdate"]:
     check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds0, 0, "SDATES")
@@ -913,8 +923,8 @@ for thisVar in varList:
 # varList = ["GSLEN"]
 # varList = ["GSLEN.onlyMature"]
 # varList = ["GSLEN.onlyMature.diffExpected"]
-varList = ["GSLEN.onlyMature.diffExpected"]
 # varList = ["GSLEN.onlyMature.diffExpected.noOutliers"]
+varList = ["GSLEN.onlyMature.diffExpected.useMedian"]
 # varList = ["GSLEN", "GSLEN.onlyMature"]
 # varList = ["GSLEN.onlyMature.noOutliers"]
 # varList = ["GSLEN.onlyMature.useMedian"]
