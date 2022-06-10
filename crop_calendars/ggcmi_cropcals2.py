@@ -166,7 +166,7 @@ for v in template_ds:
 
 # Create output files
 for v in variable_dict:
-    outfile = "%s%ss%s.%d-%d.nc" % (outdir, v, file_specifier, y1, yN)
+    outfile = "%s%ss%s.%d-%d.%s.nc" % (outdir, v, file_specifier, y1, yN, dt.datetime.now().strftime("%Y%m%d_%H%M%S"))
     variable_dict[v]["outfile"] = outfile
     variable_dict[v]["outfile_fill1"] = outfile.replace(".nc", ".fill1.nc")
     template_ds.to_netcdf(path=variable_dict[v]["outfile"])
