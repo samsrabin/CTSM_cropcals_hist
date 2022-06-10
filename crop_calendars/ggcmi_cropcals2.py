@@ -137,9 +137,9 @@ y1 = template_ds.time.values[0].year
 yN = template_ds.time.values[-1].year
 template_ds.attrs = out_attrs
 
-#  Remove variable(s) we don't need
-for v in ["hdm", "HDATES", "SDATE1", "SDATES"]:
-    if v in template_ds:
+#  Remove variable(s) we don't need (hdm, or any all-uppercase variables)
+for v in template_ds:
+    if v == "hdm" or v.upper()==v:
         template_ds = template_ds.drop(v)
 
 # Create output files
