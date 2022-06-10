@@ -34,11 +34,16 @@ import utils
 
 # %% Setup
 
-# Files/directories to use
+# Where to save output files
+outdir = "/Users/Shared/CESM_work/crop_dates/"
+
+# Files/directories to use for inputs
 templatefile = "/Users/Shared/CESM_runs/f10_f10_mg37/2021-11-23/f10_f10_mg37.clm2.h3.2000-01-01-00000.nc"
 indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar-nninterp-f10_f10_mg37/"
 file_specifier = "_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37" # In name of input and output files
-outdir = "/Users/Shared/CESM_work/crop_dates/"
+# templatefile = "/Users/Shared/CESM_runs/halfdeg_test/2022-04-22/halfdeg_test.clm2.h1.1850-01-01-00000.nc"
+# indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar/"
+# file_specifier = "_ggcmi_crop_calendar_phase3_v1.01" # In name of input and output files
 
 # Add current date/time to output attributes
 out_attrs["created"] = dt.datetime.now().replace(microsecond=0).astimezone().isoformat()
