@@ -22,6 +22,7 @@ import shutil
 import os
 import time
 import datetime as dt
+import cftime
 
 
 # %% Setup
@@ -131,8 +132,29 @@ def slice_yr(y):
         return str(y)
 
 # Open and time-slice template dataset
-template_ds = xr.open_dataset(templatefile, decode_times=True)
-template_ds = template_ds.sel(time=slice(slice_yr(y1), slice_yr(yN)))
+template_ds = xr.open_dataset(templatefile, decode_times=True).sel(time=slice(slice_yr(y1), slice_yr(yN)))
+# template_ds = template_ds.sel(time=slice(slice_yr(y1), slice_yr(yN)))
+if np.size(template_ds.time) == 0:
+    print(f"Time slice {y1}-{yN} not found in template dataset. Faking.")
+    if y1 != yN:
+        raise RuntimeError("Not sure how to fake time axis when y1 != yN")
+    template_ds = xr.open_dataset(templatefile, decode_times=True)
+    template_ds = template_ds.isel(time=slice(0,1)) # Get the first timestep. Just using .values[0] causes trouble.
+    val0 = template_ds.time.values[0]
+    if not isinstance(template_ds.time.values[0], cftime.datetime):
+        raise TypeError(f"Template file time axis is type {type(template_ds.time.values[0])}, which isn't a cftime.datetime subclass; not sure that next line (assigning fake value) will work.")
+    template_ds.time.values[0] = type(val0)(y1, 1, 1, 0, 0, 0, 0, has_year_zero=val0.has_year_zero)
+    template_ds.time_bounds.values[0] = np.array([template_ds.time.values[0,], template_ds.time.values[0]])
+    if "mcdate" in template_ds:
+        template_ds.mcdate.values = np.array([20000101,]).astype(type(template_ds.mcdate.values[0]))
+    if "mcsec" in template_ds:
+        template_ds.mcsec.values = np.array([0,]).astype(type(template_ds.mcsec.values[0]))
+    if "mdcur" in template_ds:
+        template_ds.mdcur.values = np.array([0,]).astype(type(template_ds.mdcur.values[0]))
+    if "mscur" in template_ds:
+        template_ds.mscur.values = np.array([0,]).astype(type(template_ds.mscur.values[0]))
+    if "nstep" in template_ds:
+        template_ds.nstep.values = np.array([0,]).astype(type(template_ds.nstep.values[0]))
 y1 = template_ds.time.values[0].year
 yN = template_ds.time.values[-1].year
 template_ds.attrs = out_attrs
