@@ -12,6 +12,9 @@ out_attrs = {
     "comment": "Day of year is 1-indexed (i.e., Jan. 1 = 1). Filled using cdo -remapnn,$original -setmisstonn"
 }
 
+# Your path to ctsm_py directory (i.e., where utils.py lives)
+my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
+
 
 # %% Imports
 
@@ -23,6 +26,10 @@ import os
 import time
 import datetime as dt
 import cftime
+
+import sys
+sys.path.append(my_ctsm_python_gallery)
+import utils
 
 
 # %% Setup
@@ -214,6 +221,8 @@ for thiscrop_clm in crop_dict:
         cropcal_ds = xr.open_dataset(file_ggcmi)
         # Flip latitude to match destination
         cropcal_ds = cropcal_ds.reindex(lat=cropcal_ds.lat[::-1])
+        # Rearrange longitude to match destination (does nothing if not needed)
+        cropcal_ds = utils.lon_idl2pm(cropcal_ds, fail_silently=True)
     
     for thisvar_clm in variable_dict:
         # Get GGCMI netCDF info
