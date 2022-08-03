@@ -461,9 +461,9 @@ layout = "2x2"
 bin_width = 15
 lat_bin_edges = np.arange(0, 91, bin_width)
 
-fontsize_titles = 8
-fontsize_axislabels = 8
-fontsize_ticklabels = 7
+fontsize_titles = 18
+fontsize_axislabels = 15
+fontsize_ticklabels = 15
 
 def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles): 
     im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
@@ -475,24 +475,26 @@ def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fon
     cbar = plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02)
     cbar.ax.tick_params(labelsize=fontsize_ticklabels)
     
-    ticks = np.arange(-90, 91, bin_width)
+    ticks = np.arange(-60, 91, bin_width)
     ticklabels = [str(x) for x in ticks]
     for i,x in enumerate(ticks):
         if x%2:
             ticklabels[i] = ''
-    plt.yticks(np.arange(-90,91,15), labels=ticklabels,
+    plt.yticks(np.arange(-60,91,15), labels=ticklabels,
                fontsize=fontsize_ticklabels)
+    plt.axis('off')
     
 def get_non_nans(in_da, fillValue):
     in_da = in_da.where(in_da != fillValue)
     return in_da.values[~np.isnan(in_da.values)]
 
 def set_boxplot_props(bp, color):
-    plt.setp(bp['boxes'], color=color)
-    plt.setp(bp['whiskers'], color=color)
-    plt.setp(bp['caps'], color=color)
-    plt.setp(bp['medians'], color=color)
-    plt.setp(bp['fliers'], markeredgecolor=color, markersize=3)
+    linewidth = 3
+    plt.setp(bp['boxes'], color=color, linewidth=linewidth)
+    plt.setp(bp['whiskers'], color=color, linewidth=linewidth)
+    plt.setp(bp['caps'], color=color, linewidth=linewidth)
+    plt.setp(bp['medians'], color=color, linewidth=linewidth)
+    plt.setp(bp['fliers'], markeredgecolor=color, markersize=6, linewidth=linewidth, markeredgewidth=linewidth/2)
 
 Nbins = len(lat_bin_edges)-1
 bin_names = ["All"]
@@ -538,7 +540,7 @@ if save_figs:
             fig = plt.figure(figsize=(7.5,14))
             ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
         elif layout == "2x2":
-            fig = plt.figure(figsize=(10,5))
+            fig = plt.figure(figsize=(24,12))
             spec = fig.add_gridspec(nrows=2, ncols=2,
                                     width_ratios=[0.4,0.6])
             ax = fig.add_subplot(spec[0,0],projection=ccrs.PlateCarree())
@@ -604,9 +606,9 @@ if save_figs:
         plt.xlabel("|latitude| zone", fontsize=fontsize_axislabels)
         plt.ylabel("Growing degree-days", fontsize=fontsize_axislabels)
         plt.title(f"Zonal changes: {vegtype_str}", fontsize=fontsize_titles)
-
+        
         outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}.png"
-        plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+        plt.savefig(outfile, dpi=300, transparent=False, facecolor='white', \
             bbox_inches='tight')
         plt.close()
 
