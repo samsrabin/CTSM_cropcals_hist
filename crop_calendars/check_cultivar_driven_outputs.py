@@ -179,15 +179,15 @@ def get_vegtype_str_figfile(vegtype_str_in):
 
 print("Importing CLM output sowing and harvest dates...")
 
-extra_annual_vars = ["GDDACCUM_PERHARV", "GDDHARV_PERHARV", "HARVEST_REASON_PERHARV", "HUI_PERHARV"]
+myVars = ["SDATES", "HDATES", "GDDACCUM_PERHARV", "GDDHARV_PERHARV", "HARVEST_REASON_PERHARV", "HUI_PERHARV"]
 
 dates_ds1_orig = utils.import_ds(glob.glob(indirs[1]["path"] + "*h2.*"), \
-    myVars=["SDATES", "HDATES"] + extra_annual_vars + ["GRAINC_TO_FOOD_ACCUM_PERHARV"], 
+    myVars=myVars + ["GRAINC_TO_FOOD_ACCUM_PERHARV"], 
     myVegtypes=utils.define_mgdcrop_list())
 dates_ds1_orig = check_and_trim_years(y1, yN, dates_ds1_orig)
 
 dates_ds0_orig = utils.import_ds(glob.glob(indirs[0]["path"] + "*h2.*"), \
-    myVars=["SDATES", "HDATES"] + extra_annual_vars, 
+    myVars=myVars, 
     myVegtypes=utils.define_mgdcrop_list())
 dates_ds0_orig = check_and_trim_years(y1, yN, dates_ds0_orig)
 
@@ -229,8 +229,8 @@ for v in gs_len_rx_ds:
 
 # Align output sowing and harvest dates/etc.
 
-dates_ds0 = convert_axis_time2gs(Ngs, dates_ds0_orig, extra_annual_vars)
-dates_ds1 = convert_axis_time2gs(Ngs, dates_ds1_orig, extra_annual_vars + ["GRAINC_TO_FOOD_ACCUM_PERHARV"])
+dates_ds0 = convert_axis_time2gs(Ngs, dates_ds0_orig, myVars)
+dates_ds1 = convert_axis_time2gs(Ngs, dates_ds1_orig, myVars + ["GRAINC_TO_FOOD_ACCUM_PERHARV"])
 
 # Get growing season length
 dates_ds0["GSLEN"] = get_gs_len_da(dates_ds0["HDATES"] - dates_ds0["SDATES"])
@@ -280,8 +280,8 @@ for v in constantVars:
 verbose = True
 
 
-check_gddaccum_le_hui(dates_ds0, 0)
-check_gddaccum_le_hui(dates_ds1, 1)
+check_gddaccum_le_hui(dates_ds0, " dates_ds0: ")
+check_gddaccum_le_hui(dates_ds1, " dates_ds1: ")
 
 
 # Check that prescribed sowing dates were obeyed

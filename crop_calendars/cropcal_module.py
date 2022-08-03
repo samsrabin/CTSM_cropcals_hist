@@ -36,10 +36,10 @@ def check_and_trim_years(y1, yN, ds_in):
 
 
  # Make sure GDDACCUM_PERHARV is always <= HUI_PERHARV
-def check_gddaccum_le_hui(this_ds, which_ds):
+def check_gddaccum_le_hui(this_ds, msg_txt=" "):
     if np.all(this_ds["GDDACCUM_PERHARV"] <= this_ds["HUI_PERHARV"]):
-        print(f"✅ dates_ds{which_ds}: GDDACCUM_PERHARV always <= HUI_PERHARV")
-    else: print(f"❌ dates_ds{which_ds}: GDDACCUM_PERHARV *not* always <= HUI_PERHARV")
+        print(f"✅{msg_txt}GDDACCUM_PERHARV always <= HUI_PERHARV")
+    else: print(f"❌{msg_txt}GDDACCUM_PERHARV *not* always <= HUI_PERHARV")
 
 
 def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min=None):
@@ -96,7 +96,7 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
         print(f"❌ dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed. E.g., {diffs_eg_txt}")
 
 
-def convert_axis_time2gs(Ngs, this_ds, extra_var_list):
+def convert_axis_time2gs(Ngs, this_ds, myVars):
     ### Checks ###
     # Relies on max harvests per year >= 2
     mxharvests = len(this_ds.mxharvests)
@@ -135,7 +135,7 @@ def convert_axis_time2gs(Ngs, this_ds, extra_var_list):
         == this_ds["SDATES"].isel(time=0, mxsowings=0), \
         this_ds["HDATES"].isel(time=0, mxharvests=1) > 0)
     firstharv_nan_inds = np.where(np.bitwise_or(cond1, cond2))[0]
-    for v in ["HDATES"] + extra_var_list:
+    for v in [x for x in myVars if x!="SDATES"]:
         this_ds = set_firstharv_nan(this_ds, v, firstharv_nan_inds)
     
     ### In some cells, the last growing season did complete, but we have to ignore it because it's extra. This block determines which members of HDATES (and other mxharvests-dimensioned variables) should be ignored for this reason. ###
@@ -158,7 +158,7 @@ def convert_axis_time2gs(Ngs, this_ds, extra_var_list):
 
     ### Extract the series of sowings and harvests ###
     new_ds_gs = extract_gs_timeseries(new_ds_gs, "SDATES", this_ds["SDATES"], sdate_included, Npatches, Ngs+1)
-    for v in ["HDATES"] + extra_var_list:
+    for v in [x for x in myVars if x!="SDATES"]:
         new_ds_gs = extract_gs_timeseries(new_ds_gs, v, this_ds[v], hdate_included, Npatches, Ngs)
     
     ### Save additional variables ###
