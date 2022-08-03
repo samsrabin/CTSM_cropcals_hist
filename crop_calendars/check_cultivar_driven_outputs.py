@@ -37,7 +37,8 @@ indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/",
 #                    used_rx_harvthresh = True))
 # indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforced/",
 # indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220601.03.ba902039.gddforced/",
-indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220606.4d9cfa0e.gddforced/",
+# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220606.4d9cfa0e.gddforced/",
+indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220610.299035.gddforced/",
                    used_clm_mxmat = False,
                    used_rx_sdate = True,
                    used_rx_harvthresh = True))
@@ -73,7 +74,7 @@ warnings.filterwarnings("ignore", message="__len__ for multi-part geometries is 
 warnings.filterwarnings("ignore", message="Iteration over multi-part geometries is deprecated and will be removed in Shapely 2.0. Use the `geoms` property to access the constituent parts of a multi-part geometry.")
 warnings.filterwarnings("ignore", message="All-NaN slice encountered")
 
-# Directory to save output figures
+# Directories to save outputs
 indir0 = indirs[0]["path"]
 outdir_figs = os.path.join(indirs[1]["path"], f"figs_comp_{os.path.basename(os.path.dirname(indir0))}")
 if not os.path.exists(outdir_figs):
@@ -368,7 +369,7 @@ print("Importing CLM output sowing and harvest dates...")
 extra_annual_vars = ["GDDACCUM_PERHARV", "GDDHARV_PERHARV", "HARVEST_REASON_PERHARV", "HUI_PERHARV"]
 
 dates_ds1_orig = utils.import_ds(glob.glob(indirs[1]["path"] + "*h2.*"), \
-    myVars=["SDATES", "HDATES"] + extra_annual_vars, 
+    myVars=["SDATES", "HDATES"] + extra_annual_vars + ["GRAINC_TO_FOOD_ACCUM_PERHARV"], 
     myVegtypes=utils.define_mgdcrop_list())
 dates_ds1_orig = check_and_trim_years(y1, yN, get_year_from_cftime, dates_ds1_orig)
 
@@ -422,7 +423,7 @@ for v in gs_len_rx_ds:
 # Align output sowing and harvest dates/etc.
 
 dates_ds0 = time_to_gs(Ngs, dates_ds0_orig, extra_annual_vars)
-dates_ds1 = time_to_gs(Ngs, dates_ds1_orig, extra_annual_vars)
+dates_ds1 = time_to_gs(Ngs, dates_ds1_orig, extra_annual_vars + ["GRAINC_TO_FOOD_ACCUM_PERHARV"])
 
 # Get growing season length
 dates_ds0["GSLEN"] = get_gs_len_da(dates_ds0["HDATES"] - dates_ds0["SDATES"])
@@ -677,7 +678,7 @@ for v, vegtype_str in enumerate(vegtype_list):
 
 # %% Make map of means 
 
-varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "HUI_PERHARV.onlyMature", "GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.useMedian", "SDATES", "HDATES.onlyMature"]
+# varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "HUI_PERHARV.onlyMature", "GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.useMedian", "SDATES", "HDATES.onlyMature"]
 # varList = ["GDDHARV_PERHARV"]
 # varList = ["HUI_PERHARV"]
 # varList = ["GSLEN"]
@@ -686,8 +687,13 @@ varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "HUI_PERHARV.onlyMature", "GSLEN", 
 # varList = ["GSLEN.onlyMature.noOutliers"]
 # varList = ["GSLEN.onlyMature.useMedian"]
 # varList = ["SDATES", "HDATES.onlyMature"]
+varList = ["SDATES"]
 
 vertical = False
+
+fontsize_titles = 24
+fontsize_axislabels = 24
+fontsize_ticklabels = 21
 
 for thisVar in varList:
     
@@ -749,7 +755,7 @@ for thisVar in varList:
         tmp = nx
         nx = ny
         ny = tmp
-        figsize = (8, 1.9)
+        figsize = (24, 5.7)
         cbar_adj_bottom = 0
         cbar_ax_rect = [0.3, 0.05, 0.4, 0.07]
         suptitle_y_adj = 0.9
@@ -1240,6 +1246,32 @@ for thisVar_orig in varList:
         plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
                 bbox_inches='tight')
         plt.close()
+
+
+# %% Grid a variable and save to netCDF
+
+thisVar = "GRAINC_TO_FOOD_ACCUM_PERHARV"
+
+outdir_nc = os.path.join(indirs[1]["path"], "netcdfs")
+if not os.path.exists(outdir_nc):
+    os.makedirs(outdir_nc)
+
+for v, vegtype_str in enumerate(vegtype_list):
+    print(f"{thisVar}: {vegtype_str}...")
+    vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+    thisCrop_gridded = utils.grid_one_variable(dates_ds1, thisVar, \
+            vegtype=vegtype_int).squeeze(drop=True)
+    thisCrop_gridded = thisCrop_gridded.rename(vegtype_str)
+    thisCrop_gridded = utils.lon_pm2idl(thisCrop_gridded)
+    
+    if v==0:
+        out_ds = thisCrop_gridded.to_dataset()
+    else:
+        out_ds[vegtype_str] = thisCrop_gridded
+
+outFile = os.path.join(outdir_nc, thisVar+".nc")
+out_ds.to_netcdf(outFile)
+
 
 
 
