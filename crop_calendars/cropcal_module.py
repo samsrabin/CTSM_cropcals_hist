@@ -135,7 +135,7 @@ def convert_axis_time2gs(Ngs, this_ds, myVars):
         == this_ds["SDATES"].isel(time=0, mxsowings=0), \
         this_ds["HDATES"].isel(time=0, mxharvests=1) > 0)
     firstharv_nan_inds = np.where(np.bitwise_or(cond1, cond2))[0]
-    for v in [x for x in myVars if x!="SDATES"]:
+    for v in [x for x in myVars if x=="HDATES" or "PERHARV" in x]:
         this_ds = set_firstharv_nan(this_ds, v, firstharv_nan_inds)
     
     ### In some cells, the last growing season did complete, but we have to ignore it because it's extra. This block determines which members of HDATES (and other mxharvests-dimensioned variables) should be ignored for this reason. ###
