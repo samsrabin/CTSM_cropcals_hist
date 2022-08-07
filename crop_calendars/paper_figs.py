@@ -142,7 +142,7 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    if verbose:
       print(f'Start: discrepancy of {np.sum(~np.isnan(this_ds.HDATES.values)) - expected_valid} patch-seasons')
    
-   # Set all non-positive values to NaN
+   # Set all non-positive date values to NaN. These are seasons that were never harvested (or never started): "non-seasons."
    if this_ds.HDATES.dims != ("time", "mxharvests", "patch"):
       raise RuntimeError(f"This code relies on HDATES dims ('time', 'mxharvests', 'patch'), not {this_ds.HDATES.dims}")
    hdates_ymp = this_ds.HDATES.where(this_ds.HDATES > 0).values.copy()
@@ -157,6 +157,8 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    sdates_pym[first_season_before_first_year,0,0] = np.nan
    if verbose:
       print(f'After "Ignore harvests from before this output began: discrepancy of {np.sum(~np.isnan(hdates_pym)) - expected_valid} patch-seasons')
+   
+   # We need to keep some non-seasons---it's possible that "the yearY growing season" never happened (sowing conditions weren't met), but we still need something there so that we can make an array of dimension Npatch*Ngs. We do this by changing those non-seasons from NaN to -Inf before doing the filtering and reshaping, after which we'll convert them back to NaNs.
    
    # "In years with no sowing, pretend the first no-harvest is meaningful, unless that was intentionally ignored above."
    mxharvests =  this_ds.dims["mxharvests"]
