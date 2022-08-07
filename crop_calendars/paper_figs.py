@@ -35,7 +35,7 @@ warnings.filterwarnings("ignore", message="All-NaN slice encountered")
 # %% Define functions
 
 def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegtypes=utils.define_mgdcrop_list(), 
-                  sdates_rx_ds=None, gdds_rx_ds=None):
+                  sdates_rx_ds=None, gdds_rx_ds=None, verbose=False):
    
    # Minimum harvest threshold allowed in PlantCrop()
    gdd_min = 50
@@ -52,10 +52,7 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
       y1 = this_ds.time.values[0].year
       yN = this_ds.time.values[-1].year - 2
       this_ds = check_and_trim_years(y1, yN, this_ds)
-   
-   # How many growing seasons can we use? Ignore last season because it can be incomplete for some gridcells.
-   Ngs = this_ds.dims['time'] - 1
-   
+      
    # What vegetation types are included?
    vegtype_list = [x for x in this_ds.vegtype_str.values if x in this_ds.patches1d_itype_veg_str.values]
    
@@ -92,12 +89,6 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
          if this_ds[v].dims != ("time", "mxharvests", "patch"):
             continue
          this_ds[v] = this_ds[v].where(~falsely_alive_yhp)
-
-   
-   return this_ds
-         
-   # Align output sowing and harvest dates/etc.
-   this_ds = convert_axis_time2gs_sdatesperharv(Ngs, this_ds, myVars)
    
    # Get growing season length
    this_ds["GSLEN_PERHARV"] = get_gs_len_da(this_ds["HDATES"] - this_ds["SDATES_PERHARV"])
@@ -147,7 +138,104 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    if gdds_rx_ds:
       check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, 0, "SDATES", "GDDHARV_PERHARV", gdd_min=gdd_min)
    
-   return this_ds
+   
+   ##########################################################
+   ### Convert time*mxharvests axes to growingseason axis ###
+   ##########################################################
+   
+   # How many non-NaN patch-seasons do we expect to have once we're done organizing things?
+   Npatch = this_ds.dims["patch"]
+   # Because some patches will be planted in the last year but not complete, we have to ignore any finalyear-planted seasons that do complete.
+   Ngs = this_ds.dims["time"]-1
+   expected_valid = Npatch*Ngs
+   
+   if verbose:
+      print(f'Start: discrepancy of {np.sum(~np.isnan(this_ds.HDATES.values)) - expected_valid} patch-seasons')
+   
+   # Set all non-positive values to NaN
+   hdates_ymp = this_ds.HDATES.where(this_ds.HDATES > 0).values.copy()
+   hdates_pym = np.transpose(hdates_ymp.copy(), (2,0,1))
+   sdates_ymp = this_ds.SDATES_PERHARV.where(this_ds.SDATES_PERHARV > 0).values.copy()
+   sdates_pym = np.transpose(sdates_ymp.copy(), (2,0,1))
+   hdates_pym[hdates_pym <= 0] = np.nan
+
+   # "Ignore harvests from before this output began"
+   first_season_before_first_year = hdates_pym[:,0,0] < sdates_pym[:,0,0]
+   hdates_pym[first_season_before_first_year,0,0] = np.nan
+   sdates_pym[first_season_before_first_year,0,0] = np.nan
+   if verbose:
+      print(f'After "Ignore harvests from before this output began: discrepancy of {np.sum(~np.isnan(hdates_pym)) - expected_valid} patch-seasons')
+   
+   # "In years with no sowing, pretend the first no-harvest is meaningful, unless that was intentionally ignored above."
+   if this_ds.dims["mxharvests"] > 2:
+      raise RuntimeError("Need to generalize for mxharvests > 2")
+   hdates_pym2 = hdates_pym.copy()
+   sdates_pym2 = sdates_pym.copy()
+   nosow_py = np.transpose(np.all(np.bitwise_not(this_ds.SDATES.values > 0),axis=1))
+   # Need to generalize for mxharvests > 2
+   where_nosow_py_1st = np.where(nosow_py & np.isnan(hdates_pym[:,:,0])
+                                 & ~np.tile(np.expand_dims(first_season_before_first_year, axis=1),
+                                            (1,Ngs+1))
+                                 )
+   hdates_pym2[where_nosow_py_1st[0], where_nosow_py_1st[1], 0] = -np.inf
+   sdates_pym2[where_nosow_py_1st[0], where_nosow_py_1st[1], 0] = -np.inf
+   where_nosow_py_2nd = np.where(nosow_py & ~np.isnan(hdates_pym[:,:,0]) & np.isnan(hdates_pym[:,:,1]))
+   hdates_pym2[where_nosow_py_2nd[0], where_nosow_py_2nd[1], 1] = -np.inf
+   sdates_pym2[where_nosow_py_2nd[0], where_nosow_py_2nd[1], 1] = -np.inf
+   def pym_to_pg(pym, quiet=False):
+      pg = np.reshape(pym, (pym.shape[0],-1))
+      ok_pg = pg[~np.isnan(pg)]
+      if not quiet:
+         print(f"{ok_pg.size} included; unique N seasons = {np.unique(np.sum(~np.isnan(pg), axis=1))}")
+      return pg
+   hdates_pg = pym_to_pg(hdates_pym2.copy(), quiet=~verbose)
+   sdates_pg = pym_to_pg(sdates_pym2.copy(), quiet=True)
+   if verbose:
+      print(f'After "In years with no sowing, pretend the first no-harvest is meaningful: discrepancy of {np.sum(~np.isnan(hdates_pg)) - expected_valid} patch-seasons')
+   
+   # "Ignore any harvests that were planted in the final year, because some cells will have incomplete growing seasons for the final year."
+   lastyear_complete_season = (hdates_pg[:,-2:] >= sdates_pg[:,-2:]) | np.isinf(hdates_pg[:,-2:])
+   def ignore_lastyear_complete_season(pg, excl):
+      tmp_L = pg[:,:-2]
+      tmp_R = pg[:,-2:]
+      tmp_R[np.where(excl)] = np.nan
+      pg = np.concatenate((tmp_L, tmp_R), axis=1)
+      return pg
+   hdates_pg2 = ignore_lastyear_complete_season(hdates_pg.copy(), lastyear_complete_season)
+   sdates_pg2 = ignore_lastyear_complete_season(sdates_pg.copy(), lastyear_complete_season)
+   is_valid = ~np.isnan(hdates_pg2)
+   discrepancy = np.sum(is_valid) - expected_valid
+   unique_Nseasons = np.unique(np.sum(is_valid, axis=1))
+   if verbose:
+      print(f'After "Ignore any harvests that were planted in the final year, because other cells will have incomplete growing seasons for the final year": discrepancy of {discrepancy} patch-seasons')
+      print(f"unique N seasons = {unique_Nseasons}")
+   
+   # Create Dataset with time axis as "gs" (growing season) instead of what CLM puts out
+   if discrepancy == 0:
+      this_ds_gs = set_up_ds_with_gs_axis(this_ds)
+      for v in this_ds.data_vars:
+         if this_ds[v].dims != ('time', 'mxharvests', 'patch'): 
+            continue
+         
+         # Remove the nans and reshape to patches*growingseasons
+         da_yhp = this_ds[v].copy()
+         da_pyh = da_yhp.transpose("patch", "time", "mxharvests")
+         ar_pg = np.reshape(da_pyh.values, (this_ds.dims["patch"], -1))
+         ar_valid_pg = np.reshape(ar_pg[is_valid], (this_ds.dims["patch"], Ngs))
+         # Change -infs to nans
+         ar_valid_pg[np.isinf(ar_valid_pg)] = np.nan
+         # Save as DataArray to new Dataset
+         da_pg = xr.DataArray(data = ar_valid_pg, 
+                              coords = [this_ds_gs.coords["patch"], this_ds_gs.coords["gs"]],
+                              name = da_yhp.name,
+                              attrs = da_yhp.attrs)
+         this_ds_gs[v] = da_pg
+   else:
+      raise RuntimeError(f"Can't convert time*mxharvests axes to growingseason axis: discrepancy of {discrepancy} patch-seasons")
+
+
+   
+   return this_ds_gs
 
 
 
@@ -159,140 +247,5 @@ thisfile = "/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.sdates_perhar
 
 myVars = ['GRAINC_TO_FOOD_PERHARV', 'GRAINC_TO_FOOD_ANN', 'SDATES', 'SDATES_PERHARV', 'SYEARS_PERHARV', 'HDATES', 'HYEARS', 'GDDHARV_PERHARV', 'GDDACCUM_PERHARV', 'HUI_PERHARV', 'SOWING_REASON_PERHARV', 'HARVEST_REASON_PERHARV']
 
-this_ds = import_output(thisfile, myVars=myVars)
+this_ds = import_output(thisfile, myVars=myVars, verbose=False)
 
-
-# %% Convert time*mxharvests axes to growingseason axis
-
-def pym_to_pg(pym, quiet=False):
-   pg = np.reshape(pym, (pym.shape[0],-1))
-   ok_pg = pg[~np.isnan(pg)]
-   if not quiet:
-      print(f"{ok_pg.size} included; unique N seasons = {np.unique(np.sum(~np.isnan(pg), axis=1))}")
-   return pg
-
-# We expect "1 fewer than Nyears" valid values, because we have to ignore any finalyear-planted seasons that complete
-Npatch = this_ds.dims["patch"]
-Ngs = this_ds.dims["time"]-1
-expected_valid = Npatch*Ngs
-
-print(f'Start: discrepancy of {np.sum(~np.isnan(this_ds.HDATES.values)) - expected_valid} patch-seasons')
-
-# Set all non-positive values to NaN
-hdates_ymp = this_ds.HDATES.where(this_ds.HDATES > 0).values.copy()
-hdates_pym = np.transpose(hdates_ymp.copy(), (2,0,1))
-sdates_ymp = this_ds.SDATES_PERHARV.where(this_ds.SDATES_PERHARV > 0).values.copy()
-sdates_pym = np.transpose(sdates_ymp.copy(), (2,0,1))
-print(hdates_pym.shape)
-hdates_pym[hdates_pym <= 0] = np.nan
-
-# "Ignore harvests from before this output began"
-first_season_before_first_year = hdates_pym[:,0,0] < sdates_pym[:,0,0]
-hdates_pym[first_season_before_first_year,0,0] = np.nan
-sdates_pym[first_season_before_first_year,0,0] = np.nan
-print(f'After "Ignore harvests from before this output began: discrepancy of {np.sum(~np.isnan(hdates_pym)) - expected_valid} patch-seasons')
-
-# "In years with no sowing, pretend the first no-harvest is meaningful, unless that was intentionally ignored above."
-hdates_pym2 = hdates_pym.copy()
-sdates_pym2 = sdates_pym.copy()
-nosow_py = np.transpose(np.all(np.bitwise_not(this_ds.SDATES.values > 0),axis=1))
-# Need to generalize for mxharvests > 2
-where_nosow_py_1st = np.where(nosow_py & np.isnan(hdates_pym[:,:,0]) & ~np.tile(np.expand_dims(first_season_before_first_year, axis=1), (1,Ngs+1)))
-hdates_pym2[where_nosow_py_1st[0], where_nosow_py_1st[1], 0] = -np.inf
-sdates_pym2[where_nosow_py_1st[0], where_nosow_py_1st[1], 0] = -np.inf
-where_nosow_py_2nd = np.where(nosow_py & ~np.isnan(hdates_pym[:,:,0]) & np.isnan(hdates_pym[:,:,1]))
-hdates_pym2[where_nosow_py_2nd[0], where_nosow_py_2nd[1], 1] = -np.inf
-sdates_pym2[where_nosow_py_2nd[0], where_nosow_py_2nd[1], 1] = -np.inf
-hdates_pg = pym_to_pg(hdates_pym2.copy())
-sdates_pg = pym_to_pg(sdates_pym2.copy(), quiet=True)
-print(f'After "In years with no sowing, pretend the first no-harvest is meaningful: discrepancy of {np.sum(~np.isnan(hdates_pg)) - expected_valid} patch-seasons')
-
-# "Ignore any harvests that were planted in the final year, because some cells will have incomplete growing seasons for the final year."
-lastyear_complete_season = (hdates_pg[:,-2:] >= sdates_pg[:,-2:]) | np.isinf(hdates_pg[:,-2:])
-def ignore_lastyear_complete_season(pg, excl):
-   tmp_L = pg[:,:-2]
-   tmp_R = pg[:,-2:]
-   tmp_R[np.where(excl)] = np.nan
-   pg = np.concatenate((tmp_L, tmp_R), axis=1)
-   return pg
-hdates_pg2 = ignore_lastyear_complete_season(hdates_pg.copy(), lastyear_complete_season)
-sdates_pg2 = ignore_lastyear_complete_season(sdates_pg.copy(), lastyear_complete_season)
-is_valid = ~np.isnan(hdates_pg2)
-discrepancy = np.sum(is_valid) - expected_valid
-unique_Nseasons = np.unique(np.sum(is_valid, axis=1))
-print(f'After "Ignore any harvests that were planted in the final year, because other cells will have incomplete growing seasons for the final year": discrepancy of {discrepancy} patch-seasons')
-print(f"unique N seasons = {unique_Nseasons}")
-
-# Create Dataset with time axis as "gs" (growing season) instead of what CLM puts out
-if discrepancy == 0:
-   this_ds_gs = set_up_ds_with_gs_axis(this_ds)
-   for v in this_ds.data_vars:
-      if this_ds[v].dims != ('time', 'mxharvests', 'patch'): 
-         continue
-      
-      # Remove the nans and reshape to patches*growingseasons
-      da_yhp = this_ds[v].copy()
-      da_pyh = da_yhp.transpose("patch", "time", "mxharvests")
-      ar_pg = np.reshape(da_pyh.values, (this_ds.dims["patch"], -1))
-      ar_valid_pg = np.reshape(ar_pg[is_valid], (this_ds.dims["patch"], Ngs))
-      # Change -infs to nans
-      ar_valid_pg[np.isinf(ar_valid_pg)] = np.nan
-      # Save as DataArray to new Dataset
-      da_pg = xr.DataArray(data = ar_valid_pg, 
-                           coords = [this_ds_gs.coords["patch"], this_ds_gs.coords["gs"]],
-                           name = da_yhp.name,
-                           attrs = da_yhp.attrs)
-      this_ds_gs[v] = da_pg
-else:
-   raise RuntimeError(f"Can't convert time*mxharvests axes to growingseason axis: discrepancy of {discrepancy} patch-seasons")
-
-print("All done")
-
-
-
-# %% Query a patch with bad # seasons
-# p = np.random.choice(np.where(np.sum(~np.isnan(hdates_pg2), axis=1)>4)[0], 1)[0]
-# p=47577
-# p = np.random.choice(np.where(np.sum(~np.isnan(hdates_pg2), axis=1)<4)[0], 1)[0]
-# p = 38250
-
-nan_firstsow = np.isnan(this_ds.SDATES.values[0,0,:])
-i_nan_firstsow = np.where(nan_firstsow)[0]
-i_too_many_gs = np.where(np.sum(~np.isnan(hdates_pg2), axis=1)>4)[0]
-[x for x in i_too_many_gs if x not in i_nan_firstsow] # if empty: all cells with too many growing seasons had NaN in first row
-i_nan_firstsow_but_ok_Ngs = [x for x in i_nan_firstsow if x not in i_too_many_gs]
-np.sum(~np.isnan(this_ds.SDATES.values[:,:,i_nan_firstsow_but_ok_Ngs])) # if >0: some nan_firstsow_but_ok_Ngs patches had non-nan sowings at some point
-# ps = np.random.choice(too_many_gs, 1)
-# ps = [47637] # Harvested y2d18 but (a) now sowing y1 and (b) sowing y2 not until d263
-ps = i_too_many_gs
-
-import pandas as pd
-for p in ps:
-   print(f"patch {p}: {this_ds.patches1d_itype_veg_str.values[p]}, lon {this_ds.patches1d_lon.values[p]} lat {this_ds.patches1d_lat.values[p]}")
-   print("Original:")
-   df = pd.DataFrame(np.concatenate((this_ds.SDATES.values[:,:,p], 
-                                    this_ds.SDATES_PERHARV.values[:,:,p], 
-                                    this_ds.HDATES.values[:,:,p],
-                                    ), 
-                                    axis=1))
-   df.columns = ["sdates", "hsdate1", "hsdate2", "hdate1", "hdate2"]
-   print(df)
-
-y2_hsdate1_gt_hdate1 = this_ds.SDATES_PERHARV.values[1,0,:] \
-                       > this_ds.HDATES.values[1,0,:]
-i_sow_before_patch_active = np.where(nan_firstsow & y2_hsdate1_gt_hdate1)[0]
-
-# print("Masked:")
-# print(sdates_ymp[:,:,p])
-# print(hdates_ymp[:,:,p])
-# print('After "Ignore harvests from before this output began"')
-# print(np.transpose(sdates_pym, (1,2,0))[:,:,p])
-# print(np.transpose(hdates_pym, (1,2,0))[:,:,p])
-# print('After "In years with no sowing, pretend the first no-harvest is meaningful"')
-# print(np.transpose(sdates_pym2, (1,2,0))[:,:,p])
-# print(np.transpose(hdates_pym2, (1,2,0))[:,:,p])
-# print(sdates_pg[p,:])
-# print(hdates_pg[p,:])
-# print('After "Ignore any harvests that were planted in the final year, because some cells will have incomplete growing seasons for the final year"')
-# print(sdates_pg2[p,:])
-# print(hdates_pg2[p,:])
