@@ -128,16 +128,6 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
          if ok:
             print(f"✅ CLM output {v} do not vary through {this_ds.dims['gs'] - t1} growing seasons of output.")
    
-   # Check that GDDACCUM_PERHARV <= HUI_PERHARV
-   if all(v in this_ds for v in ["GDDACCUM_PERHARV", "HUI_PERHARV"]):
-      check_gddaccum_le_hui(this_ds, allowed=True)
-      
-   # Check that prescribed calendars were obeyed
-   if sdates_rx_ds:
-      check_rx_obeyed(vegtype_list, sdates_rx_ds, this_ds, 0, "SDATES")
-   if gdds_rx_ds:
-      check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, 0, "SDATES", "GDDHARV_PERHARV", gdd_min=gdd_min)
-   
    
    ##########################################################
    ### Convert time*mxharvests axes to growingseason axis ###
@@ -232,8 +222,21 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
          this_ds_gs[v] = da_pg
    else:
       raise RuntimeError(f"Can't convert time*mxharvests axes to growingseason axis: discrepancy of {discrepancy} patch-seasons")
+   
+   
+   #######################
+   ### Complete checks ###
+   #######################
 
-
+   # Check that GDDACCUM_PERHARV <= HUI_PERHARV
+   if all(v in this_ds for v in ["GDDACCUM_PERHARV", "HUI_PERHARV"]):
+      check_gddaccum_le_hui(this_ds, both_nan_ok=True, throw_error=True)
+      
+   # Check that prescribed calendars were obeyed
+   if sdates_rx_ds:
+      check_rx_obeyed(vegtype_list, sdates_rx_ds, this_ds, 0, "SDATES")
+   if gdds_rx_ds:
+      check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, 0, "SDATES", "GDDHARV_PERHARV", gdd_min=gdd_min)
    
    return this_ds_gs
 
@@ -248,4 +251,3 @@ thisfile = "/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.sdates_perhar
 myVars = ['GRAINC_TO_FOOD_PERHARV', 'GRAINC_TO_FOOD_ANN', 'SDATES', 'SDATES_PERHARV', 'SYEARS_PERHARV', 'HDATES', 'HYEARS', 'GDDHARV_PERHARV', 'GDDACCUM_PERHARV', 'HUI_PERHARV', 'SOWING_REASON_PERHARV', 'HARVEST_REASON_PERHARV']
 
 this_ds = import_output(thisfile, myVars=myVars, verbose=False)
-
