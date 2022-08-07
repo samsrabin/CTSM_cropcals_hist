@@ -100,7 +100,7 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    this_ds = convert_axis_time2gs_sdatesperharv(Ngs, this_ds, myVars)
    
    # Get growing season length
-   this_ds["GSLEN"] = get_gs_len_da(this_ds["HDATES"] - this_ds["SDATES"])
+   this_ds["GSLEN_PERHARV"] = get_gs_len_da(this_ds["HDATES"] - this_ds["SDATES_PERHARV"])
    
    # Check that some things are constant across years
    if constantVars:
