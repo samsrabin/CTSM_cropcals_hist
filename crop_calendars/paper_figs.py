@@ -143,6 +143,8 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
       print(f'Start: discrepancy of {np.sum(~np.isnan(this_ds.HDATES.values)) - expected_valid} patch-seasons')
    
    # Set all non-positive values to NaN
+   if this_ds.HDATES.dims != ("time", "mxharvests", "patch"):
+      raise RuntimeError(f"This code relies on HDATES dims ('time', 'mxharvests', 'patch'), not {this_ds.HDATES.dims}")
    hdates_ymp = this_ds.HDATES.where(this_ds.HDATES > 0).values.copy()
    hdates_pym = np.transpose(hdates_ymp.copy(), (2,0,1))
    sdates_ymp = this_ds.SDATES_PERHARV.where(this_ds.SDATES_PERHARV > 0).values.copy()
@@ -157,21 +159,22 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
       print(f'After "Ignore harvests from before this output began: discrepancy of {np.sum(~np.isnan(hdates_pym)) - expected_valid} patch-seasons')
    
    # "In years with no sowing, pretend the first no-harvest is meaningful, unless that was intentionally ignored above."
-   if this_ds.dims["mxharvests"] > 2:
-      raise RuntimeError("Need to generalize for mxharvests > 2")
+   mxharvests =  this_ds.dims["mxharvests"]
+   if mxharvests > 2:
+      print("Warning: Untested with mxharvests > 2")
    hdates_pym2 = hdates_pym.copy()
    sdates_pym2 = sdates_pym.copy()
    nosow_py = np.transpose(np.all(np.bitwise_not(this_ds.SDATES.values > 0),axis=1))
-   # Need to generalize for mxharvests > 2
    where_nosow_py_1st = np.where(nosow_py & np.isnan(hdates_pym[:,:,0])
                                  & ~np.tile(np.expand_dims(first_season_before_first_year, axis=1),
                                             (1,Ngs+1))
                                  )
    hdates_pym2[where_nosow_py_1st[0], where_nosow_py_1st[1], 0] = -np.inf
    sdates_pym2[where_nosow_py_1st[0], where_nosow_py_1st[1], 0] = -np.inf
-   where_nosow_py_2nd = np.where(nosow_py & ~np.isnan(hdates_pym[:,:,0]) & np.isnan(hdates_pym[:,:,1]))
-   hdates_pym2[where_nosow_py_2nd[0], where_nosow_py_2nd[1], 1] = -np.inf
-   sdates_pym2[where_nosow_py_2nd[0], where_nosow_py_2nd[1], 1] = -np.inf
+   for h in np.arange(mxharvests - 1):
+      where_nosow_py = np.where(nosow_py & np.any(~np.isnan(hdates_pym[:,:,0:h]), axis=2) & np.isnan(hdates_pym[:,:,1]))
+      hdates_pym2[where_nosow_py[0], where_nosow_py[1], 1] = -np.inf
+      sdates_pym2[where_nosow_py[0], where_nosow_py[1], 1] = -np.inf
    def pym_to_pg(pym, quiet=False):
       pg = np.reshape(pym, (pym.shape[0],-1))
       ok_pg = pg[~np.isnan(pg)]
@@ -184,15 +187,15 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
       print(f'After "In years with no sowing, pretend the first no-harvest is meaningful: discrepancy of {np.sum(~np.isnan(hdates_pg)) - expected_valid} patch-seasons')
    
    # "Ignore any harvests that were planted in the final year, because some cells will have incomplete growing seasons for the final year."
-   lastyear_complete_season = (hdates_pg[:,-2:] >= sdates_pg[:,-2:]) | np.isinf(hdates_pg[:,-2:])
-   def ignore_lastyear_complete_season(pg, excl):
-      tmp_L = pg[:,:-2]
-      tmp_R = pg[:,-2:]
+   lastyear_complete_season = (hdates_pg[:,-mxharvests:] >= sdates_pg[:,-mxharvests:]) | np.isinf(hdates_pg[:,-mxharvests:])
+   def ignore_lastyear_complete_season(pg, excl, mxharvests):
+      tmp_L = pg[:,:-mxharvests]
+      tmp_R = pg[:,-mxharvests:]
       tmp_R[np.where(excl)] = np.nan
       pg = np.concatenate((tmp_L, tmp_R), axis=1)
       return pg
-   hdates_pg2 = ignore_lastyear_complete_season(hdates_pg.copy(), lastyear_complete_season)
-   sdates_pg2 = ignore_lastyear_complete_season(sdates_pg.copy(), lastyear_complete_season)
+   hdates_pg2 = ignore_lastyear_complete_season(hdates_pg.copy(), lastyear_complete_season, mxharvests)
+   sdates_pg2 = ignore_lastyear_complete_season(sdates_pg.copy(), lastyear_complete_season, mxharvests)
    is_valid = ~np.isnan(hdates_pg2)
    discrepancy = np.sum(is_valid) - expected_valid
    unique_Nseasons = np.unique(np.sum(is_valid, axis=1))
