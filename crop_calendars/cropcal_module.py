@@ -216,12 +216,15 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None):
             ar_valid_pg = np.reshape(ar_pg[is_valid], (this_ds.dims["patch"], Ngs))
             # Change -infs to nans
             ar_valid_pg[np.isinf(ar_valid_pg)] = np.nan
-            # Save as DataArray to new Dataset
+            # Save as DataArray to new Dataset, stripping _PERHARV from variable name
+            newname = v.replace("_PERHARV","")
+            if newname in this_ds_gs:
+                raise RuntimeError(f"{newname} already in dataset!")
             da_pg = xr.DataArray(data = ar_valid_pg, 
                                 coords = [this_ds_gs.coords["patch"], this_ds_gs.coords["gs"]],
-                                name = da_yhp.name,
+                                name = newname,
                                 attrs = da_yhp.attrs)
-            this_ds_gs[v] = da_pg
+            this_ds_gs[newname] = da_pg
     else:
         raise RuntimeError(f"Can't convert time*mxharvests axes to growingseason axis: discrepancy of {discrepancy} patch-seasons")
     

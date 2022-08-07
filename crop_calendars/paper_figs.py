@@ -133,15 +133,15 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    # Convert time*mxharvests axes to growingseason axis
    this_ds_gs = convert_axis_time2gs(this_ds, verbose)
    
-   # Check that GDDACCUM_PERHARV <= HUI_PERHARV
-   if all(v in this_ds for v in ["GDDACCUM_PERHARV", "HUI_PERHARV"]):
+   # Check that GDDACCUM <= HUI
+   if all(v in this_ds for v in ["GDDACCUM", "HUI"]):
       check_gddaccum_le_hui(this_ds, both_nan_ok=True, throw_error=True)
       
    # Check that prescribed calendars were obeyed
    if sdates_rx_ds:
       check_rx_obeyed(vegtype_list, sdates_rx_ds, this_ds, 0, "SDATES")
    if gdds_rx_ds:
-      check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, 0, "SDATES", "GDDHARV_PERHARV", gdd_min=gdd_min)
+      check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, 0, "SDATES", "GDDHARV", gdd_min=gdd_min)
    
    return this_ds_gs
 
@@ -153,6 +153,7 @@ from cropcal_module import *
 
 thisfile = "/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013/2022-08-05_test/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013.clm2.h1.1950-01-01-00000.nc"
 
+# Note that _PERHARV will be stripped off upon import
 myVars = ['GRAINC_TO_FOOD_PERHARV', 'GRAINC_TO_FOOD_ANN', 'SDATES', 'SDATES_PERHARV', 'SYEARS_PERHARV', 'HDATES', 'HYEARS', 'GDDHARV_PERHARV', 'GDDACCUM_PERHARV', 'HUI_PERHARV', 'SOWING_REASON_PERHARV', 'HARVEST_REASON_PERHARV']
 
 this_ds = import_output(thisfile, myVars=myVars, verbose=False)
