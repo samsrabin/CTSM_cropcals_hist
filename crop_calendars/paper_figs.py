@@ -139,7 +139,7 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    
    # Check that GDDACCUM_PERHARV <= HUI_PERHARV
    if all(v in this_ds for v in ["GDDACCUM_PERHARV", "HUI_PERHARV"]):
-      check_gddaccum_le_hui(this_ds)
+      check_gddaccum_le_hui(this_ds, allowed=True)
       
    # Check that prescribed calendars were obeyed
    if sdates_rx_ds:
