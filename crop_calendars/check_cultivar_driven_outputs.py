@@ -229,8 +229,8 @@ for v in gs_len_rx_ds:
 
 # Align output sowing and harvest dates/etc.
 
-dates_ds0 = convert_axis_time2gs(Ngs, dates_ds0_orig, myVars)
-dates_ds1 = convert_axis_time2gs(Ngs, dates_ds1_orig, myVars + ["GRAINC_TO_FOOD_ACCUM_PERHARV"])
+dates_ds0 = convert_axis_time2gs(dates_ds0_orig, myVars=myVars)
+dates_ds1 = convert_axis_time2gs(dates_ds1_orig, myVars=myVars + ["GRAINC_TO_FOOD_ACCUM_PERHARV"])
 
 # Get growing season length
 dates_ds0["GSLEN"] = get_gs_len_da(dates_ds0["HDATES"] - dates_ds0["SDATES"])
