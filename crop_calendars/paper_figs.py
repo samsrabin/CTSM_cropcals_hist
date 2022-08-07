@@ -71,10 +71,33 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    if np.any(np.bitwise_not(all_nan | all_nonpos | all_pos)):
       raise RuntimeError("Inconsistent missing/present values on mxharvests axis")
    
+   # When doing transient runs, it's somehow possible for crops in newly-active patches to be *already alive*. They even have a sowing date (idop)! This will of course not show up in SDATES, but it does show up in SDATES_PERHARV. 
+   # I could put the SDATES_PERHARV dates into where they "should" be, but instead I'm just going to invalidate those "seasons."
+   #
+   # In all but the last calendar year, which patches had no sowing?
+   no_sowing_yp = np.all(np.isnan(this_ds.SDATES.values[:-1,:,:]), axis=1)
+   # In all but the first calendar year, which harvests' jdays are < their sowings' jdays? (Indicates sowing the previous calendar year.)
+   hsdate1_gt_hdate1_yp = this_ds.SDATES_PERHARV.values[1:,0,:] > this_ds.HDATES.values[1:,0,:]
+   # Where both, we have the problem.
+   falsely_alive_yp = no_sowing_yp & hsdate1_gt_hdate1_yp
+   if np.any(falsely_alive_yp):
+      print(f"Warning: {np.sum(falsely_alive_yp)} patch-seasons being ignored: Seemingly sown the year before harvest, but no sowings occurred that year.")
+      falsely_alive_yp = np.concatenate((np.full((1, this_ds.dims["patch"]), False),
+                                       falsely_alive_yp),
+                                       axis=0)
+      falsely_alive_y1p = np.expand_dims(falsely_alive_yp, axis=1)
+      dummy_false_y1p = np.expand_dims(np.full_like(falsely_alive_yp, False), axis=1)
+      falsely_alive_yhp = np.concatenate((falsely_alive_y1p, dummy_false_y1p), axis=1)
+      for v in this_ds.data_vars:
+         if this_ds[v].dims != ("time", "mxharvests", "patch"):
+            continue
+         this_ds[v] = this_ds[v].where(~falsely_alive_yhp)
+
+   
    return this_ds
          
    # Align output sowing and harvest dates/etc.
-   this_ds = convert_axis_time2gs(Ngs, this_ds, myVars)
+   this_ds = convert_axis_time2gs_sdatesperharv(Ngs, this_ds, myVars)
    
    # Get growing season length
    this_ds["GSLEN"] = get_gs_len_da(this_ds["HDATES"] - this_ds["SDATES"])
@@ -194,18 +217,36 @@ def ignore_lastyear_complete_season(pg, excl):
    return pg
 hdates_pg2 = ignore_lastyear_complete_season(hdates_pg.copy(), lastyear_complete_season)
 sdates_pg2 = ignore_lastyear_complete_season(sdates_pg.copy(), lastyear_complete_season)
-discrepancy = np.sum(~np.isnan(hdates_pg2)) - expected_valid
+is_valid = ~np.isnan(hdates_pg2)
+discrepancy = np.sum(is_valid) - expected_valid
+unique_Nseasons = np.unique(np.sum(is_valid, axis=1))
 print(f'After "Ignore any harvests that were planted in the final year, because other cells will have incomplete growing seasons for the final year": discrepancy of {discrepancy} patch-seasons')
-print(f"unique N seasons = {np.unique(np.sum(~np.isnan(hdates_pg2), axis=1))}")
+print(f"unique N seasons = {unique_Nseasons}")
 
+# Create Dataset with time axis as "gs" (growing season) instead of what CLM puts out
 if discrepancy == 0:
-   # Remove the nans
-   # Change -infs to nans
-   # For now:
-   pass
+   this_ds_gs = set_up_ds_with_gs_axis(this_ds)
+   for v in this_ds.data_vars:
+      if this_ds[v].dims != ('time', 'mxharvests', 'patch'): 
+         continue
+      
+      # Remove the nans and reshape to patches*growingseasons
+      da_yhp = this_ds[v].copy()
+      da_pyh = da_yhp.transpose("patch", "time", "mxharvests")
+      ar_pg = np.reshape(da_pyh.values, (this_ds.dims["patch"], -1))
+      ar_valid_pg = np.reshape(ar_pg[is_valid], (this_ds.dims["patch"], Ngs))
+      # Change -infs to nans
+      ar_valid_pg[np.isinf(ar_valid_pg)] = np.nan
+      # Save as DataArray to new Dataset
+      da_pg = xr.DataArray(data = ar_valid_pg, 
+                           coords = [this_ds_gs.coords["patch"], this_ds_gs.coords["gs"]],
+                           name = da_yhp.name,
+                           attrs = da_yhp.attrs)
+      this_ds_gs[v] = da_pg
 else:
    raise RuntimeError(f"Can't convert time*mxharvests axes to growingseason axis: discrepancy of {discrepancy} patch-seasons")
 
+print("All done")
 
 
 
@@ -215,18 +256,19 @@ else:
 # p = np.random.choice(np.where(np.sum(~np.isnan(hdates_pg2), axis=1)<4)[0], 1)[0]
 # p = 38250
 
-nan_firstsow = np.where(np.isnan(this_ds.SDATES.values[0,0,:]))[0]
-too_many_gs = np.where(np.sum(~np.isnan(hdates_pg2), axis=1)>4)[0]
-[x for x in too_many_gs if x not in nan_firstsow] # if empty: all cells with too many growing seasons had NaN in first row
-nan_firstsow_but_ok_Ngs = [x for x in nan_firstsow if x not in too_many_gs]
-np.sum(~np.isnan(this_ds.SDATES.values[:,:,nan_firstsow_but_ok_Ngs])) # if >0: some nan_firstsow_but_ok_Ngs patches had non-nan sowings at some point
+nan_firstsow = np.isnan(this_ds.SDATES.values[0,0,:])
+i_nan_firstsow = np.where(nan_firstsow)[0]
+i_too_many_gs = np.where(np.sum(~np.isnan(hdates_pg2), axis=1)>4)[0]
+[x for x in i_too_many_gs if x not in i_nan_firstsow] # if empty: all cells with too many growing seasons had NaN in first row
+i_nan_firstsow_but_ok_Ngs = [x for x in i_nan_firstsow if x not in i_too_many_gs]
+np.sum(~np.isnan(this_ds.SDATES.values[:,:,i_nan_firstsow_but_ok_Ngs])) # if >0: some nan_firstsow_but_ok_Ngs patches had non-nan sowings at some point
 # ps = np.random.choice(too_many_gs, 1)
 # ps = [47637] # Harvested y2d18 but (a) now sowing y1 and (b) sowing y2 not until d263
-ps = too_many_gs
+ps = i_too_many_gs
 
 import pandas as pd
 for p in ps:
-   print(p)
+   print(f"patch {p}: {this_ds.patches1d_itype_veg_str.values[p]}, lon {this_ds.patches1d_lon.values[p]} lat {this_ds.patches1d_lat.values[p]}")
    print("Original:")
    df = pd.DataFrame(np.concatenate((this_ds.SDATES.values[:,:,p], 
                                     this_ds.SDATES_PERHARV.values[:,:,p], 
@@ -235,6 +277,10 @@ for p in ps:
                                     axis=1))
    df.columns = ["sdates", "hsdate1", "hsdate2", "hdate1", "hdate2"]
    print(df)
+
+y2_hsdate1_gt_hdate1 = this_ds.SDATES_PERHARV.values[1,0,:] \
+                       > this_ds.HDATES.values[1,0,:]
+i_sow_before_patch_active = np.where(nan_firstsow & y2_hsdate1_gt_hdate1)[0]
 
 # print("Masked:")
 # print(sdates_ymp[:,:,p])

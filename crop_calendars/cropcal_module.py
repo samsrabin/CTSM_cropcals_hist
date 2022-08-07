@@ -94,6 +94,24 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
         print(f"🟨 dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable (diffs <= {gdd_tolerance})")
     else:
         print(f"❌ dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed. E.g., {diffs_eg_txt}")
+        
+
+# Set up empty Dataset with time axis as "gs" (growing season) instead of what CLM puts out.
+# Includes all the same variables as the input dataset, minus any that had dimensions mxsowings or mxharvests.
+def set_up_ds_with_gs_axis(ds_in):
+    # Get the data variables to include in the new dataset
+    data_vars = dict()
+    for v in ds_in.data_vars:
+        if not any([x in ["mxsowings", "mxharvests"] for x in ds_in[v].dims]):
+            data_vars[v] = ds_in[v]
+    # Set up the new dataset
+    gs_years = [t.year-1 for t in ds_in.time.values[:-1]]
+    coords = ds_in.coords
+    coords["gs"] = gs_years
+    ds_out = xr.Dataset(data_vars=data_vars,
+                        coords=coords,
+                        attrs=ds_in.attrs)
+    return ds_out
 
 
 def convert_axis_time2gs(Ngs, this_ds, myVars):
