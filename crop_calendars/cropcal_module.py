@@ -231,6 +231,17 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
                                 attrs = da_yhp.attrs)
             this_ds_gs[newname] = da_pg
     else:
+        # Print details about example bad patch(es)
+        if min(unique_Nseasons) < Ngs:
+            print(f"Too few seasons (min {min(unique_Nseasons)} < {Ngs})")
+            p = np.where(np.sum(~np.isnan(hdates_pg2), axis=1) == min(unique_Nseasons))[0][0]
+            print_onepatch_wrongNgs(p, this_ds, sdates_ymp, hdates_ymp, sdates_pym, hdates_pym, sdates_pym2, hdates_pym2, sdates_pg, hdates_pg, sdates_pg2, hdates_pg2)
+            print("nosow:")
+            print(nosow_py[p,:])
+        if max(unique_Nseasons) > Ngs:
+            print(f"Too many seasons (max {max(unique_Nseasons)} > {Ngs})")
+            p = np.where(np.sum(~np.isnan(hdates_pg2), axis=1) == max(unique_Nseasons))[0][0]
+            print_onepatch_wrongNgs(p, this_ds, sdates_ymp, hdates_ymp, sdates_pym, hdates_pym, sdates_pym2, hdates_pym2, sdates_pg, hdates_pg, sdates_pg2, hdates_pg2)
         raise RuntimeError(f"Can't convert time*mxharvests axes to growingseason axis: discrepancy of {discrepancy} patch-seasons")
     
     if incl_orig:
@@ -427,6 +438,78 @@ def mask_immature(this_ds, this_vegtype, gridded_da):
                 vegtype=this_vegtype).squeeze(drop=True)
     gridded_da = gridded_da.where(reason_gridded == 1)
     return gridded_da
+
+
+def print_onepatch_wrongNgs(p, this_ds_orig, sdates_ymp, hdates_ymp, sdates_pym, hdates_pym, sdates_pym2, hdates_pym2, sdates_pg, hdates_pg, sdates_pg2, hdates_pg2):
+    try:
+        import pandas as pd
+    except:
+        print("Couldn't import pandas, so not displaying example bad patch ORIGINAL.")
+    
+    print(f"patch {p}: {this_ds_orig.patches1d_itype_veg_str.values[p]}, lon {this_ds_orig.patches1d_lon.values[p]} lat {this_ds_orig.patches1d_lat.values[p]}")
+    
+    print("Original SDATES (per sowing):")
+    print(this_ds_orig.SDATES.values[:,:,p])
+     
+    if "pandas" in sys.modules:
+        def print_pandas(msg, cols, arrs_tuple):
+            print(msg)
+            arrs_list = list(arrs_tuple)
+            for i,a in enumerate(arrs_tuple):
+                arrs_list[i] = np.reshape(a, (-1))
+            arrs_tuple2 = tuple(arrs_list)
+            df = pd.DataFrame(np.stack(arrs_tuple2, axis=1))
+            df.columns = cols
+            print(df)
+        
+        print_pandas("Original:", ["sdate", "hdate", "sreas", "hreas"], 
+                     (np.reshape(this_ds_orig.SDATES_PERHARV.values[:,:,p], (-1)),
+                      np.reshape(this_ds_orig.HDATES.values[:,:,p], (-1)),
+                      np.reshape(this_ds_orig.SOWING_REASON_PERHARV.values[:,:,p], (-1)),
+                      np.reshape(this_ds_orig.HARVEST_REASON_PERHARV.values[:,:,p], (-1)),
+                      ))
+        
+        print_pandas("Masked:", ["sdate", "hdate"], 
+                     (sdates_ymp[:,:,p],
+                      hdates_ymp[:,:,p]))
+        
+        print_pandas('After "Ignore harvests from before this output began"', ["sdate", "hdate"], 
+                     (np.transpose(sdates_pym, (1,2,0))[:,:,p],
+                      np.transpose(hdates_pym, (1,2,0))[:,:,p]))
+        
+        print_pandas('After "In years with no sowing, pretend the first no-harvest is meaningful"', ["sdate", "hdate"], 
+                     (np.transpose(sdates_pym2, (1,2,0))[:,:,p] ,
+                      np.transpose(hdates_pym2, (1,2,0))[:,:,p]))
+        
+        print_pandas("Same, but converted to gs axis", ["sdate", "hdate"], 
+                     (sdates_pg[p,:],
+                      hdates_pg[p,:]))
+        
+        print_pandas('After "Ignore any harvests that were planted in the final year, because some cells will have incomplete growing seasons for the final year"', ["sdate", "hdate"], 
+                     (sdates_pg2[p,:],
+                      hdates_pg2[p,:]))
+    else:
+        
+        def print_nopandas(a1, a2, msg):
+            print(msg)
+            if a1.ndim==1:
+                # I don't know why these aren't side-by-side!
+                print(np.stack((a1, a2), axis=1))
+            else:
+                print(np.concatenate((a1, a2), axis=1))
+    
+        print_nopandas(sdates_ymp[:,:,p], hdates_ymp[:,:,p], "Masked:")
+        
+        print_nopandas(np.transpose(sdates_pym, (1,2,0))[:,:,p], np.transpose(hdates_pym, (1,2,0))[:,:,p], 'After "Ignore harvests from before this output began"')
+        
+        print_nopandas(np.transpose(sdates_pym2, (1,2,0))[:,:,p], np.transpose(hdates_pym2, (1,2,0))[:,:,p], 'After "In years with no sowing, pretend the first no-harvest is meaningful"')
+        
+        print_nopandas(sdates_pg[p,:], hdates_pg[p,:], "Same, but converted to gs axis")
+        
+        print_nopandas(sdates_pg2[p,:], hdates_pg2[p,:], 'After "Ignore any harvests that were planted in the final year, because some cells will have incomplete growing seasons for the final year"')
+    
+    print("\n\n")
+    
 
 
 # For backwards compatibility with files missing SDATES_PERHARV.
