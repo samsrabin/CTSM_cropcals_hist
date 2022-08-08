@@ -35,15 +35,17 @@ def check_and_trim_years(y1, yN, ds_in):
     return ds_in
 
 
- # Make sure GDDACCUM_PERHARV is always <= HUI_PERHARV
-def check_gddaccum_le_hui(this_ds, msg_txt=" ", both_nan_ok = False, throw_error=False):
-    gdd_lt_hui = this_ds["GDDACCUM_PERHARV"] <= this_ds["HUI_PERHARV"]
+ # Make sure that, e.g., GDDACCUM_PERHARV is always <= HUI_PERHARV
+def check_v0_le_v1(this_ds, vars, msg_txt=" ", both_nan_ok = False, throw_error=False):
+    v0 = vars[0]
+    v1 = vars[1]
+    gdd_lt_hui = this_ds[v0] <= this_ds[v1]
     if both_nan_ok:
-        gdd_lt_hui = gdd_lt_hui | (np.isnan(this_ds["GDDACCUM_PERHARV"]) & np.isnan(this_ds["HUI_PERHARV"]))
+        gdd_lt_hui = gdd_lt_hui | (np.isnan(this_ds[v0]) & np.isnan(this_ds[v1]))
     if np.all(gdd_lt_hui):
-        print(f"✅{msg_txt}GDDACCUM_PERHARV always <= HUI_PERHARV")
+        print(f"✅{msg_txt}{v0} always <= {v1}")
     else: 
-        msg = f"❌{msg_txt}GDDACCUM_PERHARV *not* always <= HUI_PERHARV"
+        msg = f"❌{msg_txt}{v0} *not* always <= {v1}"
         if throw_error:
             print(msg)
         else:
