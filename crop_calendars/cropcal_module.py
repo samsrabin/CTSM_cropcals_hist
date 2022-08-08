@@ -46,6 +46,11 @@ def check_v0_le_v1(this_ds, vars, msg_txt=" ", both_nan_ok = False, throw_error=
         print(f"✅{msg_txt}{v0} always <= {v1}")
     else: 
         msg = f"❌{msg_txt}{v0} *not* always <= {v1}"
+        gdd_lt_hui_vals = gdd_lt_hui.values
+        p = np.where(~gdd_lt_hui_vals)[0][0]
+        msg = msg + f"\ne.g., patch {p}: {this_ds.patches1d_itype_veg_str.values[p]}, lon {this_ds.patches1d_lon.values[p]} lat {this_ds.patches1d_lat.values[p]}:"
+        msg = msg + f"\n{this_ds[v0].values[p,:]}"
+        msg = msg + f"\n{this_ds[v1].values[p,:]}"
         if throw_error:
             print(msg)
         else:
