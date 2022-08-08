@@ -186,22 +186,21 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     # "In years with no sowing, pretend the first no-harvest is meaningful, unless that was intentionally ignored above."
     sdates_orig_ymp = this_ds.SDATES.copy().values
     sdates_orig_pym = np.transpose(sdates_orig_ymp.copy(), (2,0,1))
-    if mxharvests > 2:
-        print("Warning: Untested with mxharvests > 2")
     hdates_pym2 = hdates_pym.copy()
     sdates_pym2 = sdates_pym.copy()
     nosow_py = np.all(~(sdates_orig_pym > 0), axis=2)
-    first_season_before_first_year = hdates_pym[:,0,0] < sdates_pym[:,0,0]
-    nosow_py_1st = nosow_py & np.isnan(hdates_pym[:,:,0]) \
-        & ~np.tile(np.expand_dims(first_season_before_first_year, axis=1),
-                   (1,Ngs+1))
+    nosow_py_1st = nosow_py & np.isnan(hdates_pym[:,:,0])
     where_nosow_py_1st = np.where(nosow_py_1st)
     hdates_pym2[where_nosow_py_1st[0], where_nosow_py_1st[1], 0] = -np.inf
     sdates_pym2[where_nosow_py_1st[0], where_nosow_py_1st[1], 0] = -np.inf
     for h in np.arange(mxharvests - 1):
-        where_nosow_py = np.where(nosow_py & np.any(~np.isnan(hdates_pym[:,:,0:h]), axis=2) & np.isnan(hdates_pym[:,:,h]))
-        hdates_pym2[where_nosow_py[0], where_nosow_py[1], 1] = -np.inf
-        sdates_pym2[where_nosow_py[0], where_nosow_py[1], 1] = -np.inf
+        if h == 0:
+            continue
+        elif h == 1:
+            print("Warning: Untested with mxharvests > 2")
+        where_nosow_py = np.where(nosow_py & ~np.any(np.isnan(hdates_pym[:,:,0:h]), axis=2) & np.isnan(hdates_pym[:,:,h]))
+        hdates_pym2[where_nosow_py[0], where_nosow_py[1], h+1] = -np.inf
+        sdates_pym2[where_nosow_py[0], where_nosow_py[1], h+1] = -np.inf
         
     # "In years with sowing that are followed by inactive years, check whether the last sowing was harvested before the patch was deactivated. If not, pretend the LAST [easier to implement!] no-harvest is meaningful."
     sdates_orig_masked_pym = sdates_orig_pym.copy()
