@@ -271,7 +271,7 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
             
             # Set invalid values to NaN
             da_yhp = this_ds[v].copy()
-            da_yhp = da_yhp.where(da_yhp>0)
+            da_yhp = da_yhp.where(~np.isneginf(da_yhp))
             
             # Remove the nans and reshape to patches*growingseasons
             da_pyh = da_yhp.transpose("patch", "time", "mxharvests")
