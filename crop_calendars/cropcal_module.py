@@ -202,7 +202,15 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     unique_Nseasons = np.unique(np.sum(is_valid, axis=1))
     if verbose:
         print(f'After "Ignore any harvests that were planted in the final year, because other cells will have incomplete growing seasons for the final year": discrepancy of {discrepancy} patch-seasons')
-        print(f"unique N seasons = {unique_Nseasons}")
+        try:
+            import pandas as pd
+            bc = np.bincount(np.sum(is_valid, axis=1))
+            bc = bc[bc>0]
+            df = pd.DataFrame({"Ngs": unique_Nseasons, "Count": bc})
+            print(df)
+        except:
+            print(f"unique N seasons = {unique_Nseasons}")
+        print(" ")
     
     # Create Dataset with time axis as "gs" (growing season) instead of what CLM puts out
     if discrepancy == 0:
@@ -450,10 +458,45 @@ def print_onepatch_wrongNgs(p, this_ds_orig, sdates_ymp, hdates_ymp, sdates_pym,
     
     print("Original SDATES (per sowing):")
     print(this_ds_orig.SDATES.values[:,:,p])
+    
+    print("Original HDATES (per harvest):")
+    print(this_ds_orig.HDATES.values[:,:,p])
      
     if "pandas" in sys.modules:
-        def print_pandas(msg, cols, arrs_tuple):
-            print(msg)
+        def print_pandas_ymp(msg, cols, arrs_tuple):
+            print(f"{msg} ({np.sum(~np.isnan(arrs_tuple[0]))})")
+            mxharvests = arrs_tuple[0].shape[1]
+            arrs_list2 = []
+            cols2 = []
+            for h in np.arange(mxharvests):
+                for i,a in enumerate(arrs_tuple):
+                    arrs_list2.append(a[:,h])
+                    cols2.append(cols[i] + str(h))
+            arrs_tuple2 = tuple(arrs_list2)
+            df = pd.DataFrame(np.stack(arrs_tuple2, axis=1))
+            df.columns = cols2
+            print(df)
+        
+        print_pandas_ymp("Original", ["sdate", "hdate"], 
+                     (this_ds_orig.SDATES_PERHARV.values[:,:,p],
+                      this_ds_orig.HDATES.values[:,:,p]
+                      ))
+        
+        print_pandas_ymp("Masked", ["sdate", "hdate"], 
+                     (sdates_ymp[:,:,p],
+                      hdates_ymp[:,:,p]))
+        
+        print_pandas_ymp('After "Ignore harvests from before this output began"', ["sdate", "hdate"], 
+                     (np.transpose(sdates_pym, (1,2,0))[:,:,p],
+                      np.transpose(hdates_pym, (1,2,0))[:,:,p]))
+        
+        print_pandas_ymp('After "In years with no sowing, pretend the first no-harvest is meaningful"', ["sdate", "hdate"], 
+                     (np.transpose(sdates_pym2, (1,2,0))[:,:,p] ,
+                      np.transpose(hdates_pym2, (1,2,0))[:,:,p]))
+        
+        print_pandas("Same, but converted to gs axis", ["sdate", "hdate"], 
+        def print_pandas_pg(msg, cols, arrs_tuple):
+            print(f"{msg} ({np.sum(~np.isnan(arrs_tuple[0]))})")
             arrs_list = list(arrs_tuple)
             for i,a in enumerate(arrs_tuple):
                 arrs_list[i] = np.reshape(a, (-1))
@@ -462,30 +505,11 @@ def print_onepatch_wrongNgs(p, this_ds_orig, sdates_ymp, hdates_ymp, sdates_pym,
             df.columns = cols
             print(df)
         
-        print_pandas("Original:", ["sdate", "hdate", "sreas", "hreas"], 
-                     (np.reshape(this_ds_orig.SDATES_PERHARV.values[:,:,p], (-1)),
-                      np.reshape(this_ds_orig.HDATES.values[:,:,p], (-1)),
-                      np.reshape(this_ds_orig.SOWING_REASON_PERHARV.values[:,:,p], (-1)),
-                      np.reshape(this_ds_orig.HARVEST_REASON_PERHARV.values[:,:,p], (-1)),
-                      ))
-        
-        print_pandas("Masked:", ["sdate", "hdate"], 
-                     (sdates_ymp[:,:,p],
-                      hdates_ymp[:,:,p]))
-        
-        print_pandas('After "Ignore harvests from before this output began"', ["sdate", "hdate"], 
-                     (np.transpose(sdates_pym, (1,2,0))[:,:,p],
-                      np.transpose(hdates_pym, (1,2,0))[:,:,p]))
-        
-        print_pandas('After "In years with no sowing, pretend the first no-harvest is meaningful"', ["sdate", "hdate"], 
-                     (np.transpose(sdates_pym2, (1,2,0))[:,:,p] ,
-                      np.transpose(hdates_pym2, (1,2,0))[:,:,p]))
-        
-        print_pandas("Same, but converted to gs axis", ["sdate", "hdate"], 
+        print_pandas_pg("Same, but converted to gs axis", ["sdate", "hdate"], 
                      (sdates_pg[p,:],
                       hdates_pg[p,:]))
         
-        print_pandas('After "Ignore any harvests that were planted in the final year, because some cells will have incomplete growing seasons for the final year"', ["sdate", "hdate"], 
+        print_pandas_pg('After "Ignore any harvests that were planted in the final year, because some cells will have incomplete growing seasons for the final year"', ["sdate", "hdate"], 
                      (sdates_pg2[p,:],
                       hdates_pg2[p,:]))
     else:
