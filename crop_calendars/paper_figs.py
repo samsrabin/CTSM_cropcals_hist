@@ -160,28 +160,3 @@ thisfile = "/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.sdates_perhar
 myVars = ['GRAINC_TO_FOOD_PERHARV', 'GRAINC_TO_FOOD_ANN', 'SDATES', 'SDATES_PERHARV', 'SYEARS_PERHARV', 'HDATES', 'HYEARS', 'GDDHARV_PERHARV', 'GDDACCUM_PERHARV', 'HUI_PERHARV', 'SOWING_REASON_PERHARV', 'HARVEST_REASON_PERHARV']
 
 this_ds = import_output(thisfile, myVars=myVars, verbose=False)
-
-# %%
-# p = 47637 # y0 no-season, others sown d263 harv d15
-p = 34092 # Negative harvest reason    
-import pandas as pd
-df = pd.DataFrame(np.stack((np.reshape(this_ds_orig.SDATES_PERHARV.values[:,:,p], (-1)),
-                            np.reshape(this_ds_orig.HDATES.values[:,:,p], (-1)),
-                            np.reshape(this_ds_orig.SOWING_REASON_PERHARV.values[:,:,p], (-1)),
-                            np.reshape(this_ds_orig.HARVEST_REASON_PERHARV.values[:,:,p], (-1)),
-                            ),
-                           axis=1))
-df.columns = ["sdate", "hdate", "sreas", "hreas"]
-print(df)
-print(" ")
-
-df = pd.DataFrame(np.stack((this_ds.SDATES.values[p,:],
-                            this_ds.HDATES.values[p,:],
-                            this_ds.SOWING_REASON.values[p,:],
-                            this_ds.HARVEST_REASON.values[p,:],
-                            ),
-                           axis=1))
-df.columns = ["sdate", "hdate", "sreas", "hreas"]
-print(df)
-
-# %%
