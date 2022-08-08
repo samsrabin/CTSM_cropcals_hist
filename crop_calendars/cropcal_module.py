@@ -209,8 +209,11 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
             if this_ds[v].dims != ('time', 'mxharvests', 'patch') and (not myVars or v in myVars): 
                 continue
             
-            # Remove the nans and reshape to patches*growingseasons
+            # Set invalid values to NaN
             da_yhp = this_ds[v].copy()
+            da_yhp = da_yhp.where(da_yhp>0)
+            
+            # Remove the nans and reshape to patches*growingseasons
             da_pyh = da_yhp.transpose("patch", "time", "mxharvests")
             ar_pg = np.reshape(da_pyh.values, (this_ds.dims["patch"], -1))
             ar_valid_pg = np.reshape(ar_pg[is_valid], (this_ds.dims["patch"], Ngs))
