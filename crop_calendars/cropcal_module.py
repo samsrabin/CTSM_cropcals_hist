@@ -197,14 +197,38 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
         where_nosow_py = np.where(nosow_py & np.any(~np.isnan(hdates_pym[:,:,0:h]), axis=2) & np.isnan(hdates_pym[:,:,h]))
         hdates_pym2[where_nosow_py[0], where_nosow_py[1], 1] = -np.inf
         sdates_pym2[where_nosow_py[0], where_nosow_py[1], 1] = -np.inf
+        
+    # "In years with sowing that are followed by inactive years, check whether the last sowing was harvested before the patch was deactivated. If not, pretend the LAST [easier to implement!] no-harvest is meaningful."
+    sdates_orig_masked_pym = sdates_orig_pym.copy()
+    sdates_orig_masked_pym[np.where(sdates_orig_masked_pym <= 0)] = np.nan
+    last_sdate_firstNgs_py = np.nanmax(sdates_orig_masked_pym[:,:-1,:], axis=2)
+    last_hdate_firstNgs_py = np.nanmax(hdates_pym2[:,:-1,:], axis=2)
+    last_sowing_not_harvested_sameyear_firstNgs_py = \
+        (last_hdate_firstNgs_py < last_sdate_firstNgs_py) \
+        | np.isnan(last_hdate_firstNgs_py)
+    inactive_lastNgs_py = inactive_py[:,1:]
+    last_sowing_never_harvested_firstNgs_py = last_sowing_not_harvested_sameyear_firstNgs_py & inactive_lastNgs_py
+    last_sowing_never_harvested_py = np.concatenate((last_sowing_never_harvested_firstNgs_py,
+                                                     np.full((Npatch,1), False)),
+                                                    axis=1)
+    last_sowing_never_harvested_pym = np.concatenate((np.full((Npatch, Ngs+1, mxharvests-1), False),
+                                                      np.expand_dims(last_sowing_never_harvested_py, axis=2)),
+                                                     axis=2)
+    where_last_sowing_never_harvested_pym = last_sowing_never_harvested_pym
+    hdates_pym3 = hdates_pym2.copy()
+    sdates_pym3 = sdates_pym2.copy()
+    hdates_pym3[where_last_sowing_never_harvested_pym] = -np.inf
+    sdates_pym3[where_last_sowing_never_harvested_pym] = -np.inf
+    
+    # Convert to growingseason axis
     def pym_to_pg(pym, quiet=False):
         pg = np.reshape(pym, (pym.shape[0],-1))
         ok_pg = pg[~np.isnan(pg)]
         if not quiet:
             print(f"{ok_pg.size} included; unique N seasons = {np.unique(np.sum(~np.isnan(pg), axis=1))}")
         return pg
-    hdates_pg = pym_to_pg(hdates_pym2.copy(), quiet=~verbose)
-    sdates_pg = pym_to_pg(sdates_pym2.copy(), quiet=True)
+    hdates_pg = pym_to_pg(hdates_pym3.copy(), quiet=~verbose)
+    sdates_pg = pym_to_pg(sdates_pym3.copy(), quiet=True)
     if verbose:
         print(f'After "In years with no sowing, pretend the first no-harvest is meaningful: discrepancy of {np.sum(~np.isnan(hdates_pg)) - expected_valid} patch-seasons')
     
@@ -264,13 +288,11 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
         if min(unique_Nseasons) < Ngs:
             print(f"Too few seasons (min {min(unique_Nseasons)} < {Ngs})")
             p = np.where(np.sum(~np.isnan(hdates_pg2), axis=1) == min(unique_Nseasons))[0][0]
-            print_onepatch_wrongNgs(p, this_ds, sdates_ymp, hdates_ymp, sdates_pym, hdates_pym, sdates_pym2, hdates_pym2, sdates_pg, hdates_pg, sdates_pg2, hdates_pg2)
-            print("nosow:")
-            print(nosow_py[p,:])
+            print_onepatch_wrongNgs(p, this_ds, sdates_ymp, hdates_ymp, sdates_pym, hdates_pym, sdates_pym2, hdates_pym2, sdates_pym3, hdates_pym3, sdates_pg, hdates_pg, sdates_pg2, hdates_pg2)
         if max(unique_Nseasons) > Ngs:
             print(f"Too many seasons (max {max(unique_Nseasons)} > {Ngs})")
             p = np.where(np.sum(~np.isnan(hdates_pg2), axis=1) == max(unique_Nseasons))[0][0]
-            print_onepatch_wrongNgs(p, this_ds, sdates_ymp, hdates_ymp, sdates_pym, hdates_pym, sdates_pym2, hdates_pym2, sdates_pg, hdates_pg, sdates_pg2, hdates_pg2)
+            print_onepatch_wrongNgs(p, this_ds, sdates_ymp, hdates_ymp, sdates_pym, hdates_pym, sdates_pym2, hdates_pym2, sdates_pym3, hdates_pym3, sdates_pg, hdates_pg, sdates_pg2, hdates_pg2)
         raise RuntimeError(f"Can't convert time*mxharvests axes to growingseason axis: discrepancy of {discrepancy} patch-seasons")
     
     if incl_orig:
@@ -469,7 +491,7 @@ def mask_immature(this_ds, this_vegtype, gridded_da):
     return gridded_da
 
 
-def print_onepatch_wrongNgs(p, this_ds_orig, sdates_ymp, hdates_ymp, sdates_pym, hdates_pym, sdates_pym2, hdates_pym2, sdates_pg, hdates_pg, sdates_pg2, hdates_pg2):
+def print_onepatch_wrongNgs(p, this_ds_orig, sdates_ymp, hdates_ymp, sdates_pym, hdates_pym, sdates_pym2, hdates_pym2, sdates_pym3, hdates_pym3, sdates_pg, hdates_pg, sdates_pg2, hdates_pg2):
     try:
         import pandas as pd
     except:
@@ -515,7 +537,10 @@ def print_onepatch_wrongNgs(p, this_ds_orig, sdates_ymp, hdates_ymp, sdates_pym,
                      (np.transpose(sdates_pym2, (1,2,0))[:,:,p] ,
                       np.transpose(hdates_pym2, (1,2,0))[:,:,p]))
         
-        print_pandas("Same, but converted to gs axis", ["sdate", "hdate"], 
+        print_pandas_ymp('After "In years with sowing that are followed by inactive years, check whether the last sowing was harvested before the patch was deactivated. If not, pretend the LAST no-harvest is meaningful."', ["sdate", "hdate"], 
+                     (np.transpose(sdates_pym3, (1,2,0))[:,:,p] ,
+                      np.transpose(hdates_pym3, (1,2,0))[:,:,p]))
+        
         def print_pandas_pg(msg, cols, arrs_tuple):
             print(f"{msg} ({np.sum(~np.isnan(arrs_tuple[0]))})")
             arrs_list = list(arrs_tuple)
@@ -548,6 +573,8 @@ def print_onepatch_wrongNgs(p, this_ds_orig, sdates_ymp, hdates_ymp, sdates_pym,
         print_nopandas(np.transpose(sdates_pym, (1,2,0))[:,:,p], np.transpose(hdates_pym, (1,2,0))[:,:,p], 'After "Ignore harvests from before this output began"')
         
         print_nopandas(np.transpose(sdates_pym2, (1,2,0))[:,:,p], np.transpose(hdates_pym2, (1,2,0))[:,:,p], 'After "In years with no sowing, pretend the first no-harvest is meaningful"')
+        
+        print_nopandas(np.transpose(sdates_pym3, (1,2,0))[:,:,p], np.transpose(hdates_pym3, (1,2,0))[:,:,p], 'After "In years with sowing that are followed by inactive years, check whether the last sowing was harvested before the patch was deactivated. If not, pretend the LAST [easier to implement!] no-harvest is meaningful."')
         
         print_nopandas(sdates_pg[p,:], hdates_pg[p,:], "Same, but converted to gs axis")
         
