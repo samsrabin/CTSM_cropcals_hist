@@ -133,9 +133,11 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    # Convert time*mxharvests axes to growingseason axis
    this_ds_gs = convert_axis_time2gs(this_ds, verbose=verbose, incl_orig=False)
    
-   # Check that GDDACCUM <= HUI
-   if all(v in this_ds for v in ["GDDACCUM", "HUI"]):
-      check_gddaccum_le_hui(this_ds, both_nan_ok=True, throw_error=True)
+   # Check that e.g., GDDACCUM <= HUI]
+   for vars in [["GDDACCUM", "HUI"],
+                ["SYEARS", "HYEARS"]]:
+      if all(v in this_ds_gs for v in vars):
+         check_v0_le_v1(this_ds_gs, vars, both_nan_ok=True, throw_error=True)
       
    # Check that prescribed calendars were obeyed
    if sdates_rx_ds:
