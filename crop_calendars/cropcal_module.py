@@ -123,7 +123,7 @@ def set_up_ds_with_gs_axis(ds_in):
 
 
 # Convert time*mxharvests axes to growingseason axis
-def convert_axis_time2gs(this_ds, verbose=False, myVars=None):
+def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     
     # For backwards compatibility.
     if "SDATES_PERHARV" not in this_ds:
@@ -228,7 +228,10 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None):
     else:
         raise RuntimeError(f"Can't convert time*mxharvests axes to growingseason axis: discrepancy of {discrepancy} patch-seasons")
     
-    return this_ds_gs
+    if incl_orig:
+        return this_ds_gs, this_ds
+    else:
+        return this_ds_gs
 
 
 # For backwards compatibility with files missing SDATES_PERHARV.

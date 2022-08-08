@@ -131,7 +131,7 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    
    
    # Convert time*mxharvests axes to growingseason axis
-   this_ds_gs = convert_axis_time2gs(this_ds, verbose)
+   this_ds_gs = convert_axis_time2gs(this_ds, verbose=verbose, incl_orig=False)
    
    # Check that GDDACCUM <= HUI
    if all(v in this_ds for v in ["GDDACCUM", "HUI"]):
@@ -151,18 +151,35 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
 # %% Import
 from cropcal_module import *
 
-thisfile = "/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013/2022-08-05_test/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013.clm2.h1.1950-01-01-00000.nc"
+# thisfile = "/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013/2022-08-05_test/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013.clm2.h1.1950-01-01-00000.nc"
+thisfile = "/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013/2022-08-07_test/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013.clm2.h1.1950-01-01-00000.nc"
 
 # Note that _PERHARV will be stripped off upon import
 myVars = ['GRAINC_TO_FOOD_PERHARV', 'GRAINC_TO_FOOD_ANN', 'SDATES', 'SDATES_PERHARV', 'SYEARS_PERHARV', 'HDATES', 'HYEARS', 'GDDHARV_PERHARV', 'GDDACCUM_PERHARV', 'HUI_PERHARV', 'SOWING_REASON_PERHARV', 'HARVEST_REASON_PERHARV']
 
 this_ds = import_output(thisfile, myVars=myVars, verbose=False)
 
-p = 47637 # y0 no-season, others sown d263 harv d15
+# %%
+# p = 47637 # y0 no-season, others sown d263 harv d15
+p = 34092 # Negative harvest reason    
 import pandas as pd
-df = pd.DataFrame(np.stack((this_ds.SDATES_PERHARV.values[p,:],
-                            this_ds.HDATES.values[p,:],
+df = pd.DataFrame(np.stack((np.reshape(this_ds_orig.SDATES_PERHARV.values[:,:,p], (-1)),
+                            np.reshape(this_ds_orig.HDATES.values[:,:,p], (-1)),
+                            np.reshape(this_ds_orig.SOWING_REASON_PERHARV.values[:,:,p], (-1)),
+                            np.reshape(this_ds_orig.HARVEST_REASON_PERHARV.values[:,:,p], (-1)),
                             ),
                            axis=1))
-df.columns = ["sdate", "hdate"]
+df.columns = ["sdate", "hdate", "sreas", "hreas"]
 print(df)
+print(" ")
+
+df = pd.DataFrame(np.stack((this_ds.SDATES.values[p,:],
+                            this_ds.HDATES.values[p,:],
+                            this_ds.SOWING_REASON.values[p,:],
+                            this_ds.HARVEST_REASON.values[p,:],
+                            ),
+                           axis=1))
+df.columns = ["sdate", "hdate", "sreas", "hreas"]
+print(df)
+
+# %%
