@@ -173,7 +173,7 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     hdates_pym2[where_nosow_py_1st[0], where_nosow_py_1st[1], 0] = -np.inf
     sdates_pym2[where_nosow_py_1st[0], where_nosow_py_1st[1], 0] = -np.inf
     for h in np.arange(mxharvests - 1):
-        where_nosow_py = np.where(nosow_py & np.any(~np.isnan(hdates_pym[:,:,0:h]), axis=2) & np.isnan(hdates_pym[:,:,1]))
+        where_nosow_py = np.where(nosow_py & np.any(~np.isnan(hdates_pym[:,:,0:h]), axis=2) & np.isnan(hdates_pym[:,:,h]))
         hdates_pym2[where_nosow_py[0], where_nosow_py[1], 1] = -np.inf
         sdates_pym2[where_nosow_py[0], where_nosow_py[1], 1] = -np.inf
     def pym_to_pg(pym, quiet=False):
