@@ -138,29 +138,47 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     Ngs = this_ds.dims["time"]-1
     expected_valid = Npatch*Ngs
     
+    mxharvests =  this_ds.dims["mxharvests"]
+    
     if verbose:
         print(f'Start: discrepancy of {np.sum(~np.isnan(this_ds.HDATES.values)) - expected_valid} patch-seasons')
     
     # Set all non-positive date values to NaN. These are seasons that were never harvested (or never started): "non-seasons."
     if this_ds.HDATES.dims != ("time", "mxharvests", "patch"):
         raise RuntimeError(f"This code relies on HDATES dims ('time', 'mxharvests', 'patch'), not {this_ds.HDATES.dims}")
-    hdates_ymp = this_ds.HDATES.where(this_ds.HDATES > 0).values.copy()
+    hdates_ymp = this_ds.HDATES.copy().where(this_ds.HDATES > 0).values
     hdates_pym = np.transpose(hdates_ymp.copy(), (2,0,1))
-    sdates_ymp = this_ds.SDATES_PERHARV.where(this_ds.SDATES_PERHARV > 0).values.copy()
+    sdates_ymp = this_ds.SDATES_PERHARV.copy().where(this_ds.SDATES_PERHARV > 0).values
     sdates_pym = np.transpose(sdates_ymp.copy(), (2,0,1))
     hdates_pym[hdates_pym <= 0] = np.nan
+    
+    # Find years where patch was inactive
+    inactive_py = np.transpose(
+        np.isnan(this_ds.HDATES).all(dim="mxharvests").values \
+        & np.isnan(this_ds.SDATES_PERHARV).all(dim="mxharvests").values)
+    # Find seasons that were planted while the patch was inactive
+    sown_inactive_py = inactive_py[:,:-1] & (hdates_pym[:,1:,0] < sdates_pym[:,1:,0])
+    sown_inactive_py = np.concatenate((np.full((Npatch, 1), False),
+                                       sown_inactive_py),
+                                      axis=1)
 
-    # "Ignore harvests from before this output began"
-    first_season_before_first_year = hdates_pym[:,0,0] < sdates_pym[:,0,0]
-    hdates_pym[first_season_before_first_year,0,0] = np.nan
-    sdates_pym[first_season_before_first_year,0,0] = np.nan
+    # "Ignore harvests from seasons sown (a) before this output began or (b) when the crop was inactive"
+    first_season_before_first_year_p = hdates_pym[:,0,0] < sdates_pym[:,0,0]
+    first_season_before_first_year_py = np.full(hdates_pym.shape[:-1], fill_value=False)
+    first_season_before_first_year_py[:,0] = first_season_before_first_year_p
+    sown_prerun_or_inactive_py = first_season_before_first_year_py | sown_inactive_py
+    sown_prerun_or_inactive_pym = np.concatenate((np.expand_dims(sown_prerun_or_inactive_py, axis=2),
+                                            np.full((Npatch, Ngs+1, mxharvests-1), False)),
+                                           axis=2)
+    where_sown_prerun_or_inactive_pym = np.where(sown_prerun_or_inactive_pym)
+    hdates_pym[where_sown_prerun_or_inactive_pym] = np.nan
+    sdates_pym[where_sown_prerun_or_inactive_pym] = np.nan
     if verbose:
         print(f'After "Ignore harvests from before this output began: discrepancy of {np.sum(~np.isnan(hdates_pym)) - expected_valid} patch-seasons')
     
     # We need to keep some non-seasons---it's possible that "the yearY growing season" never happened (sowing conditions weren't met), but we still need something there so that we can make an array of dimension Npatch*Ngs. We do this by changing those non-seasons from NaN to -Inf before doing the filtering and reshaping, after which we'll convert them back to NaNs.
     
     # "In years with no sowing, pretend the first no-harvest is meaningful, unless that was intentionally ignored above."
-    mxharvests =  this_ds.dims["mxharvests"]
     if mxharvests > 2:
         print("Warning: Untested with mxharvests > 2")
     hdates_pym2 = hdates_pym.copy()
