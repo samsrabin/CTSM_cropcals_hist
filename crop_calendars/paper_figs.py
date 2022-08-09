@@ -91,8 +91,6 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
             continue
          this_ds[v] = this_ds[v].where(~falsely_alive_yhp)
    
-   # Get growing season length
-   this_ds["GSLEN_PERHARV"] = get_gs_len_da(this_ds["HDATES"] - this_ds["SDATES_PERHARV"])
    
    # Check that some things are constant across years
    if constantVars:
@@ -128,11 +126,14 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
          if ok:
             print(f"✅ CLM output {v} do not vary through {this_ds.dims['gs'] - t1} growing seasons of output.")
    
-   
    # Convert time*mxharvests axes to growingseason axis
    this_ds_gs = convert_axis_time2gs(this_ds, verbose=verbose, incl_orig=False)
    
-   # Check that e.g., GDDACCUM <= HUI]
+   # Get growing season length
+   this_ds["GSLEN_PERHARV"] = get_gs_len_da(this_ds["HDATES"] - this_ds["SDATES_PERHARV"])
+   this_ds_gs["GSLEN"] = get_gs_len_da(this_ds_gs["HDATES"] - this_ds_gs["SDATES"])
+   
+   # Check that e.g., GDDACCUM <= HUI
    for vars in [["GDDACCUM", "HUI"],
                 ["SYEARS", "HYEARS"]]:
       if all(v in this_ds_gs for v in vars):
