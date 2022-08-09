@@ -90,7 +90,32 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
          if this_ds[v].dims != ("time", "mxharvests", "patch"):
             continue
          this_ds[v] = this_ds[v].where(~falsely_alive_yhp)
+         
+   # Avoid tiny negative values
+   varList_no_negative = ["GRAINC", "REASON", "GDD", "HUI", "YEAR", "DATE"]
+   tiny_negOK = 1e-12
+   for v in this_ds:
+      if not any(x in v for x in varList_no_negative):
+         continue
+      the_min = np.min(this_ds[v].values)
+      if the_min < 0:
+         if np.abs(the_min) <= tiny_negOK:
+            if verbose: print(f"Tiny negative value(s) in {v} (abs <= {tiny_negOK}) being set to 0")
+            this_ds[v].values[np.where(this_ds[v].values < 0)] = 0
+         else:
+            print(f"WARNING: Unexpected negative value(s) in {v}; minimum {the_min}")
+      elif verbose:
+         print(f"No negative value(s) in {v}")
    
+   # Check for no zero values where there shouldn't be
+   varList_no_zero = ["REASON", "DATE"]
+   for v in this_ds:
+      if not any(x in v for x in varList_no_zero):
+         continue
+      if np.any(this_ds[v].values == 0):
+         print(f"WARNING: Unexpected zero(s) in {v}")
+      elif verbose:
+         print(f"No zero value(s) in {v}")
    
    # Check that some things are constant across years
    if constantVars:
