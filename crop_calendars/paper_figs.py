@@ -24,6 +24,7 @@ from matplotlib import cm
 import datetime as dt
 import re
 import importlib
+from cropcal_module import *
 
 # Ignore these annoying warnings
 import warnings
@@ -150,7 +151,6 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
 
 
 # %% Import
-from cropcal_module import *
 
 # thisfile = "/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013/2022-08-05_test/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013.clm2.h1.1950-01-01-00000.nc"
 # thisfile = "/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013/2022-08-07_test/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013.clm2.h1.1950-01-01-00000.nc"
