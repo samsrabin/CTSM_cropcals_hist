@@ -247,6 +247,8 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     hdates_pg2 = ignore_lastyear_complete_season(hdates_pg.copy(), lastyear_complete_season, mxharvests)
     sdates_pg2 = ignore_lastyear_complete_season(sdates_pg.copy(), lastyear_complete_season, mxharvests)
     is_valid = ~np.isnan(hdates_pg2)
+    is_fake = np.isneginf(hdates_pg2)
+    is_fake = np.reshape(is_fake[is_valid], (this_ds.dims["patch"], Ngs))
     discrepancy = np.sum(is_valid) - expected_valid
     unique_Nseasons = np.unique(np.sum(is_valid, axis=1))
     if verbose:
@@ -277,7 +279,7 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
             ar_pg = np.reshape(da_pyh.values, (this_ds.dims["patch"], -1))
             ar_valid_pg = np.reshape(ar_pg[is_valid], (this_ds.dims["patch"], Ngs))
             # Change -infs to nans
-            ar_valid_pg[np.isinf(ar_valid_pg)] = np.nan
+            ar_valid_pg[is_fake] = np.nan
             # Save as DataArray to new Dataset, stripping _PERHARV from variable name
             newname = v.replace("_PERHARV","")
             if newname in this_ds_gs:
