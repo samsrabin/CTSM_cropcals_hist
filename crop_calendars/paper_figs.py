@@ -91,19 +91,28 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
             continue
          this_ds[v] = this_ds[v].where(~falsely_alive_yhp)
          
-   def check_no_negative(this_ds, varList_no_negative, tiny_negOK, which_file):
+   def check_no_negative(this_ds_in, varList_no_negative, which_file, verbose=False):
+      tiny_negOK = 1e-12
+      this_ds = this_ds_in.copy()
       for v in this_ds:
          if not any(x in v for x in varList_no_negative):
             continue
-         the_min = np.min(this_ds[v].values)
+         the_min = np.nanmin(this_ds[v].values)
          if the_min < 0:
             if np.abs(the_min) <= tiny_negOK:
                if verbose: print(f"Tiny negative value(s) in {v} (abs <= {tiny_negOK}) being set to 0 ({which_file})")
-               this_ds[v].values[np.where(this_ds[v].values < 0)] = 0
             else:
                print(f"WARNING: Unexpected negative value(s) in {v}; minimum {the_min} ({which_file})")
+            values = this_ds[v].copy().values
+            values[np.where((values < 0) & (values >= -tiny_negOK))] = 0
+            this_ds[v] = xr.DataArray(values,
+                                      coords = this_ds[v].coords,
+                                      dims = this_ds[v].dims,
+                                      attrs = this_ds[v].attrs)
+
          elif verbose:
-            print(f"No negative value(s) in {v} ({which_file})")
+            print(f"No negative value(s) in {v}; min {the_min} ({which_file})")
+      return this_ds
             
    def check_no_zeros(this_ds, varList_no_zero, which_file):
       for v in this_ds:
@@ -114,13 +123,8 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
          elif verbose:
             print(f"No zero value(s) in {v} ({which_file})")
          
-   # Avoid tiny negative values
-   varList_no_negative = ["YEAR", "DATE"]
-   tiny_negOK = 1e-12
-   check_no_negative(this_ds, varList_no_negative, tiny_negOK, "original file")
-   
    # Check for no zero values where there shouldn't be
-   varList_no_zero = ["DATE"]
+   varList_no_zero = ["DATE", "YEAR"]
    check_no_zeros(this_ds, varList_no_zero, "original file")
    
    # Check that some things are constant across years
@@ -166,8 +170,7 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    
    # Avoid tiny negative values
    varList_no_negative = ["GRAINC", "REASON", "GDD", "HUI", "YEAR", "DATE", "GSLEN"]
-   tiny_negOK = 1e-12
-   check_no_negative(this_ds_gs, varList_no_negative, tiny_negOK, "new file")
+   this_ds_gs = check_no_negative(this_ds_gs, varList_no_negative, "new file", verbose=verbose)
    
    # Check for no zero values where there shouldn't be
    varList_no_zero = ["REASON", "DATE"]
