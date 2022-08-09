@@ -96,7 +96,6 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    
    # Check that some things are constant across years
    if constantVars:
-      verbose = True
       t1 = 0 # 0-indexed
       for v in constantVars:
          ok = True
