@@ -185,6 +185,9 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    if gdds_rx_ds:
       check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, 0, "SDATES", "GDDHARV", gdd_min=gdd_min)
    
+   # Convert time axis to integer year
+   this_ds_gs = this_ds_gs.assign_coords({"time": [t.year for t in this_ds.time_bounds.values[:,0]]})
+   
    return this_ds_gs
 
 
