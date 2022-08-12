@@ -35,6 +35,14 @@ warnings.filterwarnings("ignore", message="All-NaN slice encountered")
 
 # %% Define functions
 
+def adjust_grainC(da):
+   # Parameters from Danica's 2020 paper
+   fyield = 0.85 # 85% harvest efficiency (Kucharik & Brye, 2003)
+   cgrain = 0.45 # 45% of biomass is C (Monfreda et al., 2008)
+   da = da * fyield / cgrain
+   return da
+
+
 def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegtypes=utils.define_mgdcrop_list(), 
                   sdates_rx_ds=None, gdds_rx_ds=None, verbose=False):
    
@@ -168,8 +176,14 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    this_ds["GSLEN_PERHARV"] = get_gs_len_da(this_ds["HDATES"] - this_ds["SDATES_PERHARV"])
    this_ds_gs["GSLEN"] = get_gs_len_da(this_ds_gs["HDATES"] - this_ds_gs["SDATES"])
    
+   # Get *biomass* *actually harvested*
+   this_ds["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_ANN"])
+   this_ds["GRAINC_TO_FOOD_PERHARV"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_PERHARV"])
+   this_ds_gs["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD_ANN"])
+   this_ds_gs["GRAIN_HARV_TOFOOD"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD"])
+   
    # Avoid tiny negative values
-   varList_no_negative = ["GRAINC", "REASON", "GDD", "HUI", "YEAR", "DATE", "GSLEN"]
+   varList_no_negative = ["GRAIN", "REASON", "GDD", "HUI", "YEAR", "DATE", "GSLEN"]
    this_ds_gs = check_no_negative(this_ds_gs, varList_no_negative, "new file", verbose=verbose)
    
    # Check for no zero values where there shouldn't be
