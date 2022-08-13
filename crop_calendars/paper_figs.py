@@ -383,9 +383,7 @@ def time_units_and_trim(ds, y1, yN, dt_type):
 
 
 def ungrid_cftlatlon(ds, v):
-   masked = ds[v].where(ds.cft_ever_grown > 0)
-   ar = masked.values[np.where(~np.isnan(masked.values))]
-   ar = ar.reshape((-1))
+   ar = ds[v].values.reshape((-1))
    Npatch = ar.shape[0]
    da = xr.DataArray(data = ar,
                      coords = {"patch": np.arange(Npatch)})
@@ -404,8 +402,7 @@ def ungrid_latlon(ds, v):
 
 
 def ungrid_timecftlatlon(ds, v):
-   masked = ds[v].where(ds.cft_ever_grown > 0)
-   ar = masked.values[np.where(~np.isnan(masked.values))].reshape((ds.dims["time"], -1))
+   ar = ds[v].values.reshape((ds.dims["time"], -1))
    Npatch = ar.shape[1]
    
    da = xr.DataArray(data = ar,
@@ -416,13 +413,13 @@ def ungrid_timecftlatlon(ds, v):
 
 def ungrid_timelatlon(ds, v):
    
-   da_cfttimelatlon = ds[v] \
+   # Broadcast to time*cft*lat*lon (just repeats along the new cft dimension)
+   da_timecftlatlon = ds[v] \
       * xr.DataArray(np.ones([ds.dims[x] for x in ["time", "cft", "lat", "lon"]],
                              dtype=type(ds[v].values.flat[0])),
                      dims=("time", "cft", "lat", "lon"))
    
-   masked = da_cfttimelatlon.where(ds.cft_ever_grown > 0)
-   ar = masked.values[np.where(~np.isnan(masked.values))].reshape((ds.dims["time"], -1))
+   ar = da_timecftlatlon.values.reshape((ds.dims["time"], -1))
    Npatch = ar.shape[1]
    da = xr.DataArray(data = ar,
                      coords = {"time": ds["time"],
@@ -478,6 +475,8 @@ for i, (casename, case) in enumerate(cases.items()):
    case["ds"] = this_ds
 
 
+
+
 # %% Import LU data
 
 # Define resolutions
@@ -502,11 +501,6 @@ for i, (resname, res) in enumerate(reses.items()):
    # Can avoid saving to res dict once I'm confident the ungridded Dataset works
    res['dsg'] = open_lu_ds(res['lu_path'], y1, yN, case['ds'])
    res['dsg'] = res['dsg'].assign_coords({"time": [cftime.DatetimeNoLeap(y, 1, 1, 0, 0, 0, 0, has_year_zero=True) for y in res['dsg'].time.values]})
-   
-   # Where is each CFT ever grown?
-   # res['dsg']["cft_ever_grown"] = res['dsg']['PCT_CFT'].sum(dim="time") > 0
-   res['dsg']["cft_ever_grown"] = xr.DataArray(np.full(res['dsg']['PCT_CFT'].sum(dim="time").shape, True),
-                                               dims=res['dsg']['PCT_CFT'].sum(dim="time").dims)
    
    res['dsg']['cftlatlon'] = res['dsg']['cft'] \
       * xr.DataArray(np.ones([res['dsg'].dims[x] for x in ["cft", "lat", "lon"]],
