@@ -542,11 +542,9 @@ for i, (casename, case) in enumerate(cases.items()):
    lu_dsg = reses[case['res']]['dsg']
    yield_gd = yield_gd.assign_coords({"lon": lu_dsg.lon,
                                       "lat": lu_dsg.lat})
+   case['ds']['GRAIN_HARV_TOFOOD_ANN_GD'] = yield_gd
    
-   if casename == "oldcode":
-      ts_prod_clm_yc_da = get_ts_prod_clm_yc_da(yield_gd, lu_dsg, yearList)
-   else:
-      ts_prod_clm_cmip6_yc_da = get_ts_prod_clm_yc_da(yield_gd, lu_dsg, yearList)
+   case['ds']['ts_prod_yc'] = get_ts_prod_clm_yc_da(yield_gd, lu_dsg, yearList)
 
 
 # %% Compare total production to FAO
@@ -560,27 +558,22 @@ figsize = (18, 7.5)
 # All crops
 f, axes = plt.subplots(ny, nx, sharey="row", figsize=figsize)
 fao_prod.plot(ax=axes[0])
-ts_prod_clm_yc_da.plot.line(x="Year", ax=axes[1])
-ts_prod_clm_cmip6_yc_da.plot.line(x="Year", ax=axes[2])
 axes[0].title.set_text("FAO")
 axes[0].set_ylabel("Mt")
-axes[1].title.set_text("CLM")
-axes[2].title.set_text("CLM (cmip6)")
+for i, (casename, case) in enumerate(cases.items()):
+   case['ds'].ts_prod_yc.plot.line(x="Year", ax=axes[i+1])
+   axes[i+1].title.set_text(casename)
 
 # Ignoring sugarcane
 f, axes = plt.subplots(ny, nx, sharey="row", figsize=figsize)
 fao_prod_nosgc = fao_prod.drop(columns = ["Sugar cane", "Total"])
 fao_prod_nosgc['Total'] = fao_prod_nosgc.sum(numeric_only=True, axis=1)
 fao_prod_nosgc.plot(ax=axes[0])
-ts_prod_clm_yc_da.sel({"Crop": [c for c in cropList_combined_clm if "Sugar" not in c]}).plot.line(x="Year", ax=axes[1])
-ts_prod_clm_cmip6_yc_da.sel({"Crop": [c for c in cropList_combined_clm if "Sugar" not in c]}).plot.line(x="Year", ax=axes[2])
 axes[0].title.set_text("FAO")
 axes[0].set_ylabel("Mt")
-axes[1].title.set_text("CLM")
-axes[2].title.set_text("CLM (cmip6)")
-
-
-
+for i, (casename, case) in enumerate(cases.items()):
+   case['ds'].ts_prod_yc.sel({"Crop": [c for c in cropList_combined_clm if "Sugar" not in c]}).plot.line(x="Year", ax=axes[i+1])
+   axes[i+1].title.set_text(casename)
 
 
 
