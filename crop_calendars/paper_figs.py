@@ -658,6 +658,23 @@ for i, (casename, case) in enumerate(cases.items()):
 print("Done.")
 
 
+# %% Are the values I get from re-gridding the LU data different from the original (already gridded) LU data?
+# Yes!
+### Max diff in AREA: 0.0
+### Max diff in LANDFRAC_PFT: 0.0
+### Max diff in PCT_CFT: 100.00000000000001
+### Max diff in PCT_CROP: 93.55773603795268
+### Max diff in PFTDATA_MASK: 0.0
+# Suggests that something is wrong with my ungridding functions where cft is an axis
+
+for v in reses["f09_g17"]['dsg']:
+   if v not in reses["f09_g17"]['ds']:
+      continue
+   tmp = utils.grid_one_variable(reses["f09_g17"]['ds'], v)
+   max_diff = np.nanmax(np.abs(tmp - reses["f09_g17"]['dsg'][v]))
+   print(f"Max diff in {v}: {max_diff}")
+
+
 
 # %% Get CLM crop production from ungridded Datasets
 
