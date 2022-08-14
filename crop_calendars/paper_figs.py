@@ -70,21 +70,6 @@ def adjust_gridded_lonlats(patches1d_lonlat, patches1d_ij, lu_dsg_lonlat_da, thi
       return lu_dsg_lonlat_da, patches1d_ij
 
 
-# For each case Dataset, we need to make sure each patch has the same number as what's in the corresponding lu Dataset.
-#
-# It's much more efficient to find the intersecting patches between case_ds and lu_ds if we compress their unique triplets into single unique numbers.
-def get_patch_codes(ds):
-   codes = ds.patches1d_itype_veg.values*1000\
-      + np.round(ds.patches1d_lon.values, 3) \
-      + 1j*np.round(ds.patches1d_lat.values, 3) # 1j is the imaginary number, sqrt(-1)
-   if len(codes) != len(np.unique(codes)):
-      u, c = np.unique(codes, return_counts=True)
-      dup = u[c > 1]
-      print(dup)
-      raise RuntimeError(f"Only got {len(np.unique(codes))} unique codes out of {len(codes)}")
-   return codes
-
-
 def get_ts_prod_clm_yc_da(yield_gd, lu_ds, yearList):
 
    # Convert km2 to m2
@@ -380,11 +365,14 @@ def round_lonlats_to_match_ds(ds_a, ds_b, which_coord, tolerance):
          raise RuntimeError(f"More than {max_Nloops} loops required in round_lonlats_to_match_ds()")
       tolerance_orig = tolerance
       patches_var = "patches1d_" + which_coord
-      if which_coord in ds_a:
+      if patches_var in ds_a and which_coord in ds_a:
          ds_a, tolerance = round_lonlats_to_match_da(ds_a, patches_var, tolerance, varname_b=which_coord)
-      if which_coord in ds_b:
+      if patches_var in ds_b and which_coord in ds_b:
          ds_b, tolerance = round_lonlats_to_match_da(ds_b, patches_var, tolerance, varname_b=which_coord)
-      ds_a, ds_b, tolerance = round_lonlats_to_match_da(ds_a, patches_var, tolerance, ds_b=ds_b)
+      if patches_var in ds_a and patches_var in ds_b:
+         ds_a, ds_b, tolerance = round_lonlats_to_match_da(ds_a, patches_var, tolerance, ds_b=ds_b)
+      if which_coord in ds_a and which_coord in ds_b:
+         ds_a, ds_b, tolerance = round_lonlats_to_match_da(ds_a, which_coord, tolerance, ds_b=ds_b)
    return ds_a, ds_b, tolerance
 
 
@@ -405,51 +393,6 @@ def time_units_and_trim(ds, y1, yN, dt_type):
    ds = ds.sel(time=slice(f"{y1}-01-01", f"{yN}-01-01"))
       
    return ds
-
-
-def ungrid_cftlatlon(ds, v):
-   ar = ds[v].values.reshape((-1))
-   Npatch = ar.shape[0]
-   da = xr.DataArray(data = ar,
-                     coords = {"patch": np.arange(Npatch)})
-   return da
-
-
-def ungrid_latlon(ds, v):
-   
-   ds = ds.copy()
-   ds[v] = (ds[v] \
-      * xr.DataArray(np.ones([ds.dims[x] for x in ["cft", "lat", "lon"]],
-                             dtype=type(ds[v].values.flat[0])),
-                     dims=("cft", "lat", "lon"))).transpose("cft", "lat", "lon")
-   
-   return ungrid_cftlatlon(ds, v)
-
-
-def ungrid_timecftlatlon(ds, v):
-   ar = ds[v].values.reshape((ds.dims["time"], -1))
-   Npatch = ar.shape[1]
-   
-   da = xr.DataArray(data = ar,
-                     coords = {"time": ds["time"],
-                               "patch": np.arange(Npatch)})
-   return da
-
-
-def ungrid_timelatlon(ds, v):
-   
-   # Broadcast to time*cft*lat*lon (just repeats along the new cft dimension)
-   da_timecftlatlon = ds[v] \
-      * xr.DataArray(np.ones([ds.dims[x] for x in ["time", "cft", "lat", "lon"]],
-                             dtype=type(ds[v].values.flat[0])),
-                     dims=("time", "cft", "lat", "lon"))
-   
-   ar = da_timecftlatlon.values.reshape((ds.dims["time"], -1))
-   Npatch = ar.shape[1]
-   da = xr.DataArray(data = ar,
-                     coords = {"time": ds["time"],
-                               "patch": np.arange(Npatch)})
-   return da
 
 
 # %% Import model output
@@ -526,28 +469,7 @@ for i, (resname, res) in enumerate(reses.items()):
    # Can avoid saving to res dict once I'm confident the ungridded Dataset works
    res['dsg'] = open_lu_ds(res['lu_path'], y1, yN, case['ds'])
    res['dsg'] = res['dsg'].assign_coords({"time": [cftime.DatetimeNoLeap(y, 1, 1, 0, 0, 0, 0, has_year_zero=True) for y in res['dsg'].time.values]})
-   
-   res['dsg']['cftlatlon'] = res['dsg']['cft'] \
-      * xr.DataArray(np.ones([res['dsg'].dims[x] for x in ["cft", "lat", "lon"]],
-                             dtype=type(res['dsg']['cft'].values[0])),
-                     dims=("cft", "lat", "lon"))
-   
-   res['ds'] = xr.Dataset(data_vars = {"patches1d_lon": ungrid_latlon(res['dsg'], 'LONGXY'),
-                                       "patches1d_lat": ungrid_latlon(res['dsg'], 'LATIXY'),
-                                       "patches1d_itype_veg": ungrid_cftlatlon(res['dsg'], 'cftlatlon'),
-                                       "AREA": ungrid_latlon(res['dsg'], 'AREA'),
-                                       "LANDFRAC_PFT": ungrid_latlon(res['dsg'], 'LANDFRAC_PFT'),
-                                       "PFTDATA_MASK": ungrid_latlon(res['dsg'], 'PFTDATA_MASK'),
-                                       "PCT_CROP": ungrid_timelatlon(res['dsg'], 'PCT_CROP'),
-                                       "PCT_CFT": ungrid_timecftlatlon(res['dsg'], 'PCT_CFT'),
-                                    })
-   
-   thestack = np.stack((res['ds']['patches1d_lat'].values,
-                  res['ds']['patches1d_lon'].values,
-                  res['ds']['patches1d_itype_veg'].values))
-   if thestack.shape != np.unique(thestack, axis=1).shape:
-      raise RuntimeError(f"Only {np.unique(thestack, axis=1).shape[1]} uniques out of {thestack.shape[1]}")
-
+      
 print("Done importing land use.")
 
 # Copy LU to cases dict
@@ -555,7 +477,6 @@ print("Copying LU data to case datasets:")
 for i, (casename, case) in enumerate(cases.items()):
    print(casename + "...")
    case_ds = case['ds']
-   lu_ds = reses[case['res']]['ds'].copy()
    
    # Remove missing vegetation types (???)
    bad_veg_types = [i for i,x in enumerate(case_ds.vegtype_str.values) if isinstance(x, float)]
@@ -563,163 +484,24 @@ for i, (casename, case) in enumerate(cases.items()):
       raise RuntimeError("Didn't expect to find any of these...")
    if len(bad_veg_types) > 0:
       break
-   
-   # Identify each patch with a single number
-   all_codes_case = get_patch_codes(case_ds)
-   all_codes_lu = get_patch_codes(lu_ds)
-   
-   # Find all patches that are in both Datasets
-   Npatch = len(all_codes_case)
-   is_case_in_lu = np.in1d(all_codes_case, all_codes_lu, assume_unique=True)
-   is_lu_in_case = np.in1d(all_codes_lu, all_codes_case, assume_unique=True)
-   if Npatch != np.sum(is_case_in_lu):
-      raise RuntimeError(f"Somehow only {np.sum(is_case_in_lu)} of expected {Npatch} patches from case were found in LU")
-   elif Npatch != np.sum(is_lu_in_case):
-      raise RuntimeError(f"Number of patches in case ({Npatch}) does not match number of matches in LU  ({np.sum(is_lu_in_case)})")
-   
-   # Make values on patch dimension of lu_ds match those of case_ds and vice versa
-   case_ds = case_ds.isel(patch=np.where(is_case_in_lu)[0]).assign_coords({"patch": all_codes_case[is_case_in_lu]}).sortby("patch")
-   lu_ds = lu_ds.isel(patch=np.where(is_lu_in_case)[0]).assign_coords({"patch": all_codes_lu[is_lu_in_case]}).sortby("patch")
-   
-   # Convert patch values from complex numbers to integers for simplicity
-   new_patch_nums = np.arange(Npatch)
-   case_ds = case_ds.assign_coords({"patch": new_patch_nums})
-   lu_ds = lu_ds.assign_coords({"patch": new_patch_nums})
-   
-   # Same, but for lon/lat (round to a high precision but one where float weirdness won't be an issue)
+      
+   # Harmonize lon/lat (round to a high precision but one where float weirdness won't be an issue)
    initial_tolerance = 1e-6
    lu_dsg = reses[case['res']]['dsg'].copy()
-   case_ds, lu_ds, lon_tolerance = round_lonlats_to_match_ds(case_ds, lu_ds, "lon", initial_tolerance)
-   lu_dsg = lu_dsg.assign_coords({"lon": np.round(lu_dsg.lon.values, int(-np.log10(lon_tolerance)))})
-   case_ds, lu_ds, lat_tolerance = round_lonlats_to_match_ds(case_ds, lu_ds, "lat", initial_tolerance)
-   lu_dsg = lu_dsg.assign_coords({"lat": np.round(lu_dsg.lat.values, int(-np.log10(lat_tolerance)))})
-   
-   # Add coordinates and indices that are useful for re-gridding, if we want to do so
-   lu_ds = lu_ds.assign_coords({'ivt': np.unique(lu_ds.patches1d_itype_veg)})
-   # Longitude
-   patches1d_ixy = np.full(lu_ds.patches1d_lon.shape, np.nan)
-   for i,x in enumerate(np.unique(lu_dsg['lon'])):
-      patches1d_ixy[np.where(np.isclose(lu_ds.patches1d_lon.values, x))] = i+1
-   if np.any(np.isnan(patches1d_ixy)):
-      lu_dsg['lon'], patches1d_ixy = adjust_gridded_lonlats(lu_ds.patches1d_lon, patches1d_ixy, lu_dsg['lon'], lon_tolerance, "i")
-      if np.any(np.isnan(patches1d_ixy)):
-         raise RuntimeError("???")
-   lu_ds['patches1d_ixy'] = xr.DataArray(data = patches1d_ixy,
-                                coords = {"patch": lu_ds['patch']})
-   # Latitude
-   patches1d_jxy = np.full(lu_ds.patches1d_lat.shape, np.nan)
-   for i,x in enumerate(np.unique(lu_dsg['lat'])):
-      patches1d_jxy[np.where(np.isclose(lu_ds.patches1d_lat.values, x))] = i+1
-   if np.any(np.isnan(patches1d_jxy)):
-      lu_dsg['lat'], patches1d_jxy = adjust_gridded_lonlats(lu_ds.patches1d_lat, patches1d_jxy, lu_dsg['lat'], lat_tolerance, "j")
-      if np.any(np.isnan(patches1d_jxy)):
-         raise RuntimeError("???")
-   lu_ds['patches1d_jxy'] = xr.DataArray(data = patches1d_jxy,
-                                coords = {"patch": lu_ds['patch']})
-   
+   case_ds, lu_dsg, lon_tolerance = round_lonlats_to_match_ds(case_ds, lu_dsg, "lon", initial_tolerance)
+   case_ds, lu_dsg, lat_tolerance = round_lonlats_to_match_ds(case_ds, lu_dsg, "lat", initial_tolerance)
+      
    # Ensure that time axes are formatted the same
    case_ds = time_units_and_trim(case_ds, y1, yN, cftime.DatetimeNoLeap)
-   lu_ds = time_units_and_trim(lu_ds, y1, yN, cftime.DatetimeNoLeap)
    lu_dsg = time_units_and_trim(lu_dsg, y1, yN, cftime.DatetimeNoLeap)
-   
-   # Merge LU info into case dataset
-   case_dims_orig = case_ds.dims
-   ivt_orig = case_ds.ivt.values
-   case_ds = case_ds.merge(lu_ds, join="inner")
-   case_dims_new = case_ds.dims
-   ivt_new = case_ds.ivt.values
-   if case_dims_orig != case_dims_new:
-      changed_dims = [x for x in case_dims_orig if case_dims_orig[x] != case_dims_new[x]]
-      if changed_dims == ['ivt']:
-         if case_dims_orig['ivt'] < case_dims_new['ivt']:
-            raise RuntimeError(f"Original N vegtypes ({case_dims_orig['ivt']}) < new ({case_dims_new['ivt']}) ??")
-         new_vegtypes = [x for x in ivt_new if x not in ivt_orig]
-         if new_vegtypes:
-            raise RuntimeError("Unexpected new vegtypes in LU relative to case")
-         missing_vegtypes = [x for x in ivt_orig if x not in ivt_new]
-         n_each_missing = [np.sum(case['ds'].patches1d_itype_veg.values == x) for x in missing_vegtypes]
-         if np.any(n_each_missing):
-            raise RuntimeError(f"{np.sum(n_each_missing)} occurrences of newly missing vegtypes in original case_ds")
-      else:
-         raise RuntimeError(f"Case dimensions {changed_dims} changed upon merge, from {case_dims_orig} to {case_dims_new}")
-      
-   # Useful for re-gridding, if we ever want to
-   lu_ds = lu_ds.assign_coords({'lon': lu_dsg['lon']})
-   lu_ds = lu_ds.assign_coords({'lat': lu_dsg['lat']})
-   lu_ds['vegtype_str'] = case_ds['vegtype_str']
 
    # Save
    case['ds'] = case_ds
    case['ds'].load()
-   reses[case['res']]['ds'] = lu_ds
    reses[case['res']]['dsg'] = lu_dsg
    
 
 print("Done.")
-
-
-# %% Are the values I get from re-gridding the LU data different from the original (already gridded) LU data?
-# Yes!
-### Max diff in AREA: 0.0
-### Max diff in LANDFRAC_PFT: 0.0
-### Max diff in PCT_CFT: 100.00000000000001
-### Max diff in PCT_CROP: 93.55773603795268
-### Max diff in PFTDATA_MASK: 0.0
-# Suggests that something is wrong with my ungridding functions where cft is an axis
-
-for v in reses["f09_g17"]['dsg']:
-   if v not in reses["f09_g17"]['ds']:
-      continue
-   tmp = utils.grid_one_variable(reses["f09_g17"]['ds'], v)
-   max_diff = np.nanmax(np.abs(tmp - reses["f09_g17"]['dsg'][v]))
-   print(f"Max diff in {v}: {max_diff}")
-
-
-
-# %% Get CLM crop production from ungridded Datasets
-
-cropList_combined_clm = ["Corn", "Rice", "Cotton", "Soybean", "Sugarcane", "Wheat", "Total"]
-
-def get_prod_ts_from_ungridded(ds):
-
-   # Convert km2 to m2
-   ds["cropArea"] = ds.AREA*1e6 * ds.LANDFRAC_PFT * ds.PCT_CROP/100 * ds.PCT_CFT/100
-   ds["cropArea"].attrs['units'] = 'm2'
-   ds["cropProd"] = ds["cropArea"] * ds.GRAIN_HARV_TOFOOD_ANN
-   ds["cropProd"].attrs['units'] = 'g'
-      
-   cftList_str_clm = [] # Will fill during loop below
-   cftList_int_clm = [] # Will fill during loop below
-   ts_prod_clm_yc = np.full((Nyears, len(cropList_combined_clm)), 0.0)
-   for c, thisCrop in enumerate(cropList_combined_clm[:-1]):
-      # print(f"{thisCrop}")
-      for pft_str in ds.vegtype_str.values:
-         if thisCrop.lower() not in pft_str:
-            continue
-         pft_int = utils.ivt_str2int(pft_str)
-         cftList_str_clm.append(pft_str)
-         cftList_int_clm.append(pft_int)
-         # print(f"{pft_str}: {pft_int}")
-         
-         is_this_cft = ds["patches1d_itype_veg"].values == pft_int
-         where_this_cft = np.where(is_this_cft)[0]
-         
-         thisCrop_prod = ds["cropProd"].isel(patch=where_this_cft).sum(dim="patch").values
-         ts_prod_clm_yc[:,c] += thisCrop_prod
-         # Total
-         ts_prod_clm_yc[:,-1] += thisCrop_prod
-         
-   ts_prod_clm_yc_da = xr.DataArray(ts_prod_clm_yc,
-                                    coords={"time": case['ds'].time,
-                                          "Crop": cropList_combined_clm},
-                                    attrs = ds["cropProd"].attrs)
-   ts_prod_clm_yc_da *= 1e-12
-   ds["cropProd_agg"] = ts_prod_clm_yc_da
-   return ds
-
-
-for i, (casename, case) in enumerate(cases.items()):
-   case['ds'] = get_prod_ts_from_ungridded(case['ds'])
 
 
 # %% Get FAO data from CSV
@@ -747,46 +529,8 @@ fao_prod = fao_prod.copy().pivot(index="Year", columns="Crop", values="Value")
 fao_prod['Total'] = fao_prod.sum(numeric_only=True, axis=1)
 
 
-# %% Compare UNGRIDDED total production to FAO
 
-# Set up figure
-ny = 1
-nx = 3
-# figsize = (14, 7.5)
-figsize = (18, 7.5)
-
-# All crops
-f, axes = plt.subplots(ny, nx, sharey="row", figsize=figsize)
-fao_prod.plot(ax=axes[0])
-cases['oldcode']['ds'].cropProd_agg.plot.line(x="time", ax=axes[1])
-cases['cmip6_i.e21.IHIST.f09_g17']['ds'].cropProd_agg.plot.line(x="time", ax=axes[2])
-axes[0].title.set_text("FAO")
-axes[0].set_ylabel("Mt")
-axes[1].title.set_text("CLM")
-axes[2].title.set_text("CLM (cmip6)")
-
-
-# Ignoring sugarcane
-f, axes = plt.subplots(ny, nx, sharey="row", figsize=figsize)
-fao_prod_nosgc = fao_prod.drop(columns = ["Sugar cane", "Total"])
-fao_prod_nosgc['Total'] = fao_prod_nosgc.sum(numeric_only=True, axis=1)
-fao_prod_nosgc.plot(ax=axes[0])
-cases['oldcode']['ds'].cropProd_agg.sel({"Crop": [c for c in cropList_combined_clm if "Sugar" not in c]}).plot.line(x="time", ax=axes[1])
-cases['cmip6_i.e21.IHIST.f09_g17']['ds'].cropProd_agg.sel({"Crop": [c for c in cropList_combined_clm if "Sugar" not in c]}).plot.line(x="time", ax=axes[2])
-axes[0].title.set_text("FAO")
-axes[0].set_ylabel("Mt")
-axes[1].title.set_text("CLM")
-axes[2].title.set_text("CLM (cmip6)")
-
-
-
-
-
-
-
-
-
-# %% Get CLM crop production from gridded
+# %% Get CLM crop production
 
 cropList_combined_clm = ["Corn", "Rice", "Cotton", "Soybean", "Sugarcane", "Wheat", "Total"]
 
@@ -805,7 +549,7 @@ for i, (casename, case) in enumerate(cases.items()):
       ts_prod_clm_cmip6_yc_da = get_ts_prod_clm_yc_da(yield_gd, lu_dsg, yearList)
 
 
-# %% Compare GRIDDED total production to FAO
+# %% Compare total production to FAO
 
 # Set up figure
 ny = 1
@@ -822,7 +566,6 @@ axes[0].title.set_text("FAO")
 axes[0].set_ylabel("Mt")
 axes[1].title.set_text("CLM")
 axes[2].title.set_text("CLM (cmip6)")
-
 
 # Ignoring sugarcane
 f, axes = plt.subplots(ny, nx, sharey="row", figsize=figsize)
