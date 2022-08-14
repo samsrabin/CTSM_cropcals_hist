@@ -45,6 +45,31 @@ def adjust_grainC(da):
    return da
 
 
+# Rounding errors can result in differences of up to lon/lat_tolerance. Tolerate those by replacing the value in the gridded dataset.
+def adjust_gridded_lonlats(patches1d_lonlat, patches1d_ij, lu_dsg_lonlat_da, this_tolerance, i_or_j_str):
+      missing_lonlats = np.unique(patches1d_lonlat.values[np.isnan(patches1d_ij)])
+      new_gridded_lonlats = lu_dsg_lonlat_da.values
+      for m in missing_lonlats:
+         # Find closest value in gridded lonlat
+         min_diff = np.inf
+         for i, n in enumerate(np.sort(lu_dsg_lonlat_da)):
+            this_diff = n - m
+            if np.abs(this_diff) < min_diff:
+               min_diff = np.abs(this_diff)
+               closest_i = i
+               closest_n = n
+            if this_diff > 0:
+               break
+         if min_diff > this_tolerance:
+            raise ValueError(f"NaN in patches1d_{i_or_j_str}xy; closest value is {min_diff}° off.")
+         print(f"Replacing {m} with {closest_n}")
+         new_gridded_lonlats[closest_i] = closest_n
+         patches1d_ij[patches1d_lonlat.values == m] = closest_i + 1
+      lu_dsg_lonlat_da = xr.DataArray(data = new_gridded_lonlats,
+                                      coords = {"lat": new_gridded_lonlats})
+      return lu_dsg_lonlat_da, patches1d_ij
+
+
 # For each case Dataset, we need to make sure each patch has the same number as what's in the corresponding lu Dataset.
 #
 # It's much more efficient to find the intersecting patches between case_ds and lu_ds if we compress their unique triplets into single unique numbers.
@@ -507,8 +532,8 @@ for i, (resname, res) in enumerate(reses.items()):
                              dtype=type(res['dsg']['cft'].values[0])),
                      dims=("cft", "lat", "lon"))
    
-   res['ds'] = xr.Dataset(data_vars = {"patches1d_lat": ungrid_latlon(res['dsg'], 'LATIXY'),
-                                       "patches1d_lon": ungrid_latlon(res['dsg'], 'LONGXY'),
+   res['ds'] = xr.Dataset(data_vars = {"patches1d_lon": ungrid_latlon(res['dsg'], 'LONGXY'),
+                                       "patches1d_lat": ungrid_latlon(res['dsg'], 'LATIXY'),
                                        "patches1d_itype_veg": ungrid_cftlatlon(res['dsg'], 'cftlatlon'),
                                        "AREA": ungrid_latlon(res['dsg'], 'AREA'),
                                        "LANDFRAC_PFT": ungrid_latlon(res['dsg'], 'LANDFRAC_PFT'),
@@ -569,6 +594,29 @@ for i, (casename, case) in enumerate(cases.items()):
    case_ds, lu_ds, lat_tolerance = round_lonlats_to_match_ds(case_ds, lu_ds, "lat", initial_tolerance)
    lu_dsg = lu_dsg.assign_coords({"lat": np.round(lu_dsg.lat.values, int(-np.log10(lat_tolerance)))})
    
+   # Add coordinates and indices that are useful for re-gridding, if we want to do so
+   lu_ds = lu_ds.assign_coords({'ivt': np.unique(lu_ds.patches1d_itype_veg)})
+   # Longitude
+   patches1d_ixy = np.full(lu_ds.patches1d_lon.shape, np.nan)
+   for i,x in enumerate(np.unique(lu_dsg['lon'])):
+      patches1d_ixy[np.where(np.isclose(lu_ds.patches1d_lon.values, x))] = i+1
+   if np.any(np.isnan(patches1d_ixy)):
+      lu_dsg['lon'], patches1d_ixy = adjust_gridded_lonlats(lu_ds.patches1d_lon, patches1d_ixy, lu_dsg['lon'], lon_tolerance, "i")
+      if np.any(np.isnan(patches1d_ixy)):
+         raise RuntimeError("???")
+   lu_ds['patches1d_ixy'] = xr.DataArray(data = patches1d_ixy,
+                                coords = {"patch": lu_ds['patch']})
+   # Latitude
+   patches1d_jxy = np.full(lu_ds.patches1d_lat.shape, np.nan)
+   for i,x in enumerate(np.unique(lu_dsg['lat'])):
+      patches1d_jxy[np.where(np.isclose(lu_ds.patches1d_lat.values, x))] = i+1
+   if np.any(np.isnan(patches1d_jxy)):
+      lu_dsg['lat'], patches1d_jxy = adjust_gridded_lonlats(lu_ds.patches1d_lat, patches1d_jxy, lu_dsg['lat'], lat_tolerance, "j")
+      if np.any(np.isnan(patches1d_jxy)):
+         raise RuntimeError("???")
+   lu_ds['patches1d_jxy'] = xr.DataArray(data = patches1d_jxy,
+                                coords = {"patch": lu_ds['patch']})
+   
    # Ensure that time axes are formatted the same
    case_ds = time_units_and_trim(case_ds, y1, yN, cftime.DatetimeNoLeap)
    lu_ds = time_units_and_trim(lu_ds, y1, yN, cftime.DatetimeNoLeap)
@@ -576,14 +624,34 @@ for i, (casename, case) in enumerate(cases.items()):
    
    # Merge LU info into case dataset
    case_dims_orig = case_ds.dims
+   ivt_orig = case_ds.ivt.values
    case_ds = case_ds.merge(lu_ds, join="inner")
    case_dims_new = case_ds.dims
+   ivt_new = case_ds.ivt.values
    if case_dims_orig != case_dims_new:
-      raise RuntimeError("Case dimensions changed upon merge, from {case_dims_orig} to {case_dims_new}")
+      changed_dims = [x for x in case_dims_orig if case_dims_orig[x] != case_dims_new[x]]
+      if changed_dims == ['ivt']:
+         if case_dims_orig['ivt'] < case_dims_new['ivt']:
+            raise RuntimeError(f"Original N vegtypes ({case_dims_orig['ivt']}) < new ({case_dims_new['ivt']}) ??")
+         new_vegtypes = [x for x in ivt_new if x not in ivt_orig]
+         if new_vegtypes:
+            raise RuntimeError("Unexpected new vegtypes in LU relative to case")
+         missing_vegtypes = [x for x in ivt_orig if x not in ivt_new]
+         n_each_missing = [np.sum(case['ds'].patches1d_itype_veg.values == x) for x in missing_vegtypes]
+         if np.any(n_each_missing):
+            raise RuntimeError(f"{np.sum(n_each_missing)} occurrences of newly missing vegtypes in original case_ds")
+      else:
+         raise RuntimeError(f"Case dimensions {changed_dims} changed upon merge, from {case_dims_orig} to {case_dims_new}")
+      
+   # Useful for re-gridding, if we ever want to
+   lu_ds = lu_ds.assign_coords({'lon': lu_dsg['lon']})
+   lu_ds = lu_ds.assign_coords({'lat': lu_dsg['lat']})
+   lu_ds['vegtype_str'] = case_ds['vegtype_str']
 
-   # Save      
+   # Save
    case['ds'] = case_ds
    case['ds'].load()
+   reses[case['res']]['ds'] = lu_ds
    reses[case['res']]['dsg'] = lu_dsg
    
 
