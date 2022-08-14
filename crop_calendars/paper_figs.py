@@ -581,9 +581,68 @@ for i, (casename, case) in enumerate(cases.items()):
    axes[i+1].title.set_text(casename)
 
 
+# %% Compare individual crops
 
+# Set up figure
+ny = 2
+nx = 4
+# figsize = (14, 7.5)
+figsize = (20, 10)
+f, axes = plt.subplots(ny, nx, figsize=figsize)
+axes = axes.flatten()
 
+caselist = ["FAO"]
+for (casename, case) in cases.items():
+   caselist.append(casename)
 
+for c, thisCrop_clm in enumerate(cropList_combined_clm):
+   ax = axes[c]
+   thisCrop_fao = fao_prod.columns[c]
+   ydata = np.array(fao_prod[thisCrop_fao])
+   for i, (casename, case) in enumerate(cases.items()):
+      ts_prod_y = case['ds'].ts_prod_yc.sel(Crop=thisCrop_clm).values
+      if i==0:
+         ydata = np.stack((ydata, ts_prod_y))
+      else:
+         ydata = np.concatenate((ydata, 
+                                np.expand_dims(ts_prod_y, axis=0)),
+                                axis=0)
+   da = xr.DataArray(data = ydata, 
+                     coords = {'Case': caselist,
+                               'Year': np.arange(y1,yN+1)})
+   da.plot.line(x="Year", ax=ax)
+   ax.title.set_text(thisCrop_clm)
+   ax.set_xlabel("")
+   ax.set_ylabel("Mt")
+   ax.get_legend().remove()
+   
+# Total (no sugarcane)
+ax = axes[-1]
+ydata = np.array(fao_prod_nosgc['Total'])
+for i, (casename, case) in enumerate(cases.items()):
+   ts_prod_y = (case['ds'].ts_prod_yc.sel(Crop="Total")
+                - case['ds'].ts_prod_yc.sel(Crop="Sugarcane")).values
+   if i==0:
+      ydata = np.stack((ydata, ts_prod_y))
+   else:
+      ydata = np.concatenate((ydata, 
+                              np.expand_dims(ts_prod_y, axis=0)),
+                              axis=0)
+da = xr.DataArray(data = ydata, 
+                  coords = {'Case': caselist,
+                            'Year': np.arange(y1,yN+1)})
+da.plot.line(x="Year", ax=ax)
+ax.title.set_text("Total (no sugarcane)")
+ax.set_xlabel("")
+ax.set_ylabel("Mt")
+ax.get_legend().remove()
+
+f.suptitle("Global crop production",
+           x = 0.2,
+           fontsize=24)
+f.legend(handles = ax.lines,
+         labels = caselist,
+         loc = "upper center")
 
 
 
