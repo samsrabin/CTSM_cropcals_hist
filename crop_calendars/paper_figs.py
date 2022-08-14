@@ -70,7 +70,7 @@ def adjust_gridded_lonlats(patches1d_lonlat, patches1d_ij, lu_dsg_lonlat_da, thi
       return lu_dsg_lonlat_da, patches1d_ij
 
 
-def get_ts_prod_clm_yc_da(yield_gd, lu_ds, yearList):
+def get_ts_prod_clm_yc_da(yield_gd, lu_ds, yearList, cropList_combined_clm):
 
    # Convert km2 to m2
    allCropArea = lu_ds.AREA*1e6 * lu_ds.LANDFRAC_PFT * lu_ds.PCT_CROP/100
@@ -544,7 +544,7 @@ for i, (casename, case) in enumerate(cases.items()):
                                       "lat": lu_dsg.lat})
    case['ds']['GRAIN_HARV_TOFOOD_ANN_GD'] = yield_gd
    
-   case['ds']['ts_prod_yc'] = get_ts_prod_clm_yc_da(yield_gd, lu_dsg, yearList)
+   case['ds']['ts_prod_yc'] = get_ts_prod_clm_yc_da(yield_gd, lu_dsg, yearList, cropList_combined_clm)
 
 
 # %% Compare total production to FAO
