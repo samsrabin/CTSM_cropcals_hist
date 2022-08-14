@@ -528,6 +528,13 @@ fao_prod.Value *= 1e-6
 fao_prod = fao_prod.copy().pivot(index="Year", columns="Crop", values="Value")
 fao_prod['Total'] = fao_prod.sum(numeric_only=True, axis=1)
 
+# Remove unneeded years
+fao_prod = fao_prod.filter(items=np.arange(y1,yN+1), axis=0)
+
+# Make no-sugarcane version
+fao_prod_nosgc = fao_prod.drop(columns = ["Sugar cane", "Total"])
+fao_prod_nosgc['Total'] = fao_prod_nosgc.sum(numeric_only=True, axis=1)
+
 
 
 # %% Get CLM crop production
@@ -566,8 +573,6 @@ for i, (casename, case) in enumerate(cases.items()):
 
 # Ignoring sugarcane
 f, axes = plt.subplots(ny, nx, sharey="row", figsize=figsize)
-fao_prod_nosgc = fao_prod.drop(columns = ["Sugar cane", "Total"])
-fao_prod_nosgc['Total'] = fao_prod_nosgc.sum(numeric_only=True, axis=1)
 fao_prod_nosgc.plot(ax=axes[0])
 axes[0].title.set_text("FAO")
 axes[0].set_ylabel("Mt")
