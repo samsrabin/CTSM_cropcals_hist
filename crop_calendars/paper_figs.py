@@ -565,9 +565,9 @@ for i, (casename, case) in enumerate(cases.items()):
    initial_tolerance = 1e-6
    lu_dsg = reses[case['res']]['dsg'].copy()
    case_ds, lu_ds, lon_tolerance = round_lonlats_to_match_ds(case_ds, lu_ds, "lon", initial_tolerance)
-   lu_dsg = lu_dsg.assign_coords({"lon": np.round(lu_dsg.lon.values, int(-np.log(lon_tolerance)))})
+   lu_dsg = lu_dsg.assign_coords({"lon": np.round(lu_dsg.lon.values, int(-np.log10(lon_tolerance)))})
    case_ds, lu_ds, lat_tolerance = round_lonlats_to_match_ds(case_ds, lu_ds, "lat", initial_tolerance)
-   lu_dsg = lu_dsg.assign_coords({"lat": np.round(lu_dsg.lat.values, int(-np.log(lat_tolerance)))})
+   lu_dsg = lu_dsg.assign_coords({"lat": np.round(lu_dsg.lat.values, int(-np.log10(lat_tolerance)))})
    
    # Ensure that time axes are formatted the same
    case_ds = time_units_and_trim(case_ds, y1, yN, cftime.DatetimeNoLeap)
