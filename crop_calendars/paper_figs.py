@@ -472,8 +472,8 @@ for i, (resname, res) in enumerate(reses.items()):
       
 print("Done importing land use.")
 
-# Copy LU to cases dict
-print("Copying LU data to case datasets:")
+# Harmonize LU and cases
+print("Harmonizing LU data and case datasets:")
 for i, (casename, case) in enumerate(cases.items()):
    print(casename + "...")
    case_ds = case['ds']
@@ -552,33 +552,178 @@ for i, (casename, case) in enumerate(cases.items()):
    case['ds']['GRAIN_HARV_TOFOOD_ANN_GD'] = yield_gd
    
    case['ds']['ts_prod_yc'] = get_ts_prod_clm_yc_da(yield_gd, lu_dsg, yearList, cropList_combined_clm)
+print("Done gridding.")
+
+
+# %% Import FAO Earthstat (gridded FAO data)
+
+print("Importing FAO EarthStat...")
+earthstats = {}
+
+# Import high res
+earthstats['f09_g17'] = xr.open_dataset('/Users/Shared/CESM_work/CropEvalData_ssr/FAO-EarthStatYields/EARTHSTATMIRCAUNFAOCropDataDeg09.nc')
+
+# Include just crops we care about
+cropList_fao_gd_all = ['Wheat', 'Maize', 'Rice', 'Barley', 'Rye', 'Millet', 'Sorghum', 'Soybeans', 'Sunflower', 'Potatoes', 'Cassava', 'Sugar cane', 'Sugar beet', 'Oil palm', 'Rape seed / Canola', 'Groundnuts / Peanuts', 'Pulses', 'Citrus', 'Date palm', 'Grapes / Vine', 'Cotton', 'Cocoa', 'Coffee', 'Others perennial', 'Fodder grasses', 'Others annual', 'Fibre crops', 'All crops']
+cropList_fao_gd = ["Maize", "Rice", "Cotton", "Soybeans", "Sugar cane", "Wheat"]
+earthstats['f09_g17'] = earthstats['f09_g17'].isel(crop=[cropList_fao_gd_all.index(x) for x in cropList_fao_gd]).assign_coords({'crop': cropList_combined_clm[:-1]})
+
+# Include just years we care about
+earthstats['f09_g17'] = earthstats['f09_g17'].isel(time=[i for i,x in enumerate(earthstats['f09_g17'].time.values) if x.year in np.arange(y1,yN+1)])
+
+# Interpolate to lower res, starting with just variables that won't get messed up by the interpolation
+print("Interpolating to f19_g17...")
+interp_lons = reses['f19_g17']['dsg'].lon.values
+interp_lats = reses['f19_g17']['dsg'].lat.values
+drop_vars = ['Area', 'HarvestArea', 'IrrigatedArea', 'PhysicalArea', 'RainfedArea', 'Production']
+earthstats['f19_g17'] = earthstats['f09_g17']\
+   .drop(labels=drop_vars)\
+   .interp(lon=interp_lons, lat=interp_lats)
+   
+# Disallow negative interpolated values
+for v in earthstats['f19_g17']:
+   vals = earthstats['f19_g17'][v].values
+   vals[vals < 0] = 0
+   earthstats['f19_g17'][v] = xr.DataArray(data = vals,
+                                           coords = earthstats['f19_g17'][v].coords,
+                                           attrs = earthstats['f19_g17'][v].attrs)
+   
+# These are not exact, but it seems like:
+#    PhysicalArea = RainfedArea + IrrigatedArea (max diff ~51 ha, max rel diff ~0.01%)
+#    PhysicalFraction = RainfedFraction + IrrigatedFraction (max rel diff ~0.01%)
+#    Production = HarvestArea * Yield (max diff 4 tons, max rel diff ~0.000012%)
+# But!!!
+#    PhysicalArea ≠ Area * LandFraction * PhysicalFraction (max rel diff 100%)
+
+# Re-calculate variables that were dropped
+f19_g17_cellarea = reses['f19_g17']['dsg']['AREA']
+f19_g17_landarea = f19_g17_cellarea * earthstats['f19_g17']['LandFraction']
+f19_g17_croparea_ha = f19_g17_landarea * earthstats['f19_g17']['PhysicalFraction']*100
+recalc_ds = xr.Dataset(data_vars = \
+   {'Area': f19_g17_cellarea,
+    'PhysicalArea': f19_g17_croparea_ha,
+    'HarvestArea': f19_g17_croparea_ha * earthstats['f19_g17']['HarvestFraction'],
+    'IrrigatedArea': f19_g17_croparea_ha * earthstats['f19_g17']['IrrigatedFraction'],
+    'RainfedArea': f19_g17_croparea_ha * earthstats['f19_g17']['RainfedFraction'],
+    'Production': f19_g17_croparea_ha * earthstats['f19_g17']['HarvestFraction']*earthstats['f19_g17']['Yield']})
+for v in recalc_ds:
+   recalc_ds[v].attrs = earthstats['f09_g17'].attrs
+   if recalc_ds[v].dims == ('lat', 'lon', 'crop', 'time'):
+      recalc_ds[v] = recalc_ds[v].transpose('crop', 'time', 'lat', 'lon')
+   discrep_sum_rel = 100*(np.sum(recalc_ds[v].values) - np.sum(earthstats['f09_g17'][v].values)) / np.sum(earthstats['f09_g17'][v].values)
+   print(f"Discrepancy in {v} f19_g17 rel to f09_g17: {discrep_sum_rel}%")
+earthstats['f19_g17'] = earthstats['f19_g17'].merge(recalc_ds)
+
+# Check consistency of non-dropped variables
+for v in earthstats['f19_g17']:
+   if "Area" in v or v == "Production":
+      continue
+   discrep_sum_rel = 100*(np.mean(earthstats['f19_g17'][v].values) - np.mean(earthstats['f09_g17'][v].values)) / np.mean(earthstats['f09_g17'][v].values)
+   print(f"Discrepancy in {v} f19_g17 rel to f09_g17: {discrep_sum_rel}%")
+
+
+# # Get totals
+# earthstats['f09_g17'] = xr.concat((earthstats['f09_g17'], earthstats['f09_g17'].sum(dim="crop").expand_dims(dim="crop")), dim="crop")
+# earthstats['f19_g17'] = xr.concat((earthstats['f19_g17'], earthstats['f19_g17'].sum(dim="crop").expand_dims(dim="crop")), dim="crop")
+
+print("Done importing FAO EarthStat.")
 
 
 # %% Compare total production to FAO
 
-# Set up figure
-ny = 1
-nx = 3
-# figsize = (14, 7.5)
-figsize = (18, 7.5)
+
+def finish_axes(ax, units=None, title=None):
+   if units:
+      ax.set_ylabel(units)
+   ax.set_xlabel("")
+   if title:
+      ax.title.set_text(title)
+   ax.get_legend().remove()
+   
+def drop_sugarcane_earthstats(ds, var, coord):
+   ds = ds.drop(crop="Sugar cane")
+   return ds
+
+def make_ts_fig_eachcase(fao_prod, earthstats, cropList_combined_clm, cases, suptitle):
+   # Set up figure
+   ny = 2
+   nx = 3
+   # figsize = (14, 7.5)
+   figsize = (18, 10)
+
+   f, axes = plt.subplots(ny, nx, sharey="row", figsize=figsize)
+   axes = axes.flatten()
+   
+   if "no sgc" in suptitle:
+      cropList = [c for c in cropList_combined_clm if c != "Sugarcane"]
+   else:
+      cropList = cropList_combined_clm
+   
+   caselist = ["FAOSTAT"]
+   a = 0
+   fao_prod.plot(ax=axes[0])
+   finish_axes(axes[a], units="Mt", title=caselist[-1])
+
+   thisres = "f09_g17"
+   caselist += [f"FAO EarthStat ({thisres})"]
+   a = 1
+   if "no sgc" in suptitle:
+      prod_ctyx = earthstats[thisres].Production.copy().values
+      i = [i for i, c in enumerate(cropList_combined_clm) if c not in ["Sugarcane", "Total"]]
+      prod_ctyx = prod_ctyx[i,...]
+      prod_ctyx = np.concatenate((prod_ctyx,
+                                  np.expand_dims(np.sum(prod_ctyx, axis=0), axis=0)),
+                                 axis=0)
+      new_coords = earthstats[thisres].copy().Production.coords
+      new_coords['crop'] = cropList
+      prod_ctyx_da = xr.DataArray(data = prod_ctyx,
+                                  attrs = earthstats[thisres].Production.attrs,
+                                  coords = new_coords)
+   else:
+      prod_ctyx_da = earthstats[thisres].Production
+   prod_ct_da = prod_ctyx_da.copy().sum(dim=["lat", "lon"])
+   (1e-6*prod_ct_da).plot.line(x="time", ax=axes[a])
+   finish_axes(axes[a], units="Mt", title=caselist[-1])
+   
+   # CLM outputs
+   for i, (casename, case) in enumerate(cases.items()):
+      caselist += [casename]
+      ax = i+a+1
+      axis = axes[ax]
+      if "no sgc" in suptitle:
+         ts_prod_yc = case['ds'].ts_prod_yc.copy().values
+         i = [i for i, c in enumerate(cropList_combined_clm) if c not in ["Sugarcane", "Total"]]
+         ts_prod_yc = ts_prod_yc[:,i]
+         ts_prod_yc = np.concatenate((ts_prod_yc,
+                                      np.expand_dims(np.sum(ts_prod_yc, axis=1), axis=1)),
+                                     axis=1)
+         ts_prod_yc_da = xr.DataArray(data = ts_prod_yc,
+                                      attrs = case['ds'].ts_prod_yc.attrs,
+                                      coords = {'Year': case['ds'].ts_prod_yc.Year,
+                                                'Crop': cropList})
+      else:
+         ts_prod_yc_da = case['ds'].ts_prod_yc
+      ts_prod_yc_da.plot.line(x="Year", ax=axis)
+      finish_axes(axis, units="Mt", title=casename)
+
+   f.suptitle(suptitle,
+            x = 0.1, horizontalalignment = 'left',
+            fontsize=24)
+   
+   f.legend(handles = axis.lines,
+            labels = cropList,
+            loc = "upper center",
+            ncol=3)
+   
+   # Delete unused axes, if any
+   for a in np.arange(ax+1, ny*nx):
+      f.delaxes(axes[a])
 
 # All crops
-f, axes = plt.subplots(ny, nx, sharey="row", figsize=figsize)
-fao_prod.plot(ax=axes[0])
-axes[0].title.set_text("FAO")
-axes[0].set_ylabel("Mt")
-for i, (casename, case) in enumerate(cases.items()):
-   case['ds'].ts_prod_yc.plot.line(x="Year", ax=axes[i+1])
-   axes[i+1].title.set_text(casename)
+make_ts_fig_eachcase(fao_prod, earthstats, cropList_combined_clm, cases, "Global crop production")
 
-# Ignoring sugarcane
-f, axes = plt.subplots(ny, nx, sharey="row", figsize=figsize)
-fao_prod_nosgc.plot(ax=axes[0])
-axes[0].title.set_text("FAO")
-axes[0].set_ylabel("Mt")
-for i, (casename, case) in enumerate(cases.items()):
-   case['ds'].ts_prod_yc.sel({"Crop": [c for c in cropList_combined_clm if "Sugar" not in c]}).plot.line(x="Year", ax=axes[i+1])
-   axes[i+1].title.set_text(casename)
+# No sugarcane
+make_ts_fig_eachcase(fao_prod_nosgc, earthstats, cropList_combined_clm, cases, "Global crop production (no sgc)")
 
 
 # %% Compare individual crops
@@ -591,22 +736,43 @@ figsize = (20, 10)
 f, axes = plt.subplots(ny, nx, figsize=figsize)
 axes = axes.flatten()
 
-caselist = ["FAO"]
+caselist = ["FAOSTAT"]
+this_earthstat_res = "f09_g17"
+caselist += [f"FAO EarthStat ({this_earthstat_res})"]
 for (casename, case) in cases.items():
    caselist.append(casename)
 
-for c, thisCrop_clm in enumerate(cropList_combined_clm):
+for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
    ax = axes[c]
-   thisCrop_fao = fao_prod.columns[c]
-   ydata = np.array(fao_prod[thisCrop_fao])
+   
+   # FAOSTAT
+   if thisCrop_clm == "Total (no sgc)":
+      thisCrop_fao = fao_prod_nosgc.columns[-1]
+      ydata = np.array(fao_prod_nosgc[thisCrop_fao])
+   else:
+      thisCrop_fao = fao_prod.columns[c]
+      ydata = np.array(fao_prod[thisCrop_fao])
+   
+   # FAO EarthStat
+   if thisCrop_clm == "Total":
+      prod_tyx = earthstats[this_earthstat_res].Production.sum(dim="crop").copy()
+   elif thisCrop_clm == "Total (no sgc)":
+      prod_tyx = earthstats[this_earthstat_res].drop_sel(crop=['Sugarcane']).Production.sum(dim="crop").copy()
+   else:
+      prod_tyx = earthstats[this_earthstat_res].Production.sel(crop=thisCrop_clm).copy()
+   ts_prod_y = 1e-6*prod_tyx.sum(dim=["lat","lon"]).values
+   ydata = np.stack((ydata,
+                     ts_prod_y))
+   
+   # CLM outputs
    for i, (casename, case) in enumerate(cases.items()):
-      ts_prod_y = case['ds'].ts_prod_yc.sel(Crop=thisCrop_clm).values
-      if i==0:
-         ydata = np.stack((ydata, ts_prod_y))
+      if thisCrop_clm == "Total (no sgc)":
+         ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Total']).ts_prod_yc.sum(dim="Crop").copy()
       else:
-         ydata = np.concatenate((ydata, 
-                                np.expand_dims(ts_prod_y, axis=0)),
-                                axis=0)
+         ts_prod_y = case['ds'].ts_prod_yc.sel(Crop=thisCrop_clm).copy()
+      ydata = np.concatenate((ydata,
+                              np.expand_dims(ts_prod_y.values, axis=0)),
+                             axis=0)
    da = xr.DataArray(data = ydata, 
                      coords = {'Case': caselist,
                                'Year': np.arange(y1,yN+1)})
@@ -615,34 +781,28 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm):
    ax.set_xlabel("")
    ax.set_ylabel("Mt")
    ax.get_legend().remove()
+
+# Delete unused axes, if any
+for a in np.arange(c+1, ny*nx):
+   f.delaxes(axes[a])
    
-# Total (no sugarcane)
-ax = axes[-1]
-ydata = np.array(fao_prod_nosgc['Total'])
-for i, (casename, case) in enumerate(cases.items()):
-   ts_prod_y = (case['ds'].ts_prod_yc.sel(Crop="Total")
-                - case['ds'].ts_prod_yc.sel(Crop="Sugarcane")).values
-   if i==0:
-      ydata = np.stack((ydata, ts_prod_y))
-   else:
-      ydata = np.concatenate((ydata, 
-                              np.expand_dims(ts_prod_y, axis=0)),
-                              axis=0)
-da = xr.DataArray(data = ydata, 
-                  coords = {'Case': caselist,
-                            'Year': np.arange(y1,yN+1)})
-da.plot.line(x="Year", ax=ax)
-ax.title.set_text("Total (no sugarcane)")
-ax.set_xlabel("")
-ax.set_ylabel("Mt")
-ax.get_legend().remove()
 
 f.suptitle("Global crop production",
-           x = 0.2,
+           x = 0.1, horizontalalignment = 'left',
            fontsize=24)
 f.legend(handles = ax.lines,
          labels = caselist,
-         loc = "upper center")
+         loc = "upper center");
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -723,3 +883,70 @@ ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
 make_map(ax, this_map.mean(dim="time").sel(ivt_str="spring_wheat"), "spring wheat", bin_width, fontsize_ticklabels, fontsize_titles)
 ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
 make_map(ax, this_map.mean(dim="time").sel(ivt_str="irrigated_spring_wheat"), "irrigated spring wheat", bin_width, fontsize_ticklabels, fontsize_titles)
+
+
+# %% Import FAO Earthstat QUARTER DEGREE (gridded FAO data)
+
+earthstats = {}
+
+# Import high res
+earthstats['qd'] = xr.open_dataset('/Users/Shared/CESM_work/CropEvalData_ssr/FAO-EarthStatYields/EARTHSTATMIRCAUNFAOCropDataDeg025.nc')
+
+# Include just crops we care about
+cropList_fao_gd_all = ['Wheat', 'Maize', 'Rice', 'Barley', 'Rye', 'Millet', 'Sorghum', 'Soybeans', 'Sunflower', 'Potatoes', 'Cassava', 'Sugar cane', 'Sugar beet', 'Oil palm', 'Rape seed / Canola', 'Groundnuts / Peanuts', 'Pulses', 'Citrus', 'Date palm', 'Grapes / Vine', 'Cotton', 'Cocoa', 'Coffee', 'Others perennial', 'Fodder grasses', 'Others annual', 'Fibre crops', 'All crops']
+cropList_fao_gd = ["Maize", "Rice", "Cotton", "Soybeans", "Sugar cane", "Wheat"]
+earthstats['qd'] = earthstats['qd'].isel(crop=[cropList_fao_gd_all.index(x) for x in cropList_fao_gd]).assign_coords({'crop': cropList_combined_clm[:-1]})
+
+# Include just years we care about
+earthstats['qd'] = earthstats['qd'].isel(time=[i for i,x in enumerate(earthstats['qd'].time.values) if x.year in np.arange(y1,yN+1)])
+
+# Interpolate to lower res, starting with just variables that won't get messed up by the interpolation
+interp_lons = reses['f19_g17']['dsg'].lon.values
+interp_lats = reses['f19_g17']['dsg'].lat.values
+drop_vars = ['Area', 'HarvestArea', 'IrrigatedArea', 'PhysicalArea', 'RainfedArea', 'Production']
+earthstats['f19_g17'] = earthstats['qd']\
+   .drop(labels=drop_vars)\
+   .interp(lon=interp_lons, lat=interp_lats)
+   
+# Disallow negative interpolated values
+for v in earthstats['f19_g17']:
+   vals = earthstats['f19_g17'][v].values
+   vals[vals < 0] = 0
+   earthstats['f19_g17'][v] = xr.DataArray(data = vals,
+                                           coords = earthstats['f19_g17'][v].coords,
+                                           attrs = earthstats['f19_g17'][v].attrs)
+   
+# These are not exact, but it seems like:
+#    PhysicalArea = RainfedArea + IrrigatedArea (max diff ~51 ha, max rel diff ~0.01%)
+#    PhysicalFraction = RainfedFraction + IrrigatedFraction (max rel diff ~0.01%)
+#    Production = HarvestArea * Yield (max diff 4 tons, max rel diff ~0.000012%)
+# But!!!
+#    PhysicalArea ≠ Area * LandFraction * PhysicalFraction (max rel diff 100%)
+
+# %%Re-calculate variables that were dropped
+f19_g17_cellarea = reses['f19_g17']['dsg']['AREA']
+f19_g17_landarea = f19_g17_cellarea * earthstats['f19_g17']['LandFraction']
+f19_g17_croparea_ha = f19_g17_landarea * earthstats['f19_g17']['PhysicalFraction']*100
+recalc_ds = xr.Dataset(data_vars = \
+   {'Area': f19_g17_cellarea,
+    'PhysicalArea': f19_g17_croparea_ha,
+    'HarvestArea': f19_g17_croparea_ha * earthstats['f19_g17']['HarvestFraction'],
+    'IrrigatedArea': f19_g17_croparea_ha * earthstats['f19_g17']['IrrigatedFraction'],
+    'RainfedArea': f19_g17_croparea_ha * earthstats['f19_g17']['RainfedFraction'],
+    'Production': f19_g17_croparea_ha * earthstats['f19_g17']['HarvestFraction']*earthstats['f19_g17']['Yield']})
+for v in recalc_ds:
+   recalc_ds[v].attrs = earthstats['qd'].attrs
+   if recalc_ds[v].dims == ('lat', 'lon', 'crop', 'time'):
+      recalc_ds[v] = recalc_ds[v].transpose('crop', 'time', 'lat', 'lon')
+   discrep_sum_rel = 100*(np.nansum(recalc_ds[v].values) - np.nansum(earthstats['qd'][v].values)) / np.nansum(earthstats['qd'][v].values)
+   print(f"Discrepancy in {v} f19_g17 rel to qd: {discrep_sum_rel}%")
+earthstats['f19_g17'] = earthstats['f19_g17'].merge(recalc_ds)
+
+
+for v in earthstats['f19_g17']:
+   if "Area" in v or v == "Production":
+      continue
+   discrep_sum_rel = 100*(np.nanmean(earthstats['f19_g17'][v].values) - np.nanmean(earthstats['qd'][v].values)) / np.nanmean(earthstats['qd'][v].values)
+   print(f"Discrepancy in {v} f19_g17 rel to qd: {discrep_sum_rel}%")
+
+
