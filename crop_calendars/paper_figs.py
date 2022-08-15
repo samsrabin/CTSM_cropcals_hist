@@ -739,7 +739,7 @@ plt.savefig(outDir_figs + "Global crop production (no sgc).pdf",
             bbox_inches='tight')
 
 
-# %% Compare area and production of individual crops
+# %% Compare area, production, and yield of individual crops
 
 # Set up figure
 ny = 2
@@ -750,6 +750,8 @@ f_area, axes_area = plt.subplots(ny, nx, figsize=figsize)
 axes_area = axes_area.flatten()
 f_prod, axes_prod = plt.subplots(ny, nx, figsize=figsize)
 axes_prod = axes_prod.flatten()
+f_yield, axes_yield = plt.subplots(ny, nx, figsize=figsize)
+axes_yield = axes_yield.flatten()
 
 caselist = ["FAOSTAT"]
 this_earthstat_res = "f09_g17"
@@ -785,6 +787,7 @@ def finishup_allcrops_plot(c, ny, nx, axes_this, f_this, suptitle, outDir_figs):
 for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
    ax_area = axes_area[c]
    ax_prod = axes_prod[c]
+   ax_yield = axes_yield[c]
    
    # FAOSTAT
    if thisCrop_clm == "Total (no sgc)":
@@ -853,13 +856,18 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
    # Convert ha to Mha
    ydata_area *= 1e-6
    
+   # Calculate FAO* yields
+   ydata_yield = ydata_prod / ydata_area
+   
    # Make plots for this crop
    make_1crop_plot(ax_area, ydata_area, caselist, thisCrop_clm, "Mha", y1, yN)
    make_1crop_plot(ax_prod, ydata_prod, caselist, thisCrop_clm, "Mt", y1, yN)
+   make_1crop_plot(ax_yield, ydata_yield, caselist, thisCrop_clm, "t/ha", y1, yN)
    
 # Finish up and save
 finishup_allcrops_plot(c, ny, nx, axes_area, f_area, "Global crop area", outDir_figs)
 finishup_allcrops_plot(c, ny, nx, axes_prod, f_prod, "Global crop production", outDir_figs)
+finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outDir_figs)   
 
 
 
