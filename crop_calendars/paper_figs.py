@@ -468,13 +468,15 @@ for i, (resname, res) in enumerate(reses.items()):
    if case["res"] != resname:
       raise RuntimeError(f"No case found with res {resname}")
    
-   # Can avoid saving to res dict once I'm confident the ungridded Dataset works
    res['dsg'] = open_lu_ds(res['lu_path'], y1, yN, case['ds'])
    res['dsg'] = res['dsg'].assign_coords({"time": [cftime.DatetimeNoLeap(y, 1, 1, 0, 0, 0, 0, has_year_zero=True) for y in res['dsg'].time.values]})
+   
+   res['dsg']['AREA_CFT'] = res['dsg'].AREA*1e6 * res['dsg'].LANDFRAC_PFT * res['dsg'].PCT_CROP/100 * res['dsg'].PCT_CFT/100
+   res['dsg']['AREA_CFT'].attrs = {'units': 'm2'}
       
 print("Done importing land use.")
 
-# Harmonize LU and cases
+# %%Harmonize LU and cases
 print("Harmonizing LU data and case datasets:")
 for i, (casename, case) in enumerate(cases.items()):
    print(casename + "...")
@@ -511,32 +513,38 @@ print("Done.")
 fao_all = pd.read_csv("/Users/sam/Documents/git_repos/CTSM_cropcals_hist/crop_calendar_MATLAB/FAOSTAT_data_6-15-2022.csv")
 fao_all.rename(columns={"Item": "Crop"}, inplace=True, errors="raise") # Because I always confuse Item vs. Element
 
-fao_prod = fao_all.copy().query("Element == 'Production'")
+def get_fao_data(fao_all, element):
+   fao_this = fao_all.copy().query(f"Element == '{element}'")
 
-# Combine "Maize" and "Maize, green"
-fao_prod.Crop.replace("Maize.*", "Maize", regex=True, inplace=True)
-fao_prod = fao_prod.groupby(by=["Crop","Year","Element","Area","Unit"], as_index=False).agg("sum")
+   # Combine "Maize" and "Maize, green"
+   fao_this.Crop.replace("Maize.*", "Maize", regex=True, inplace=True)
+   fao_this = fao_this.groupby(by=["Crop","Year","Element","Area","Unit"], as_index=False).agg("sum")
 
-# Pick one rice
-rice_to_keep = "Rice, paddy"
-rice_to_drop = "Rice, paddy (rice milled equivalent)"
-drop_this = [x == rice_to_drop for x in fao_prod.Crop]
-fao_prod = fao_prod.drop(fao_prod[drop_this].index)
+   # Pick one rice
+   rice_to_keep = "Rice, paddy"
+   rice_to_drop = "Rice, paddy (rice milled equivalent)"
+   drop_this = [x == rice_to_drop for x in fao_this.Crop]
+   fao_this = fao_this.drop(fao_this[drop_this].index)
 
-# Convert t to Mt
-fao_prod.Value *= 1e-6
+   # Convert t to Mt
+   if element == 'Production':
+      fao_this.Value *= 1e-6
 
-# Pivot and add Total column
-fao_prod = fao_prod.copy().pivot(index="Year", columns="Crop", values="Value")
-fao_prod['Total'] = fao_prod.sum(numeric_only=True, axis=1)
+   # Pivot and add Total column
+   fao_this = fao_this.copy().pivot(index="Year", columns="Crop", values="Value")
+   fao_this['Total'] = fao_this.sum(numeric_only=True, axis=1)
 
-# Remove unneeded years
-fao_prod = fao_prod.filter(items=np.arange(y1,yN+1), axis=0)
+   # Remove unneeded years
+   fao_this = fao_this.filter(items=np.arange(y1,yN+1), axis=0)
 
-# Make no-sugarcane version
-fao_prod_nosgc = fao_prod.drop(columns = ["Sugar cane", "Total"])
-fao_prod_nosgc['Total'] = fao_prod_nosgc.sum(numeric_only=True, axis=1)
+   # Make no-sugarcane version
+   fao_this_nosgc = fao_this.drop(columns = ["Sugar cane", "Total"])
+   fao_this_nosgc['Total'] = fao_this_nosgc.sum(numeric_only=True, axis=1)
+   
+   return fao_this, fao_this_nosgc
 
+fao_prod, fao_prod_nosgc = get_fao_data(fao_all, 'Production')
+fao_area, fao_area_nosgc = get_fao_data(fao_all, 'Area harvested')
 
 
 # %% Get CLM crop production
@@ -731,7 +739,102 @@ plt.savefig(outDir_figs + "Global crop production (no sgc).pdf",
             bbox_inches='tight')
 
 
-# %% Compare individual crops
+# %% Compare area of individual crops
+
+# Set up figure
+ny = 2
+nx = 4
+# figsize = (14, 7.5)
+figsize = (20, 10)
+f, axes = plt.subplots(ny, nx, figsize=figsize)
+axes = axes.flatten()
+
+caselist = ["FAOSTAT"]
+this_earthstat_res = "f09_g17"
+caselist += [f"FAO EarthStat ({this_earthstat_res})"]
+for (casename, case) in cases.items():
+   caselist.append(casename)
+
+for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
+   ax = axes[c]
+   
+   # FAOSTAT
+   if thisCrop_clm == "Total (no sgc)":
+      thisCrop_fao = fao_area_nosgc.columns[-1]
+      ydata = np.array(fao_area_nosgc[thisCrop_fao])
+   else:
+      thisCrop_fao = fao_area.columns[c]
+      ydata = np.array(fao_area[thisCrop_fao])
+   
+   # FAO EarthStat
+   if thisCrop_clm == "Total":
+      area_tyx = earthstats[this_earthstat_res].HarvestArea.sum(dim="crop").copy()
+   elif thisCrop_clm == "Total (no sgc)":
+      area_tyx = earthstats[this_earthstat_res].drop_sel(crop=['Sugarcane']).HarvestArea.sum(dim="crop").copy()
+   else:
+      area_tyx = earthstats[this_earthstat_res].HarvestArea.sel(crop=thisCrop_clm).copy()
+   ts_area_y = area_tyx.sum(dim=["lat","lon"]).values
+   ydata = np.stack((ydata,
+                     ts_area_y))
+   
+   # CLM outputs
+   for i, (casename, case) in enumerate(cases.items()):
+      
+      lu_dsg = reses[case['res']]['dsg']
+      
+      dummy_tyx_da = lu_dsg.AREA_CFT.isel(cft=0, drop=True)
+      area_tyx = np.full(dummy_tyx_da.shape, 0.0)
+      if "Total" in thisCrop_clm:
+         incl_crops = [x for x in case['ds'].ivt_str.values if x.replace('irrigated_','').replace('temperate_','').replace('tropical_','') in [y.lower() for y in cropList_combined_clm]]
+         if thisCrop_clm == "Total (no sgc)":
+            incl_crops = [x for x in incl_crops if "sugarcane" not in x]
+         elif thisCrop_clm == "Total":
+            pass
+         else:
+            raise RuntimeError("???")
+         area_tyx = lu_dsg.AREA_CFT.sel(cft=[utils.ivt_str2int(x) for x in incl_crops]).sum(dim="cft").values
+      else:
+         for pft_str in case['ds'].ivt_str.values:
+            if thisCrop_clm.lower() not in pft_str:
+               continue
+            pft_int = utils.ivt_str2int(pft_str)
+            area_tyx += lu_dsg.AREA_CFT.sel(cft=pft_int).values
+      area_tyx *= 1e-4 # m2 to ha
+      area_tyx_da = xr.DataArray(data=area_tyx, coords=dummy_tyx_da.coords)
+      ts_area_y = area_tyx_da.sum(dim=["lat", "lon"])
+      
+      
+      ydata = np.concatenate((ydata,
+                              np.expand_dims(ts_area_y.values, axis=0)),
+                             axis=0)
+   
+   # Convert ha to Mha
+   ydata *= 1e-6
+   da = xr.DataArray(data = ydata, 
+                     coords = {'Case': caselist,
+                               'Year': np.arange(y1,yN+1)})
+   da.plot.line(x="Year", ax=ax)
+   ax.title.set_text(thisCrop_clm)
+   ax.set_xlabel("")
+   ax.set_ylabel("Mha")
+   ax.get_legend().remove()
+
+# Delete unused axes, if any
+for a in np.arange(c+1, ny*nx):
+   f.delaxes(axes[a])
+   
+f.suptitle("Global crop area",
+           x = 0.1, horizontalalignment = 'left',
+           fontsize=24)
+f.legend(handles = ax.lines,
+         labels = caselist,
+         loc = "upper center");
+
+plt.savefig(outDir_figs + "Global crop area by crop.pdf",
+            bbox_inches='tight')
+
+
+# %% Compare production of individual crops
 
 # Set up figure
 ny = 2
@@ -778,6 +881,7 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
       ydata = np.concatenate((ydata,
                               np.expand_dims(ts_prod_y.values, axis=0)),
                              axis=0)
+      
    da = xr.DataArray(data = ydata, 
                      coords = {'Case': caselist,
                                'Year': np.arange(y1,yN+1)})
@@ -801,6 +905,7 @@ f.legend(handles = ax.lines,
 
 plt.savefig(outDir_figs + "Global crop production by crop.pdf",
             bbox_inches='tight')
+
 
 
 
