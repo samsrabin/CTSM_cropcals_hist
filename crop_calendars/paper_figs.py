@@ -13,6 +13,8 @@ from cropcal_module import *
 sys.path.append(my_ctsm_python_gallery)
 import utils
 
+outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures/"
+
 import numpy as np
 from scipy import stats
 import xarray as xr
@@ -631,7 +633,6 @@ print("Done importing FAO EarthStat.")
 
 # %% Compare total production to FAO
 
-
 def finish_axes(ax, units=None, title=None):
    if units:
       ax.set_ylabel(units)
@@ -721,9 +722,13 @@ def make_ts_fig_eachcase(fao_prod, earthstats, cropList_combined_clm, cases, sup
 
 # All crops
 make_ts_fig_eachcase(fao_prod, earthstats, cropList_combined_clm, cases, "Global crop production")
+plt.savefig(outDir_figs + "Global crop production.pdf",
+            bbox_inches='tight')
 
 # No sugarcane
 make_ts_fig_eachcase(fao_prod_nosgc, earthstats, cropList_combined_clm, cases, "Global crop production (no sgc)")
+plt.savefig(outDir_figs + "Global crop production (no sgc).pdf",
+            bbox_inches='tight')
 
 
 # %% Compare individual crops
@@ -794,7 +799,8 @@ f.legend(handles = ax.lines,
          labels = caselist,
          loc = "upper center");
 
-
+plt.savefig(outDir_figs + "Global crop production by crop.pdf",
+            bbox_inches='tight')
 
 
 
