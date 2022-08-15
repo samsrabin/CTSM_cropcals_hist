@@ -739,49 +739,85 @@ plt.savefig(outDir_figs + "Global crop production (no sgc).pdf",
             bbox_inches='tight')
 
 
-# %% Compare area of individual crops
+# %% Compare area and production of individual crops
 
 # Set up figure
 ny = 2
 nx = 4
 # figsize = (14, 7.5)
 figsize = (20, 10)
-f, axes = plt.subplots(ny, nx, figsize=figsize)
-axes = axes.flatten()
+f_area, axes_area = plt.subplots(ny, nx, figsize=figsize)
+axes_area = axes_area.flatten()
+f_prod, axes_prod = plt.subplots(ny, nx, figsize=figsize)
+axes_prod = axes_prod.flatten()
 
 caselist = ["FAOSTAT"]
 this_earthstat_res = "f09_g17"
 caselist += [f"FAO EarthStat ({this_earthstat_res})"]
 for (casename, case) in cases.items():
    caselist.append(casename)
+   
+def make_1crop_plot(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN):
+   da = xr.DataArray(data = ydata_this,
+                     coords = {'Case': caselist,
+                               'Year': np.arange(y1,yN+1)})
+   da.plot.line(x="Year", ax=ax_this)
+   ax_this.title.set_text(thisCrop_clm)
+   ax_this.set_xlabel("")
+   ax_this.set_ylabel(units)
+   ax_this.get_legend().remove()
+
+def finishup_allcrops_plot(c, ny, nx, axes_this, f_this, suptitle, outDir_figs):
+   # Delete unused axes, if any
+   for a in np.arange(c+1, ny*nx):
+      f_this.delaxes(axes_this[a])
+      
+   f_this.suptitle(suptitle,
+                   x = 0.1, horizontalalignment = 'left',
+                   fontsize=24)
+   f_this.legend(handles = axes_this[0].lines,
+                 labels = caselist,
+                 loc = "upper center");
+
+   f_this.savefig(outDir_figs + suptitle + " by crop.pdf",
+                  bbox_inches='tight')
 
 for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
-   ax = axes[c]
+   ax_area = axes_area[c]
+   ax_prod = axes_prod[c]
    
    # FAOSTAT
    if thisCrop_clm == "Total (no sgc)":
       thisCrop_fao = fao_area_nosgc.columns[-1]
-      ydata = np.array(fao_area_nosgc[thisCrop_fao])
+      ydata_area = np.array(fao_area_nosgc[thisCrop_fao])
+      ydata_prod = np.array(fao_prod_nosgc[thisCrop_fao])
    else:
       thisCrop_fao = fao_area.columns[c]
-      ydata = np.array(fao_area[thisCrop_fao])
+      ydata_area = np.array(fao_area[thisCrop_fao])
+      ydata_prod = np.array(fao_prod[thisCrop_fao])
    
    # FAO EarthStat
    if thisCrop_clm == "Total":
       area_tyx = earthstats[this_earthstat_res].HarvestArea.sum(dim="crop").copy()
+      prod_tyx = earthstats[this_earthstat_res].Production.sum(dim="crop").copy()
    elif thisCrop_clm == "Total (no sgc)":
       area_tyx = earthstats[this_earthstat_res].drop_sel(crop=['Sugarcane']).HarvestArea.sum(dim="crop").copy()
+      prod_tyx = earthstats[this_earthstat_res].drop_sel(crop=['Sugarcane']).Production.sum(dim="crop").copy()
    else:
       area_tyx = earthstats[this_earthstat_res].HarvestArea.sel(crop=thisCrop_clm).copy()
+      prod_tyx = earthstats[this_earthstat_res].Production.sel(crop=thisCrop_clm).copy()
    ts_area_y = area_tyx.sum(dim=["lat","lon"]).values
-   ydata = np.stack((ydata,
-                     ts_area_y))
-   
+   ydata_area = np.stack((ydata_area,
+                          ts_area_y))
+   ts_prod_y = 1e-6*prod_tyx.sum(dim=["lat","lon"]).values
+   ydata_prod = np.stack((ydata_prod,
+                          ts_prod_y))
+      
    # CLM outputs
    for i, (casename, case) in enumerate(cases.items()):
       
+      # Area
       lu_dsg = reses[case['res']]['dsg']
-      
       dummy_tyx_da = lu_dsg.AREA_CFT.isel(cft=0, drop=True)
       area_tyx = np.full(dummy_tyx_da.shape, 0.0)
       if "Total" in thisCrop_clm:
@@ -802,118 +838,28 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
       area_tyx *= 1e-4 # m2 to ha
       area_tyx_da = xr.DataArray(data=area_tyx, coords=dummy_tyx_da.coords)
       ts_area_y = area_tyx_da.sum(dim=["lat", "lon"])
+      ydata_area = np.concatenate((ydata_area,
+                                   np.expand_dims(ts_area_y.values, axis=0)),
+                                  axis=0)
       
-      
-      ydata = np.concatenate((ydata,
-                              np.expand_dims(ts_area_y.values, axis=0)),
-                             axis=0)
-   
-   # Convert ha to Mha
-   ydata *= 1e-6
-   da = xr.DataArray(data = ydata, 
-                     coords = {'Case': caselist,
-                               'Year': np.arange(y1,yN+1)})
-   da.plot.line(x="Year", ax=ax)
-   ax.title.set_text(thisCrop_clm)
-   ax.set_xlabel("")
-   ax.set_ylabel("Mha")
-   ax.get_legend().remove()
-
-# Delete unused axes, if any
-for a in np.arange(c+1, ny*nx):
-   f.delaxes(axes[a])
-   
-f.suptitle("Global crop area",
-           x = 0.1, horizontalalignment = 'left',
-           fontsize=24)
-f.legend(handles = ax.lines,
-         labels = caselist,
-         loc = "upper center");
-
-plt.savefig(outDir_figs + "Global crop area by crop.pdf",
-            bbox_inches='tight')
-
-
-# %% Compare production of individual crops
-
-# Set up figure
-ny = 2
-nx = 4
-# figsize = (14, 7.5)
-figsize = (20, 10)
-f, axes = plt.subplots(ny, nx, figsize=figsize)
-axes = axes.flatten()
-
-caselist = ["FAOSTAT"]
-this_earthstat_res = "f09_g17"
-caselist += [f"FAO EarthStat ({this_earthstat_res})"]
-for (casename, case) in cases.items():
-   caselist.append(casename)
-
-for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
-   ax = axes[c]
-   
-   # FAOSTAT
-   if thisCrop_clm == "Total (no sgc)":
-      thisCrop_fao = fao_prod_nosgc.columns[-1]
-      ydata = np.array(fao_prod_nosgc[thisCrop_fao])
-   else:
-      thisCrop_fao = fao_prod.columns[c]
-      ydata = np.array(fao_prod[thisCrop_fao])
-   
-   # FAO EarthStat
-   if thisCrop_clm == "Total":
-      prod_tyx = earthstats[this_earthstat_res].Production.sum(dim="crop").copy()
-   elif thisCrop_clm == "Total (no sgc)":
-      prod_tyx = earthstats[this_earthstat_res].drop_sel(crop=['Sugarcane']).Production.sum(dim="crop").copy()
-   else:
-      prod_tyx = earthstats[this_earthstat_res].Production.sel(crop=thisCrop_clm).copy()
-   ts_prod_y = 1e-6*prod_tyx.sum(dim=["lat","lon"]).values
-   ydata = np.stack((ydata,
-                     ts_prod_y))
-   
-   # CLM outputs
-   for i, (casename, case) in enumerate(cases.items()):
+      # Production
       if thisCrop_clm == "Total (no sgc)":
          ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Total']).ts_prod_yc.sum(dim="Crop").copy()
       else:
          ts_prod_y = case['ds'].ts_prod_yc.sel(Crop=thisCrop_clm).copy()
-      ydata = np.concatenate((ydata,
-                              np.expand_dims(ts_prod_y.values, axis=0)),
-                             axis=0)
-      
-   da = xr.DataArray(data = ydata, 
-                     coords = {'Case': caselist,
-                               'Year': np.arange(y1,yN+1)})
-   da.plot.line(x="Year", ax=ax)
-   ax.title.set_text(thisCrop_clm)
-   ax.set_xlabel("")
-   ax.set_ylabel("Mt")
-   ax.get_legend().remove()
-
-# Delete unused axes, if any
-for a in np.arange(c+1, ny*nx):
-   f.delaxes(axes[a])
+      ydata_prod = np.concatenate((ydata_prod,
+                                 np.expand_dims(ts_prod_y.values, axis=0)),
+                                 axis=0)
+   # Convert ha to Mha
+   ydata_area *= 1e-6
    
-
-f.suptitle("Global crop production",
-           x = 0.1, horizontalalignment = 'left',
-           fontsize=24)
-f.legend(handles = ax.lines,
-         labels = caselist,
-         loc = "upper center");
-
-plt.savefig(outDir_figs + "Global crop production by crop.pdf",
-            bbox_inches='tight')
-
-
-
-
-
-
-
-
-
+   # Make plots for this crop
+   make_1crop_plot(ax_area, ydata_area, caselist, thisCrop_clm, "Mha", y1, yN)
+   make_1crop_plot(ax_prod, ydata_prod, caselist, thisCrop_clm, "Mt", y1, yN)
+   
+# Finish up and save
+finishup_allcrops_plot(c, ny, nx, axes_area, f_area, "Global crop area", outDir_figs)
+finishup_allcrops_plot(c, ny, nx, axes_prod, f_prod, "Global crop production", outDir_figs)
 
 
 
