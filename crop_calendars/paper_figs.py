@@ -414,6 +414,10 @@ cases['cmip6_i.e21.IHIST.f09_g17'] = {'filepath': '/Users/Shared/CESM_work/CropE
 cases['ctsm5.1.dev092'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013/2022-08-08/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013.clm2.h1.1950-01-01-00000.nc',
                     'constantVars': None,
                     'res': 'f19_g17'}
+# My run with rx_crop_calendars2 code but CLM calendars
+cases['mycode_clmcals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1950-2013.clm/2022-08-09/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1950-2013.clm.clm2.h1.1950-01-01-00000.nc',
+                    'constantVars': None,
+                    'res': 'f19_g17'}
 
 # Note that _PERHARV will be stripped off upon import
 myVars = ['GRAINC_TO_FOOD_PERHARV', 'GRAINC_TO_FOOD_ANN', 'SDATES', 'SDATES_PERHARV', 'SYEARS_PERHARV', 'HDATES', 'HYEARS', 'GDDHARV_PERHARV', 'GDDACCUM_PERHARV', 'HUI_PERHARV', 'SOWING_REASON_PERHARV', 'HARVEST_REASON_PERHARV']
@@ -777,9 +781,11 @@ def finishup_allcrops_plot(c, ny, nx, axes_this, f_this, suptitle, outDir_figs):
    f_this.suptitle(suptitle,
                    x = 0.1, horizontalalignment = 'left',
                    fontsize=24)
+   
    f_this.legend(handles = axes_this[0].lines,
                  labels = caselist,
-                 loc = "upper center");
+                 loc = "upper center",
+                 ncol = int(np.floor(len(caselist)/4))+1)
 
    f_this.savefig(outDir_figs + suptitle + " by crop.pdf",
                   bbox_inches='tight')
