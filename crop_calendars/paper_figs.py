@@ -636,10 +636,6 @@ for v in earthstats['f19_g17']:
    print(f"Discrepancy in {v} f19_g17 rel to f09_g17: {discrep_sum_rel}%")
 
 
-# # Get totals
-# earthstats['f09_g17'] = xr.concat((earthstats['f09_g17'], earthstats['f09_g17'].sum(dim="crop").expand_dims(dim="crop")), dim="crop")
-# earthstats['f19_g17'] = xr.concat((earthstats['f19_g17'], earthstats['f19_g17'].sum(dim="crop").expand_dims(dim="crop")), dim="crop")
-
 print("Done importing FAO EarthStat.")
 
 
@@ -854,70 +850,5 @@ ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
 make_map(ax, this_map.mean(dim="time").sel(ivt_str="spring_wheat"), "spring wheat", bin_width, fontsize_ticklabels, fontsize_titles)
 ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
 make_map(ax, this_map.mean(dim="time").sel(ivt_str="irrigated_spring_wheat"), "irrigated spring wheat", bin_width, fontsize_ticklabels, fontsize_titles)
-
-
-# %% Import FAO Earthstat QUARTER DEGREE (gridded FAO data)
-
-earthstats = {}
-
-# Import high res
-earthstats['qd'] = xr.open_dataset('/Users/Shared/CESM_work/CropEvalData_ssr/FAO-EarthStatYields/EARTHSTATMIRCAUNFAOCropDataDeg025.nc')
-
-# Include just crops we care about
-cropList_fao_gd_all = ['Wheat', 'Maize', 'Rice', 'Barley', 'Rye', 'Millet', 'Sorghum', 'Soybeans', 'Sunflower', 'Potatoes', 'Cassava', 'Sugar cane', 'Sugar beet', 'Oil palm', 'Rape seed / Canola', 'Groundnuts / Peanuts', 'Pulses', 'Citrus', 'Date palm', 'Grapes / Vine', 'Cotton', 'Cocoa', 'Coffee', 'Others perennial', 'Fodder grasses', 'Others annual', 'Fibre crops', 'All crops']
-cropList_fao_gd = ["Maize", "Rice", "Cotton", "Soybeans", "Sugar cane", "Wheat"]
-earthstats['qd'] = earthstats['qd'].isel(crop=[cropList_fao_gd_all.index(x) for x in cropList_fao_gd]).assign_coords({'crop': cropList_combined_clm[:-1]})
-
-# Include just years we care about
-earthstats['qd'] = earthstats['qd'].isel(time=[i for i,x in enumerate(earthstats['qd'].time.values) if x.year in np.arange(y1,yN+1)])
-
-# Interpolate to lower res, starting with just variables that won't get messed up by the interpolation
-interp_lons = reses['f19_g17']['dsg'].lon.values
-interp_lats = reses['f19_g17']['dsg'].lat.values
-drop_vars = ['Area', 'HarvestArea', 'IrrigatedArea', 'PhysicalArea', 'RainfedArea', 'Production']
-earthstats['f19_g17'] = earthstats['qd']\
-   .drop(labels=drop_vars)\
-   .interp(lon=interp_lons, lat=interp_lats)
-   
-# Disallow negative interpolated values
-for v in earthstats['f19_g17']:
-   vals = earthstats['f19_g17'][v].values
-   vals[vals < 0] = 0
-   earthstats['f19_g17'][v] = xr.DataArray(data = vals,
-                                           coords = earthstats['f19_g17'][v].coords,
-                                           attrs = earthstats['f19_g17'][v].attrs)
-   
-# These are not exact, but it seems like:
-#    PhysicalArea = RainfedArea + IrrigatedArea (max diff ~51 ha, max rel diff ~0.01%)
-#    PhysicalFraction = RainfedFraction + IrrigatedFraction (max rel diff ~0.01%)
-#    Production = HarvestArea * Yield (max diff 4 tons, max rel diff ~0.000012%)
-# But!!!
-#    PhysicalArea ≠ Area * LandFraction * PhysicalFraction (max rel diff 100%)
-
-# %%Re-calculate variables that were dropped
-f19_g17_cellarea = reses['f19_g17']['dsg']['AREA']
-f19_g17_landarea = f19_g17_cellarea * earthstats['f19_g17']['LandFraction']
-f19_g17_croparea_ha = f19_g17_landarea * earthstats['f19_g17']['PhysicalFraction']*100
-recalc_ds = xr.Dataset(data_vars = \
-   {'Area': f19_g17_cellarea,
-    'PhysicalArea': f19_g17_croparea_ha,
-    'HarvestArea': f19_g17_croparea_ha * earthstats['f19_g17']['HarvestFraction'],
-    'IrrigatedArea': f19_g17_croparea_ha * earthstats['f19_g17']['IrrigatedFraction'],
-    'RainfedArea': f19_g17_croparea_ha * earthstats['f19_g17']['RainfedFraction'],
-    'Production': f19_g17_croparea_ha * earthstats['f19_g17']['HarvestFraction']*earthstats['f19_g17']['Yield']})
-for v in recalc_ds:
-   recalc_ds[v].attrs = earthstats['qd'].attrs
-   if recalc_ds[v].dims == ('lat', 'lon', 'crop', 'time'):
-      recalc_ds[v] = recalc_ds[v].transpose('crop', 'time', 'lat', 'lon')
-   discrep_sum_rel = 100*(np.nansum(recalc_ds[v].values) - np.nansum(earthstats['qd'][v].values)) / np.nansum(earthstats['qd'][v].values)
-   print(f"Discrepancy in {v} f19_g17 rel to qd: {discrep_sum_rel}%")
-earthstats['f19_g17'] = earthstats['f19_g17'].merge(recalc_ds)
-
-
-for v in earthstats['f19_g17']:
-   if "Area" in v or v == "Production":
-      continue
-   discrep_sum_rel = 100*(np.nanmean(earthstats['f19_g17'][v].values) - np.nanmean(earthstats['qd'][v].values)) / np.nanmean(earthstats['qd'][v].values)
-   print(f"Discrepancy in {v} f19_g17 rel to qd: {discrep_sum_rel}%")
 
 
