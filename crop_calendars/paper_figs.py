@@ -838,12 +838,38 @@ finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outD
 
 importlib.reload(utils)
 
-# this_var = 'GDDHARV'; suptitle = f'Mean harvest reqt {y1}-{yN-1}';  time_dim = "gs"; units="GDD"; multiplier = 1
-this_var = 'GRAIN_HARV_TOFOOD_ANN_GD'; suptitle = f'Mean annual yield {y1}-{yN}';  time_dim = "time"; units = "t/ha"; multiplier = 1e-6 * 1e4 # g/m2 to tons/ha
-# this_var = 'GSLEN'; suptitle = f'Mean growing season length {y1}-{yN-1}';  time_dim = "gs"; units="days"; multiplier = 1
-# this_var = 'HDATES'; suptitle = f'Mean harvest date {y1}-{yN-1}';  time_dim = "gs"; units="day of year"; multiplier = 1
-# this_var = 'HUI'; suptitle = f'Mean HUI accum {y1}-{yN-1}';  time_dim = "gs"; units="GDD"; multiplier = 1
-# this_var = 'SDATES'; suptitle = f'Mean sowing date {y1}-{yN-1}';  time_dim = "gs"; units="day of year"; multiplier = 1
+varList = {
+   'GDDHARV': {
+      'suptitle':   'Mean harvest reqt',
+      'time_dim':   'gs',
+      'units':      'GDD',
+      'multiplier': 1},
+   'GRAIN_HARV_TOFOOD_ANN_GD': {
+      'suptitle':   'Mean annual yield',
+      'time_dim':   'time',
+      'units':      't/ha',
+      'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
+   'GSLEN': {
+      'suptitle':   'Mean growing season length',
+      'time_dim':   'gs',
+      'units':      'days',
+      'multiplier': 1},
+   'HDATES': {
+      'suptitle':   'Mean harvest date',
+      'time_dim':   'gs',
+      'units':      'day of year',
+      'multiplier': 1},
+   'HUI': {
+      'suptitle':   'Mean HUI accum',
+      'time_dim':   'gs',
+      'units':      'GDD',
+      'multiplier': 1},
+   'SDATES': {
+      'suptitle':   'Mean sowing date',
+      'time_dim':   'gs',
+      'units':      'day of year',
+      'multiplier': 1},
+}
 
 nx = 2
 fontsize_titles = 18
@@ -851,132 +877,145 @@ fontsize_axislabels = 15
 fontsize_ticklabels = 15
 dpi = 150
 
-# First, determine how many cases have this variable
-ny = 0
-for i, (casename, case) in enumerate(cases.items()):
-   if this_var in case['ds']:
-      ny += 1
-if ny == 1:
-   figsize = (24, 7.5)    # width, height
-   suptitle_ypos = 0.85
-elif ny == 2:
-   figsize = (18, 11.25)    # width, height
-   suptitle_ypos = 0.95
-elif ny == 3:
-   figsize = (14, 10)    # width, height
-   suptitle_ypos = 1
-   # cbar_pos = [0.2, 0.05, 0.6, 0.025]  # left edge, bottom edge, width, height
-   cbar_pos = [0.2, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
-   new_sp_bottom = 0.11 # default: 0.1
-   # new_sp_left = 0.23   # default: 0.125
-   new_sp_left = 0.125
-else:
-   raise ValueError(f"Set up for ny = {ny}")
+for (this_var, var_info) in varList.items():
+   
+   if var_info['time_dim'] == "time":
+      yrange_str = f'{y1}-{yN}'
+   else:
+      yrange_str = f'{y1}-{yN-1} gs'
+   suptitle = var_info['suptitle'] + f' ({yrange_str})'
+   
+   print(f'Mapping {this_var}...')
 
-# Get all crops we care about
-clm_types_main = [x.lower().replace('wheat','spring_wheat') for x in cropList_combined_clm[:-1]]
-clm_types_rfir = []
-for x in clm_types_main:
-   for y in cases[list(cases.keys())[0]]['ds'].vegtype_str.values:
-      if x in y:
-         clm_types_rfir.append(y)
-clm_types = np.unique([x.replace('irrigated_', '') for x in clm_types_rfir])
-
-
-
-for thisCrop_main in clm_types:
-   c = -1
-   fig = plt.figure(figsize=figsize)
-   ims = []
-   axes = []
-   cbs = []
-   fig_caselist = []
+   # First, determine how many cases have this variable
+   ny = 0
    for i, (casename, case) in enumerate(cases.items()):
+      if this_var in case['ds']:
+         ny += 1
+   if ny == 1:
+      print("WARNING: Check that the layout looks good for ny == 1")
+      figsize = (24, 7.5)    # width, height
+      suptitle_ypos = 0.85
+   elif ny == 2:
+      figsize = (12, 7)    # width, height
+      suptitle_ypos = 1
+      cbar_pos = [0.17, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
+      new_sp_bottom = 0.11
+      new_sp_left = None
+   elif ny == 3:
+      figsize = (14, 10)    # width, height
+      suptitle_ypos = 1
+      cbar_pos = [0.2, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
+      new_sp_bottom = 0.11 # default: 0.1
+      new_sp_left = 0.125
+   else:
+      raise ValueError(f"Set up for ny = {ny}")
 
-      this_ds = case['ds']
-      if this_var not in case['ds']:
-         continue
-      c += 1
-      fig_caselist += [casename]
-      this_map = this_ds[this_var]
-      
-      found_types = [x for x in this_ds.vegtype_str.values if thisCrop_main in x]
+   # Get all crops we care about
+   clm_types_main = [x.lower().replace('wheat','spring_wheat') for x in cropList_combined_clm[:-1]]
+   clm_types_rfir = []
+   for x in clm_types_main:
+      for y in cases[list(cases.keys())[0]]['ds'].vegtype_str.values:
+         if x in y:
+            clm_types_rfir.append(y)
+   clm_types = np.unique([x.replace('irrigated_', '') for x in clm_types_rfir])
 
-      # Grid, if needed
-      if "lon" not in this_map.dims:
-         this_map = utils.grid_one_variable(this_ds, this_var, vegtype=found_types)
+   for thisCrop_main in clm_types:
+      print(f'   {thisCrop_main}...')
+      c = -1
+      fig = plt.figure(figsize=figsize)
+      ims = []
+      axes = []
+      cbs = []
+      fig_caselist = []
+      for i, (casename, case) in enumerate(cases.items()):
+
+         this_ds = case['ds']
+         if this_var not in case['ds']:
+            continue
+         c += 1
+         fig_caselist += [casename]
+         this_map = this_ds[this_var]
          
-      # Get mean, set colormap
-      if units == "day of year":
-         ar = stats.circmean(this_map, high=365, low=1, axis=this_map.dims.index(time_dim), nan_policy='omit')
-         dummy_map = this_map.isel({time_dim: 0}, drop=True)
-         this_map = xr.DataArray(data = ar,
-                                 coords = dummy_map.coords,
-                                 attrs = dummy_map.attrs)
-         cmap = 'twilight'
-         vrange = [1, 365]
-      else:
-         this_map = this_map.mean(dim=time_dim)
-         cmap = 'viridis'
-         vrange = None
-      
-      rainfed_types = [x for x in found_types if "irrigated" not in x]
-      ax = fig.add_subplot(ny,nx,nx*c+1,projection=ccrs.PlateCarree(), ylabel="mirntnt")
-      axes.append(ax)
+         found_types = [x for x in this_ds.vegtype_str.values if thisCrop_main in x]
+
+         # Grid, if needed
+         if "lon" not in this_map.dims:
+            this_map = utils.grid_one_variable(this_ds, this_var, vegtype=found_types)
+            
+         # Get mean, set colormap
+         if var_info['units'] == "day of year":
+            ar = stats.circmean(this_map, high=365, low=1, axis=this_map.dims.index(var_info['time_dim']), nan_policy='omit')
+            dummy_map = this_map.isel({var_info['time_dim']: 0}, drop=True)
+            this_map = xr.DataArray(data = ar,
+                                    coords = dummy_map.coords,
+                                    attrs = dummy_map.attrs)
+            cmap = 'twilight'
+            vrange = [1, 365]
+         else:
+            this_map = this_map.mean(dim=var_info['time_dim'])
+            cmap = 'viridis'
+            vrange = None
+         
+         rainfed_types = [x for x in found_types if "irrigated" not in x]
+         ax = fig.add_subplot(ny,nx,nx*c+1,projection=ccrs.PlateCarree(), ylabel="mirntnt")
+         axes.append(ax)
+         thisCrop = thisCrop_main
+         im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize_ticklabels, fontsize_titles, multiplier=var_info['multiplier'], units=var_info['units'], cmap=cmap, vrange=vrange, linewidth=0.5)
+         ims.append(im)
+         cbs.append(cb)
+
+         irrigated_types = [x for x in found_types if "irrigated" in x]
+         ax = fig.add_subplot(ny,nx,nx*c+2,projection=ccrs.PlateCarree())
+         axes.append(ax)
+         thisCrop = "irrigated_" + thisCrop_main
+         im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize_ticklabels, fontsize_titles, multiplier=var_info['multiplier'], units=var_info['units'], cmap=cmap, vrange=vrange, linewidth=0.5)
+         ims.append(im)
+         cbs.append(cb)
+
+      if not vrange:
+         equalize_colorbars(ims)
+
+      fig.suptitle(suptitle,
+                  x = 0.55,
+                  y = suptitle_ypos,
+                  fontsize = 24)
+
+      # Add row labels
+      leftmost = np.arange(0, nx*ny, nx)
+      for a, ax in enumerate(axes):
+         if a not in leftmost:
+            nearest_leftmost = np.max(leftmost[leftmost < a])
+            axes[a].sharey(axes[nearest_leftmost])
+      for i, a in enumerate(leftmost):
+         axes[a].set_ylabel(fig_caselist[i], fontsize=fontsize_titles)
+         axes[a].yaxis.set_label_coords(-0.05, 0.5)
+
+      # Add column labels
       thisCrop = thisCrop_main
-      im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize_ticklabels, fontsize_titles, multiplier=multiplier, units=units, cmap=cmap, vrange=vrange, linewidth=0.5)
-      ims.append(im)
-      cbs.append(cb)
+      if "soybean" in thisCrop and "tropical" not in thisCrop:
+         thisCrop = thisCrop.replace("soy", "temperate_soy")
+      topmost = np.arange(nx)
+      column_labels = ['rainfed', 'irrigated']
+      for a, ax in enumerate(axes):
+         if a not in topmost:
+            nearest_topmost = a % nx
+            axes[a].sharex(axes[nearest_topmost])
+      for i, a in enumerate(topmost):
+         axes[a].set_title(f"{thisCrop} ({column_labels[i]})",
+                           fontsize=fontsize_titles,
+                           y=1.1)
+      
+      cbar_ax = fig.add_axes(cbar_pos)
+      fig.tight_layout()
+      cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=var_info['units'])
+      cb.ax.tick_params(labelsize=fontsize_ticklabels)
+      cb.set_label(var_info['units'], fontsize=fontsize_titles)
+      
+      plt.subplots_adjust(bottom=new_sp_bottom, left=new_sp_left)
 
-      irrigated_types = [x for x in found_types if "irrigated" in x]
-      ax = fig.add_subplot(ny,nx,nx*c+2,projection=ccrs.PlateCarree())
-      axes.append(ax)
-      thisCrop = "irrigated_" + thisCrop_main
-      im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize_ticklabels, fontsize_titles, multiplier=multiplier, units=units, cmap=cmap, vrange=vrange, linewidth=0.5)
-      ims.append(im)
-      cbs.append(cb)
-
-   if not vrange:
-      equalize_colorbars(ims)
-
-   fig.suptitle(suptitle,
-                x = 0.55,
-                y = suptitle_ypos,
-                fontsize = 24) ;
-
-   # Add row labels
-   leftmost = np.arange(0, nx*ny, nx)
-   for a, ax in enumerate(axes):
-      if a not in leftmost:
-         nearest_leftmost = np.max(leftmost[leftmost < a])
-         axes[a].sharey(axes[nearest_leftmost])
-   for i, a in enumerate(leftmost):
-      axes[a].set_ylabel(fig_caselist[i], fontsize=fontsize_titles)
-      axes[a].yaxis.set_label_coords(-0.05, 0.5)
+      fig.savefig(outDir_figs + "Map " + suptitle + f" {thisCrop}.png",
+                  bbox_inches='tight', facecolor='white', dpi=dpi)
+      plt.close()
    
-   # Add column labels
-   thisCrop = thisCrop_main
-   if "soybean" in thisCrop and "tropical" not in thisCrop:
-      thisCrop = thisCrop.replace("soy", "temperate_soy")
-   topmost = np.arange(nx)
-   column_labels = ['rainfed', 'irrigated']
-   for a, ax in enumerate(axes):
-      if a not in topmost:
-         nearest_topmost = a % nx
-         axes[a].sharex(axes[nearest_topmost])
-   for i, a in enumerate(topmost):
-      axes[a].set_title(f"{thisCrop} ({column_labels[i]})",
-                        fontsize=fontsize_titles,
-                        y=1.1)
-   
-   cbar_ax = fig.add_axes(cbar_pos)
-   fig.tight_layout()
-   cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=units)
-   cb.ax.tick_params(labelsize=fontsize_ticklabels)
-   cb.set_label(units, fontsize=fontsize_titles)
-   
-   plt.subplots_adjust(bottom=new_sp_bottom, left=new_sp_left)
-   
-   fig.savefig(outDir_figs + "Map " + suptitle + f" {thisCrop}.png",
-               bbox_inches='tight', facecolor='white', dpi=dpi)
-   
+print('Done making maps.')
