@@ -285,22 +285,22 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    return this_ds_gs
 
 
-def make_map(ax, this_map, fontsize_ticklabels, fontsize_titles, multiplier=1.0, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False): 
+def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False): 
    im = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
-                       this_map*multiplier, shading="auto",
+                       this_map, shading="auto",
                        cmap=cmap)
    if vrange:
       im.set_clim(vrange[0], vrange[1])
    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
    ax.coastlines(linewidth=linewidth)
    if this_title:
-      ax.set_title(this_title, fontsize=fontsize_titles)
+      ax.set_title(this_title, fontsize=fontsize['titles'])
    if show_cbar:
       cbar = plt.colorbar(im, orientation="horizontal", fraction=0.1, pad=0.02)
-      cbar.set_label(label=units, fontsize=fontsize_ticklabels)
-      cbar.ax.tick_params(labelsize=fontsize_ticklabels)
+      cbar.set_label(label=units, fontsize=fontsize['axislabels'])
+      cbar.ax.tick_params(labelsize=fontsize['ticklabels'])
     
-   def set_ticks(lonlat_bin_width, fontsize_ticklabels, x_or_y):
+   def set_ticks(lonlat_bin_width, fontsize, x_or_y):
       
       if x_or_y == "x":
          ticks = np.arange(-180, 181, lonlat_bin_width)
@@ -314,17 +314,17 @@ def make_map(ax, this_map, fontsize_ticklabels, fontsize_titles, multiplier=1.0,
       
       if x_or_y == "x":
          plt.xticks(ticks, labels=ticklabels,
-                     fontsize=fontsize_ticklabels)
+                     fontsize=fontsize['ticklabels'])
       else:
          plt.yticks(ticks, labels=ticklabels,
-                     fontsize=fontsize_ticklabels)
+                     fontsize=fontsize['ticklabels'])
    
    if lonlat_bin_width:
-      set_ticks(lonlat_bin_width, fontsize_ticklabels, "y")
-      # set_ticks(lonlat_bin_width, fontsize_ticklabels, "x")
+      set_ticks(lonlat_bin_width, fontsize, "y")
+      # set_ticks(lonlat_bin_width, fontsize, "x")
    else:
       # Need to do this for subplot row labels
-      set_ticks(-1, fontsize_ticklabels, "y")
+      set_ticks(-1, fontsize, "y")
       plt.yticks([])
    for x in ax.spines:
       ax.spines[x].set_visible(False)
@@ -836,7 +836,9 @@ finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outD
 
 # %% Make maps of individual crops (rainfed, irrigated)
 
-importlib.reload(utils)
+# Define reference case, if you want to plot differences
+# ref_case = None
+ref_casename = 'ctsm5.1.dev092'
 
 varList = {
    'GDDHARV': {
@@ -872,10 +874,19 @@ varList = {
 }
 
 nx = 2
-fontsize_titles = 18
-fontsize_axislabels = 15
-fontsize_ticklabels = 15
 dpi = 150
+
+fontsize = {}
+if ref_casename:
+   fontsize['titles'] = 14
+   fontsize['axislabels'] = 12
+   fontsize['ticklabels'] = 8
+   fontsize['suptitle'] = 16
+else:
+   fontsize['titles'] = 18
+   fontsize['axislabels'] = 15
+   fontsize['ticklabels'] = 15
+   fontsize['suptitle'] = 24
 
 for (this_var, var_info) in varList.items():
    
@@ -889,21 +900,42 @@ for (this_var, var_info) in varList.items():
 
    # First, determine how many cases have this variable
    ny = 0
+   fig_caselist = []
    for i, (casename, case) in enumerate(cases.items()):
-      if this_var in case['ds']:
+      if ref_casename and cases[ref_casename]['res'] != case['res']:
+         # Not bothering with regridding (for now?)
+         pass
+      elif this_var in case['ds']:
          ny += 1
+         fig_caselist += [casename]
+      elif casename == ref_casename:
+         raise RuntimeError(f'ref_case {ref_casename} is missing {this_var}')
+   
+   # Rearrange caselist for this figure so that reference case is first
+   if ref_casename:
+      if len(fig_caselist) <= 1:
+         raise RuntimeError(f"Only ref case {ref_casename} has {this_var}")
+      fig_caselist = [ref_casename] + [x for x in fig_caselist if x != ref_casename]
+   
+   # Now set some figure parameters based on # cases
    if ny == 1:
       print("WARNING: Check that the layout looks good for ny == 1")
       figsize = (24, 7.5)    # width, height
       suptitle_ypos = 0.85
    elif ny == 2:
       figsize = (12, 7)    # width, height
-      suptitle_ypos = 1
+      if ref_casename:
+         suptitle_xpos = 0.515
+         suptitle_ypos = 0.95
+      else:
+         suptitle_xpos = 0.55
+         suptitle_ypos = 1
       cbar_pos = [0.17, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
       new_sp_bottom = 0.11
       new_sp_left = None
    elif ny == 3:
       figsize = (14, 10)    # width, height
+      suptitle_xpos = 0.55
       suptitle_ypos = 1
       cbar_pos = [0.2, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
       new_sp_bottom = 0.11 # default: 0.1
@@ -927,14 +959,19 @@ for (this_var, var_info) in varList.items():
       ims = []
       axes = []
       cbs = []
-      fig_caselist = []
-      for i, (casename, case) in enumerate(cases.items()):
+      for i, casename in enumerate(fig_caselist):
 
+         case = cases[casename]
          this_ds = case['ds']
          if this_var not in case['ds']:
             continue
+         elif ref_casename and cases[ref_casename]['res'] != case['res']:
+            # Not bothering with regridding (for now?)
+            continue
          c += 1
-         fig_caselist += [casename]
+         
+         plotting_diffs = ref_casename and casename != ref_casename
+         
          this_map = this_ds[this_var]
          
          found_types = [x for x in this_ds.vegtype_str.values if thisCrop_main in x]
@@ -944,24 +981,51 @@ for (this_var, var_info) in varList.items():
             this_map = utils.grid_one_variable(this_ds, this_var, vegtype=found_types)
             
          # Get mean, set colormap
-         if var_info['units'] == "day of year":
+         units = var_info['units']
+         if units == "day of year":
             ar = stats.circmean(this_map, high=365, low=1, axis=this_map.dims.index(var_info['time_dim']), nan_policy='omit')
             dummy_map = this_map.isel({var_info['time_dim']: 0}, drop=True)
             this_map = xr.DataArray(data = ar,
                                     coords = dummy_map.coords,
                                     attrs = dummy_map.attrs)
-            cmap = 'twilight'
-            vrange = [1, 365]
+            if plotting_diffs:
+               this_map_vals = (this_map - refcase_map).values
+               this_map_vals[this_map_vals > 365/2] -= 365
+               this_map = xr.DataArray(data = this_map_vals,
+                                       coords = this_map.coords,
+                                       attrs = this_map.attrs)
+               cmap = 'RdBu'
+               vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
+               units = "days"
+            else:
+               cmap = 'twilight'
+               vrange = [1, 365]
          else:
             this_map = this_map.mean(dim=var_info['time_dim'])
-            cmap = 'viridis'
-            vrange = None
+            this_map *= var_info['multiplier']
+            if plotting_diffs:
+               this_map = this_map - refcase_map
+               cmap = 'RdBu'
+               vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
+            else:
+               cmap = 'viridis'
+               vrange = None
+         
+         if casename == ref_casename:
+            refcase_map = this_map.copy()
+            
+         cbar_units = units
+         if plotting_diffs:
+            cbar_units = f"Diff. from {ref_casename} ({units})"
+            if not np.any(np.abs(this_map) > 0):
+               print(f'      {casename} identical to {ref_casename}!')
+               cbar_units += ": None!"
          
          rainfed_types = [x for x in found_types if "irrigated" not in x]
          ax = fig.add_subplot(ny,nx,nx*c+1,projection=ccrs.PlateCarree(), ylabel="mirntnt")
          axes.append(ax)
          thisCrop = thisCrop_main
-         im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize_ticklabels, fontsize_titles, multiplier=var_info['multiplier'], units=var_info['units'], cmap=cmap, vrange=vrange, linewidth=0.5)
+         im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize, units=cbar_units, cmap=cmap, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename))
          ims.append(im)
          cbs.append(cb)
 
@@ -969,17 +1033,20 @@ for (this_var, var_info) in varList.items():
          ax = fig.add_subplot(ny,nx,nx*c+2,projection=ccrs.PlateCarree())
          axes.append(ax)
          thisCrop = "irrigated_" + thisCrop_main
-         im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize_ticklabels, fontsize_titles, multiplier=var_info['multiplier'], units=var_info['units'], cmap=cmap, vrange=vrange, linewidth=0.5)
+         im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize, units=cbar_units, cmap=cmap, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename))
          ims.append(im)
          cbs.append(cb)
 
-      if not vrange:
+      if ref_casename:
+         equalize_colorbars(ims[:nx])
+         equalize_colorbars(ims[nx:])
+      elif not vrange:
          equalize_colorbars(ims)
 
       fig.suptitle(suptitle,
-                  x = 0.55,
+                  x = suptitle_xpos,
                   y = suptitle_ypos,
-                  fontsize = 24)
+                  fontsize = fontsize['suptitle'])
 
       # Add row labels
       leftmost = np.arange(0, nx*ny, nx)
@@ -988,7 +1055,7 @@ for (this_var, var_info) in varList.items():
             nearest_leftmost = np.max(leftmost[leftmost < a])
             axes[a].sharey(axes[nearest_leftmost])
       for i, a in enumerate(leftmost):
-         axes[a].set_ylabel(fig_caselist[i], fontsize=fontsize_titles)
+         axes[a].set_ylabel(fig_caselist[i], fontsize=fontsize['titles'])
          axes[a].yaxis.set_label_coords(-0.05, 0.5)
 
       # Add column labels
@@ -1003,18 +1070,22 @@ for (this_var, var_info) in varList.items():
             axes[a].sharex(axes[nearest_topmost])
       for i, a in enumerate(topmost):
          axes[a].set_title(f"{thisCrop} ({column_labels[i]})",
-                           fontsize=fontsize_titles,
+                           fontsize=fontsize['titles'],
                            y=1.1)
       
-      cbar_ax = fig.add_axes(cbar_pos)
-      fig.tight_layout()
-      cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=var_info['units'])
-      cb.ax.tick_params(labelsize=fontsize_ticklabels)
-      cb.set_label(var_info['units'], fontsize=fontsize_titles)
+      if not ref_casename:
+         cbar_ax = fig.add_axes(cbar_pos)
+         fig.tight_layout()
+         cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=units)
+         cb.ax.tick_params(labelsize=fontsize['ticklabels'])
+         cb.set_label(units, fontsize=fontsize['titles'])
       
       plt.subplots_adjust(bottom=new_sp_bottom, left=new_sp_left)
-
-      fig.savefig(outDir_figs + "Map " + suptitle + f" {thisCrop}.png",
+      
+      diff_txt = ""
+      if ref_casename:
+         diff_txt = f" Diff {ref_casename}"
+      fig.savefig(outDir_figs + "Map " + suptitle + diff_txt + f" {thisCrop}.png",
                   bbox_inches='tight', facecolor='white', dpi=dpi)
       plt.close()
    
