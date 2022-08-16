@@ -831,16 +831,6 @@ finishup_allcrops_plot(c, ny, nx, axes_prod, f_prod, "Global crop production", o
 finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outDir_figs)   
 
 
-
-
-
-# %%
-
-gridded = utils.grid_one_variable(this_ds, "GRAINC_TO_FOOD_ANN")
-this_map = gridded.mean(dim="time").sel(ivt_str="spring_wheat")
-this_map.squeeze() + lu_ds.PFTDATA_MASK
-
-
 # %% Make maps of individual crops (rainfed, irrigated)
 
 importlib.reload(utils)
