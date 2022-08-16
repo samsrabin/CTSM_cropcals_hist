@@ -7,8 +7,19 @@ yN = 2009 # 2009
 # Save map figures to files?
 save_figs = True
 
-# Your path to ctsm_py directory (i.e., where utils.py lives)
-my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
+# Where is the script running?
+import socket
+hostname = socket.gethostname()
+
+# Import the CTSM Python utilities
+if hostname == "Sams-2021-MacBook-Pro.local":
+    my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
+    import sys
+    sys.path.append(my_ctsm_python_gallery)
+    import utils
+else:
+    # Only possible because I have export PYTHONPATH=$HOME in my .bash_profile
+    from ctsm_python_gallery_myfork.ctsm_py import utils
 
 # Directory where input file(s) can be found (figure files will be saved in subdir here)
 # indir = "/Users/Shared/CESM_runs/f10_f10_mg37_1850/"
@@ -17,10 +28,20 @@ my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myf
 # indir = "/Users/Shared/CESM_runs/f10_f10_mg37/2022-03-30/"
 # indir = "/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220601"
 # indir = "/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220601.02.72441c4e"
-indir = "/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220601.03.ba902039"
+# indir = "/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220601.03.ba902039"
+indir = "/glade/scratch/samrabin/archive/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1950-2013.ggcmi2/lnd/hist"
+
+#sdate_inFile = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
+#hdate_inFile = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.20220602_230029.nc"
+sdate_inFile = "/glade/u/home/samrabin/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
+hdate_inFile = "/glade/u/home/samrabin/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
 
 # Directory to save output netCDF
-outdir = "/Users/Shared/CESM_work/crop_dates/"
+import os
+if hostname == "Sams-2021-MacBook-Pro.local":
+    outdir = "/Users/Shared/CESM_work/crop_dates/"
+else:
+    outdir = "/glade/u/home/samrabin/crop_dates/"
 if save_figs:
     outdir_figs = indir + "figs/"
     if not os.path.exists(outdir_figs):
@@ -35,12 +56,6 @@ import cftime
 import cartopy.crs as ccrs
 from matplotlib import cm
 import datetime as dt
-
-import os
-
-import sys
-sys.path.append(my_ctsm_python_gallery)
-import utils
 
 import warnings
 warnings.filterwarnings("ignore", message="__len__ for multi-part geometries is deprecated and will be removed in Shapely 2.0. Check the length of the `geoms` property instead to get the  number of parts of a multi-part geometry.")
@@ -79,6 +94,7 @@ def thisCrop_map_to_patches(lon_points, lat_points, map_ds, vegtype_int):
 
 
 # %% Import output sowing and harvest dates
+print("Import output sowing and harvest dates...")
 
 # Keep 1 extra year to avoid incomplete final growing season for crops harvested after Dec. 31.
 y1_import_str = f"{y1+1}-01-01"
@@ -108,6 +124,7 @@ patchList = dates_ds.patch.values
 # %%
 # Check that, during period of interest, simulated harvest always happens the day before sowing
 # Could vectorize this, but it gets complicated because some cells are sown Jan. 1 and some aren't.
+print("Checking...")
 verbose = True
 
 ok_p = np.full((dates_ds.dims["patch"]), True)
@@ -181,13 +198,14 @@ else:
 
 
 # %% Import expected sowing dates. This will be used as our template output file.
+print("Importing expected sowing dates...")
 
-sdate_inFile = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
 
 sdates_rx = import_rx_dates("s", sdate_inFile, dates_ds)
 
 
 # %% Check that input and output sdates match
+print("Checking that input and output sdates match...")
 
 sdates_grid = utils.grid_one_variable(\
     dates_ds, 
@@ -237,9 +255,8 @@ if all_ok:
 
 
 # %% Import prescribed harvest dates
+print("Importing prescribed harvest dates...")
 
-# hdate_inFile = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
-hdate_inFile = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.20220602_230029.nc"
 
 hdates_rx = import_rx_dates("h", hdate_inFile, dates_ds)
 
@@ -271,6 +288,7 @@ if not np.any(h1_ds[clm_gdd_var].values != 0):
 
 
 # %% Get mean GDDs in GGCMI growing season
+print("Getting mean GDDs in GGCMI growing season...")
 
 import cftime
 
@@ -417,6 +435,7 @@ for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
         gddharv_maps_ds[thisVar] = gddharv_gridded
     
 # Add dummy variables for crops not actually simulated
+print("Adding dummy variables...")
 # Unnecessary?
 template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
 all_vars = [v.replace("sdate","gdd") for v in template_ds if "sdate" in v]
@@ -616,6 +635,7 @@ if save_figs:
     
 
 # %% Check that all cells that had sdates are represented
+print("Checking that all cells that had sdates are represented...")
 
 all_ok = True
 for vt_str in vegtypes_included:
@@ -646,6 +666,7 @@ else:
 
 
 # %% Save to netCDF
+print("Saving...")
 
 # Get output file path
 if not os.path.exists(outdir):
@@ -679,6 +700,8 @@ def save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx):
 
 save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx)
 save_gdds(sdate_inFile, hdate_inFile, outfile_fill0, gdd_fill0_maps_ds, sdates_rx)
+
+print("All done!")
 
 
 # %% Misc.
