@@ -284,7 +284,7 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    return this_ds_gs
 
 
-def make_map(ax, this_map, this_title, fontsize_ticklabels, fontsize_titles, multiplier=1.0, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0): 
+def make_map(ax, this_map, fontsize_ticklabels, fontsize_titles, multiplier=1.0, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None): 
    im = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
                        this_map*multiplier, shading="auto",
                        cmap=cmap)
@@ -292,21 +292,40 @@ def make_map(ax, this_map, this_title, fontsize_ticklabels, fontsize_titles, mul
       im.set_clim(vrange[0], vrange[1])
    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
    ax.coastlines(linewidth=linewidth)
-   ax.set_title(this_title, fontsize=fontsize_titles)
+   if this_title:
+      ax.set_title(this_title, fontsize=fontsize_titles)
    cbar = plt.colorbar(im, orientation="horizontal", fraction=0.1, pad=0.02)
    cbar.set_label(label=units, fontsize=fontsize_ticklabels)
    cbar.ax.tick_params(labelsize=fontsize_ticklabels)
     
-   if lonlat_bin_width:
-      ticks = np.arange(-60, 91, lonlat_bin_width)
+   def set_ticks(lonlat_bin_width, fontsize_ticklabels, x_or_y):
+      
+      if x_or_y == "x":
+         ticks = np.arange(-180, 181, lonlat_bin_width)
+      else:
+         ticks = np.arange(-60, 91, lonlat_bin_width)
+         
       ticklabels = [str(x) for x in ticks]
       for i,x in enumerate(ticks):
          if x%2:
                ticklabels[i] = ''
-      plt.yticks(np.arange(-60,91,15), labels=ticklabels,
-                  fontsize=fontsize_ticklabels)
+      
+      if x_or_y == "x":
+         plt.xticks(ticks, labels=ticklabels,
+                     fontsize=fontsize_ticklabels)
+      else:
+         plt.yticks(ticks, labels=ticklabels,
+                     fontsize=fontsize_ticklabels)
+   
+   if lonlat_bin_width:
+      set_ticks(lonlat_bin_width, fontsize_ticklabels, "y")
+      # set_ticks(lonlat_bin_width, fontsize_ticklabels, "x")
    else:
-      plt.axis('off')
+      # Need to do this for subplot row labels
+      set_ticks(-1, fontsize_ticklabels, "y")
+      plt.yticks([])
+   for x in ax.spines:
+      ax.spines[x].set_visible(False)
       
    return im, cbar
 
@@ -461,8 +480,10 @@ cases['mycode_clmcals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cr
 myVars = ['GRAINC_TO_FOOD_PERHARV', 'GRAINC_TO_FOOD_ANN', 'SDATES', 'SDATES_PERHARV', 'SYEARS_PERHARV', 'HDATES', 'HYEARS', 'GDDHARV_PERHARV', 'GDDACCUM_PERHARV', 'HUI_PERHARV', 'SOWING_REASON_PERHARV', 'HARVEST_REASON_PERHARV']
 
 verbose_import = False
+caselist = []
 for i, (casename, case) in enumerate(cases.items()):
    print(f"Importing {casename}...")
+   caselist.append(casename)
    
    if casename == 'cmip6_i.e21.IHIST.f09_g17':
       cmip6_dir = "/Users/Shared/CESM_work/CropEvalData_ssr/danica_timeseries-cmip6_i.e21.IHIST.f09_g17/month_1/"
@@ -691,11 +712,11 @@ axes_prod = axes_prod.flatten()
 f_yield, axes_yield = plt.subplots(ny, nx, figsize=figsize)
 axes_yield = axes_yield.flatten()
 
-caselist = ["FAOSTAT"]
+fig_caselist = ["FAOSTAT"]
 this_earthstat_res = "f09_g17"
-caselist += [f"FAO EarthStat ({this_earthstat_res})"]
+fig_caselist += [f"FAO EarthStat ({this_earthstat_res})"]
 for (casename, case) in cases.items():
-   caselist.append(casename)
+   fig_caselist.append(casename)
    
 def make_1crop_plot(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN):
    da = xr.DataArray(data = ydata_this,
@@ -717,9 +738,9 @@ def finishup_allcrops_plot(c, ny, nx, axes_this, f_this, suptitle, outDir_figs):
                    fontsize=24)
    
    f_this.legend(handles = axes_this[0].lines,
-                 labels = caselist,
+                 labels = fig_caselist,
                  loc = "upper center",
-                 ncol = int(np.floor(len(caselist)/4))+1)
+                 ncol = int(np.floor(len(fig_caselist)/4))+1)
 
    f_this.savefig(outDir_figs + suptitle + " by crop.pdf",
                   bbox_inches='tight')
@@ -800,9 +821,9 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
    ydata_yield = ydata_prod / ydata_area
    
    # Make plots for this crop
-   make_1crop_plot(ax_area, ydata_area, caselist, thisCrop_clm, "Mha", y1, yN)
-   make_1crop_plot(ax_prod, ydata_prod, caselist, thisCrop_clm, "Mt", y1, yN)
-   make_1crop_plot(ax_yield, ydata_yield, caselist, thisCrop_clm, "t/ha", y1, yN)
+   make_1crop_plot(ax_area, ydata_area, fig_caselist, thisCrop_clm, "Mha", y1, yN)
+   make_1crop_plot(ax_prod, ydata_prod, fig_caselist, thisCrop_clm, "Mt", y1, yN)
+   make_1crop_plot(ax_yield, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", y1, yN)
    
 # Finish up and save
 finishup_allcrops_plot(c, ny, nx, axes_area, f_area, "Global crop area", outDir_figs)
@@ -869,12 +890,14 @@ for thisCrop_main in clm_types:
    ims = []
    axes = []
    cbs = []
+   fig_caselist = []
    for i, (casename, case) in enumerate(cases.items()):
 
       this_ds = case['ds']
       if this_var not in case['ds']:
          continue
       c += 1
+      fig_caselist += [casename]
       this_map = this_ds[this_var]
       
       found_types = [x for x in this_ds.vegtype_str.values if thisCrop_main in x]
@@ -919,6 +942,25 @@ for thisCrop_main in clm_types:
    fig.suptitle(suptitle,
                y = suptitle_ypos,
                fontsize = 24) ;
+
+   # Add row labels
+   leftmost = np.arange(0, nx*ny, nx)
+   for a, ax in enumerate(axes):
+      if a not in leftmost:
+         nearest_leftmost = np.max(leftmost[leftmost < a])
+         axes[a].sharey(axes[nearest_leftmost])
+   for i, a in enumerate(leftmost):
+      axes[a].set_ylabel(fig_caselist[i], fontsize=fontsize_axislabels)
+   
+   # Add column labels
+   topmost = np.arange(nx)
+   column_labels = ['rainfed', 'irrigated']
+   for a, ax in enumerate(axes):
+      if a not in topmost:
+         nearest_topmost = a % nx
+         axes[a].sharex(axes[nearest_topmost])
+   for i, a in enumerate(topmost):
+      axes[a].set_title(f"{thisCrop_main} ({column_labels[i]})", fontsize=fontsize_axislabels)
    
    fig.savefig(outDir_figs + "Map " + suptitle + f" {thisCrop_main}.png",
                bbox_inches='tight', facecolor='white', dpi=dpi)
