@@ -284,14 +284,14 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    return this_ds_gs
 
 
-def make_map(ax, this_map, this_title, fontsize_ticklabels, fontsize_titles, multiplier=1.0, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None): 
+def make_map(ax, this_map, this_title, fontsize_ticklabels, fontsize_titles, multiplier=1.0, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0): 
    im = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
                        this_map*multiplier, shading="auto",
                        cmap=cmap)
    if vrange:
       im.set_clim(vrange[0], vrange[1])
    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
-   ax.coastlines()
+   ax.coastlines(linewidth=linewidth)
    ax.set_title(this_title, fontsize=fontsize_titles)
    cbar = plt.colorbar(im, orientation="horizontal", fraction=0.1, pad=0.02)
    cbar.set_label(label=units, fontsize=fontsize_ticklabels)
@@ -822,64 +822,87 @@ this_map.squeeze() + lu_ds.PFTDATA_MASK
 
 # %% Make maps of individual crops (rainfed, irrigated)
 
+importlib.reload(utils)
+
 # this_var = 'GDDHARV'; suptitle = f'Mean harvest reqt {y1}-{yN-1}';  time_dim = "gs"; units="GDD"; multiplier = 1
-# this_var = 'GRAIN_HARV_TOFOOD_ANN_GD'; suptitle = f'Mean annual yield {y1}-{yN}';  time_dim = "time"; units = "t/ha", multiplier = 1e-6 * 1e4 # g/m2 to tons/ha
+# this_var = 'GRAIN_HARV_TOFOOD_ANN_GD'; suptitle = f'Mean annual yield {y1}-{yN}';  time_dim = "time"; units = "t/ha"; multiplier = 1e-6 * 1e4 # g/m2 to tons/ha
 # this_var = 'GSLEN'; suptitle = f'Mean growing season length {y1}-{yN-1}';  time_dim = "gs"; units="days"; multiplier = 1
-# this_var = 'HDATES'; suptitle = f'Mean harvest date {y1}-{yN-1}';  time_dim = "gs"; units="day of year"; multiplier = 1
+this_var = 'HDATES'; suptitle = f'Mean harvest date {y1}-{yN-1}';  time_dim = "gs"; units="day of year"; multiplier = 1
+# this_var = 'HUI'; suptitle = f'Mean HUI accum {y1}-{yN-1}';  time_dim = "gs"; units="GDD"; multiplier = 1
 # this_var = 'SDATES'; suptitle = f'Mean sowing date {y1}-{yN-1}';  time_dim = "gs"; units="day of year"; multiplier = 1
 
+nx = 2
 fontsize_titles = 18
 fontsize_axislabels = 15
 fontsize_ticklabels = 15
-ny = 1
-nx = 2
-fig = plt.figure(figsize=(24, 7.5))
-
-this_ds = cases['ctsm5.1.dev092']['ds']
-this_map = this_ds[this_var]
-
-# Grid, if needed
-if "lon" not in this_map.dims:
-   this_map = utils.grid_one_variable(this_ds, this_var, ivt_str=["spring_wheat", "irrigated_spring_wheat"])
-   
-# Get mean, set colormap
-if units == "day of year":
-   ar = stats.circmean(this_map, high=365, low=1, axis=this_map.dims.index(time_dim), nan_policy='omit')
-   dummy_map = this_map.isel({time_dim: 0}, drop=True)
-   this_map = xr.DataArray(data = ar,
-                           coords = dummy_map.coords,
-                           attrs = dummy_map.attrs)
-   cmap = 'twilight'
-   vrange = [1, 365]
-else:
-   this_map = this_map.mean(dim=time_dim)
-   cmap = 'viridis'
-   vrange = None
-   
 
 ims = []
 axes = []
 cbs = []
 
-thisCrop = "spring_wheat"
-ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
-axes.append(ax)
-im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), thisCrop.replace("_"," "), fontsize_ticklabels, fontsize_titles, multiplier=multiplier, units=units, cmap=cmap, vrange=vrange)
-ims.append(im)
-cbs.append(cb)
+# First, determine how many cases have this variable
+ny = 0
+for i, (casename, case) in enumerate(cases.items()):
+   if this_var in case['ds']:
+      ny += 1
+if ny == 1:
+   fig = plt.figure(figsize=(24, 7.5))
+   suptitle_ypos = 0.8
+elif ny == 2:
+   fig = plt.figure(figsize=(18, 11.25))
+   suptitle_ypos = 0.9
+elif ny == 3:
+   fig = plt.figure(figsize=(14, 14))
+   suptitle_ypos = 0.9
+else:
+   raise ValueError(f"Set up for ny = {ny}")
 
-thisCrop = "irrigated_spring_wheat"
-ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
-axes.append(ax)
-im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), thisCrop.replace("_"," "), fontsize_ticklabels, fontsize_titles, multiplier=multiplier, units=units, cmap=cmap, vrange=vrange)
-ims.append(im)
-cbs.append(cb)
+c = -1
+for i, (casename, case) in enumerate(cases.items()):
+
+   this_ds = case['ds']
+   if this_var not in case['ds']:
+      continue
+   c += 1
+   this_map = this_ds[this_var]
+
+   # Grid, if needed
+   if "lon" not in this_map.dims:
+      this_map = utils.grid_one_variable(this_ds, this_var, vegtype=["spring_wheat", "irrigated_spring_wheat"])
+      
+   # Get mean, set colormap
+   if units == "day of year":
+      ar = stats.circmean(this_map, high=365, low=1, axis=this_map.dims.index(time_dim), nan_policy='omit')
+      dummy_map = this_map.isel({time_dim: 0}, drop=True)
+      this_map = xr.DataArray(data = ar,
+                              coords = dummy_map.coords,
+                              attrs = dummy_map.attrs)
+      cmap = 'twilight'
+      vrange = [1, 365]
+   else:
+      this_map = this_map.mean(dim=time_dim)
+      cmap = 'viridis'
+      vrange = None
+   
+   thisCrop = "spring_wheat"
+   ax = fig.add_subplot(ny,nx,nx*c+1,projection=ccrs.PlateCarree())
+   axes.append(ax)
+   im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), thisCrop.replace("_"," "), fontsize_ticklabels, fontsize_titles, multiplier=multiplier, units=units, cmap=cmap, vrange=vrange, linewidth=0.5)
+   ims.append(im)
+   cbs.append(cb)
+
+   thisCrop = "irrigated_spring_wheat"
+   ax = fig.add_subplot(ny,nx,nx*c+2,projection=ccrs.PlateCarree())
+   axes.append(ax)
+   im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), thisCrop.replace("_"," "), fontsize_ticklabels, fontsize_titles, multiplier=multiplier, units=units, cmap=cmap, vrange=vrange, linewidth=0.5)
+   ims.append(im)
+   cbs.append(cb)
 
 if not vrange:
    equalize_colorbars(cbs, ims)
 
 fig.suptitle(suptitle,
-             y = 0.8,
+             y = suptitle_ypos,
              fontsize = 24) ;
 
 
