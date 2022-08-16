@@ -955,6 +955,9 @@ for thisCrop_main in clm_types:
       axes[a].yaxis.set_label_coords(-0.05, 0.5)
    
    # Add column labels
+   thisCrop = thisCrop_main
+   if "soybean" in thisCrop and "tropical" not in thisCrop:
+      thisCrop = thisCrop.replace("soy", "temperate_soy")
    topmost = np.arange(nx)
    column_labels = ['rainfed', 'irrigated']
    for a, ax in enumerate(axes):
@@ -962,7 +965,7 @@ for thisCrop_main in clm_types:
          nearest_topmost = a % nx
          axes[a].sharex(axes[nearest_topmost])
    for i, a in enumerate(topmost):
-      axes[a].set_title(f"{thisCrop_main} ({column_labels[i]})",
+      axes[a].set_title(f"{thisCrop} ({column_labels[i]})",
                         fontsize=fontsize_titles,
                         y=1.1)
    
@@ -974,8 +977,6 @@ for thisCrop_main in clm_types:
    
    plt.subplots_adjust(bottom=new_sp_bottom, left=new_sp_left)
    
-   fig.savefig(outDir_figs + "Map " + suptitle + f" {thisCrop_main}.png",
+   fig.savefig(outDir_figs + "Map " + suptitle + f" {thisCrop}.png",
                bbox_inches='tight', facecolor='white', dpi=dpi)
-
-
-
+   
