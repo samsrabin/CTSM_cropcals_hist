@@ -72,14 +72,14 @@ def adjust_gridded_lonlats(patches1d_lonlat, patches1d_ij, lu_dsg_lonlat_da, thi
       return lu_dsg_lonlat_da, patches1d_ij
 
 
-def equalize_colorbars(cbs, ims):
+def equalize_colorbars(ims):
    vmin = np.inf
    vmax = -np.inf
-   ncbs = len(cbs)
-   for cb in cbs:
-      vmin = min(vmin, cb.vmin)
-      vmax = max(vmax, cb.vmax)
-   for i in np.arange(ncbs):
+   nims = len(ims)
+   for im in ims:
+      vmin = min(vmin, im.get_clim()[0])
+      vmax = max(vmax, im.get_clim()[1])
+   for i in np.arange(nims):
       ims[i].set_clim(vmin, vmax)
 
 
@@ -284,7 +284,7 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    return this_ds_gs
 
 
-def make_map(ax, this_map, fontsize_ticklabels, fontsize_titles, multiplier=1.0, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None): 
+def make_map(ax, this_map, fontsize_ticklabels, fontsize_titles, multiplier=1.0, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False): 
    im = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
                        this_map*multiplier, shading="auto",
                        cmap=cmap)
@@ -294,9 +294,10 @@ def make_map(ax, this_map, fontsize_ticklabels, fontsize_titles, multiplier=1.0,
    ax.coastlines(linewidth=linewidth)
    if this_title:
       ax.set_title(this_title, fontsize=fontsize_titles)
-   cbar = plt.colorbar(im, orientation="horizontal", fraction=0.1, pad=0.02)
-   cbar.set_label(label=units, fontsize=fontsize_ticklabels)
-   cbar.ax.tick_params(labelsize=fontsize_ticklabels)
+   if show_cbar:
+      cbar = plt.colorbar(im, orientation="horizontal", fraction=0.1, pad=0.02)
+      cbar.set_label(label=units, fontsize=fontsize_ticklabels)
+      cbar.ax.tick_params(labelsize=fontsize_ticklabels)
     
    def set_ticks(lonlat_bin_width, fontsize_ticklabels, x_or_y):
       
@@ -326,8 +327,11 @@ def make_map(ax, this_map, fontsize_ticklabels, fontsize_titles, multiplier=1.0,
       plt.yticks([])
    for x in ax.spines:
       ax.spines[x].set_visible(False)
-      
-   return im, cbar
+   
+   if show_cbar:
+      return im, cbar
+   else:
+      return im, None
 
 
 def open_lu_ds(filename, y1, yN, existing_ds):
@@ -464,9 +468,9 @@ Nyears = len(yearList)
 # Define cases
 cases = {}
 # A run that someone else did
-cases['cmip6_i.e21.IHIST.f09_g17'] = {'filepath': '/Users/Shared/CESM_work/CropEvalData_ssr/danica_timeseries-cmip6_i.e21.IHIST.f09_g17/month_1/ssr_trimmed_annual.nc',
-                                      'constantVars': None,
-                                      'res': 'f09_g17'}
+cases['cmip6'] = {'filepath': '/Users/Shared/CESM_work/CropEvalData_ssr/danica_timeseries-cmip6_i.e21.IHIST.f09_g17/month_1/ssr_trimmed_annual.nc',
+                  'constantVars': None,
+                  'res': 'f09_g17'}
 # My run with normal CLM code + my outputs
 cases['ctsm5.1.dev092'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013/2022-08-08/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013.clm2.h1.1950-01-01-00000.nc',
                     'constantVars': None,
@@ -485,10 +489,8 @@ for i, (casename, case) in enumerate(cases.items()):
    print(f"Importing {casename}...")
    caselist.append(casename)
    
-   if casename == 'cmip6_i.e21.IHIST.f09_g17':
-      cmip6_dir = "/Users/Shared/CESM_work/CropEvalData_ssr/danica_timeseries-cmip6_i.e21.IHIST.f09_g17/month_1/"
-      cmip6_file = cmip6_dir + "ssr_trimmed_annual.nc"
-      this_ds = xr.open_dataset(cmip6_file)
+   if casename == 'cmip6':
+      this_ds = xr.open_dataset(case['filepath'])
 
       # Convert gC/m2 to g/m2 actually harvested
       this_ds["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds.GRAINC_TO_FOOD)
@@ -836,9 +838,9 @@ finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outD
 importlib.reload(utils)
 
 # this_var = 'GDDHARV'; suptitle = f'Mean harvest reqt {y1}-{yN-1}';  time_dim = "gs"; units="GDD"; multiplier = 1
-# this_var = 'GRAIN_HARV_TOFOOD_ANN_GD'; suptitle = f'Mean annual yield {y1}-{yN}';  time_dim = "time"; units = "t/ha"; multiplier = 1e-6 * 1e4 # g/m2 to tons/ha
+this_var = 'GRAIN_HARV_TOFOOD_ANN_GD'; suptitle = f'Mean annual yield {y1}-{yN}';  time_dim = "time"; units = "t/ha"; multiplier = 1e-6 * 1e4 # g/m2 to tons/ha
 # this_var = 'GSLEN'; suptitle = f'Mean growing season length {y1}-{yN-1}';  time_dim = "gs"; units="days"; multiplier = 1
-this_var = 'HDATES'; suptitle = f'Mean harvest date {y1}-{yN-1}';  time_dim = "gs"; units="day of year"; multiplier = 1
+# this_var = 'HDATES'; suptitle = f'Mean harvest date {y1}-{yN-1}';  time_dim = "gs"; units="day of year"; multiplier = 1
 # this_var = 'HUI'; suptitle = f'Mean HUI accum {y1}-{yN-1}';  time_dim = "gs"; units="GDD"; multiplier = 1
 # this_var = 'SDATES'; suptitle = f'Mean sowing date {y1}-{yN-1}';  time_dim = "gs"; units="day of year"; multiplier = 1
 
@@ -854,14 +856,19 @@ for i, (casename, case) in enumerate(cases.items()):
    if this_var in case['ds']:
       ny += 1
 if ny == 1:
-   figsize = (24, 7.5)
-   suptitle_ypos = 0.8
+   figsize = (24, 7.5)    # width, height
+   suptitle_ypos = 0.85
 elif ny == 2:
-   figsize = (18, 11.25)
-   suptitle_ypos = 0.9
+   figsize = (18, 11.25)    # width, height
+   suptitle_ypos = 0.95
 elif ny == 3:
-   figsize = (14, 14)
-   suptitle_ypos = 0.9
+   figsize = (14, 10)    # width, height
+   suptitle_ypos = 1
+   # cbar_pos = [0.2, 0.05, 0.6, 0.025]  # left edge, bottom edge, width, height
+   cbar_pos = [0.2, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
+   new_sp_bottom = 0.11 # default: 0.1
+   # new_sp_left = 0.23   # default: 0.125
+   new_sp_left = 0.125
 else:
    raise ValueError(f"Set up for ny = {ny}")
 
@@ -873,6 +880,8 @@ for x in clm_types_main:
       if x in y:
          clm_types_rfir.append(y)
 clm_types = np.unique([x.replace('irrigated_', '') for x in clm_types_rfir])
+
+
 
 for thisCrop_main in clm_types:
    c = -1
@@ -927,11 +936,12 @@ for thisCrop_main in clm_types:
       cbs.append(cb)
 
    if not vrange:
-      equalize_colorbars(cbs, ims)
+      equalize_colorbars(ims)
 
    fig.suptitle(suptitle,
-               y = suptitle_ypos,
-               fontsize = 24) ;
+                x = 0.55,
+                y = suptitle_ypos,
+                fontsize = 24) ;
 
    # Add row labels
    leftmost = np.arange(0, nx*ny, nx)
@@ -940,7 +950,8 @@ for thisCrop_main in clm_types:
          nearest_leftmost = np.max(leftmost[leftmost < a])
          axes[a].sharey(axes[nearest_leftmost])
    for i, a in enumerate(leftmost):
-      axes[a].set_ylabel(fig_caselist[i], fontsize=fontsize_axislabels)
+      axes[a].set_ylabel(fig_caselist[i], fontsize=fontsize_titles)
+      axes[a].yaxis.set_label_coords(-0.05, 0.5)
    
    # Add column labels
    topmost = np.arange(nx)
@@ -950,7 +961,17 @@ for thisCrop_main in clm_types:
          nearest_topmost = a % nx
          axes[a].sharex(axes[nearest_topmost])
    for i, a in enumerate(topmost):
-      axes[a].set_title(f"{thisCrop_main} ({column_labels[i]})", fontsize=fontsize_axislabels)
+      axes[a].set_title(f"{thisCrop_main} ({column_labels[i]})",
+                        fontsize=fontsize_titles,
+                        y=1.1)
+   
+   cbar_ax = fig.add_axes(cbar_pos)
+   fig.tight_layout()
+   cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=units)
+   cb.ax.tick_params(labelsize=fontsize_ticklabels)
+   cb.set_label(units, fontsize=fontsize_titles)
+   
+   plt.subplots_adjust(bottom=new_sp_bottom, left=new_sp_left)
    
    fig.savefig(outDir_figs + "Map " + suptitle + f" {thisCrop_main}.png",
                bbox_inches='tight', facecolor='white', dpi=dpi)
