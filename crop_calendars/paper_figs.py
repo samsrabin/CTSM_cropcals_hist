@@ -835,10 +835,7 @@ nx = 2
 fontsize_titles = 18
 fontsize_axislabels = 15
 fontsize_ticklabels = 15
-
-ims = []
-axes = []
-cbs = []
+dpi = 150
 
 # First, determine how many cases have this variable
 ny = 0
@@ -846,63 +843,85 @@ for i, (casename, case) in enumerate(cases.items()):
    if this_var in case['ds']:
       ny += 1
 if ny == 1:
-   fig = plt.figure(figsize=(24, 7.5))
+   figsize = (24, 7.5)
    suptitle_ypos = 0.8
 elif ny == 2:
-   fig = plt.figure(figsize=(18, 11.25))
+   figsize = (18, 11.25)
    suptitle_ypos = 0.9
 elif ny == 3:
-   fig = plt.figure(figsize=(14, 14))
+   figsize = (14, 14)
    suptitle_ypos = 0.9
 else:
    raise ValueError(f"Set up for ny = {ny}")
 
-c = -1
-for i, (casename, case) in enumerate(cases.items()):
+# Get all crops we care about
+clm_types_main = [x.lower().replace('wheat','spring_wheat') for x in cropList_combined_clm[:-1]]
+clm_types_rfir = []
+for x in clm_types_main:
+   for y in cases[list(cases.keys())[0]]['ds'].vegtype_str.values:
+      if x in y:
+         clm_types_rfir.append(y)
+clm_types = np.unique([x.replace('irrigated_', '') for x in clm_types_rfir])
 
-   this_ds = case['ds']
-   if this_var not in case['ds']:
-      continue
-   c += 1
-   this_map = this_ds[this_var]
+for thisCrop_main in clm_types:
+   c = -1
+   fig = plt.figure(figsize=figsize)
+   ims = []
+   axes = []
+   cbs = []
+   for i, (casename, case) in enumerate(cases.items()):
 
-   # Grid, if needed
-   if "lon" not in this_map.dims:
-      this_map = utils.grid_one_variable(this_ds, this_var, vegtype=["spring_wheat", "irrigated_spring_wheat"])
+      this_ds = case['ds']
+      if this_var not in case['ds']:
+         continue
+      c += 1
+      this_map = this_ds[this_var]
       
-   # Get mean, set colormap
-   if units == "day of year":
-      ar = stats.circmean(this_map, high=365, low=1, axis=this_map.dims.index(time_dim), nan_policy='omit')
-      dummy_map = this_map.isel({time_dim: 0}, drop=True)
-      this_map = xr.DataArray(data = ar,
-                              coords = dummy_map.coords,
-                              attrs = dummy_map.attrs)
-      cmap = 'twilight'
-      vrange = [1, 365]
-   else:
-      this_map = this_map.mean(dim=time_dim)
-      cmap = 'viridis'
-      vrange = None
+      found_types = [x for x in this_ds.vegtype_str.values if thisCrop_main in x]
+
+      # Grid, if needed
+      if "lon" not in this_map.dims:
+         this_map = utils.grid_one_variable(this_ds, this_var, vegtype=found_types)
+         
+      # Get mean, set colormap
+      if units == "day of year":
+         ar = stats.circmean(this_map, high=365, low=1, axis=this_map.dims.index(time_dim), nan_policy='omit')
+         dummy_map = this_map.isel({time_dim: 0}, drop=True)
+         this_map = xr.DataArray(data = ar,
+                                 coords = dummy_map.coords,
+                                 attrs = dummy_map.attrs)
+         cmap = 'twilight'
+         vrange = [1, 365]
+      else:
+         this_map = this_map.mean(dim=time_dim)
+         cmap = 'viridis'
+         vrange = None
+      
+      rainfed_types = [x for x in found_types if "irrigated" not in x]
+      ax = fig.add_subplot(ny,nx,nx*c+1,projection=ccrs.PlateCarree(), ylabel="mirntnt")
+      axes.append(ax)
+      thisCrop = thisCrop_main
+      im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize_ticklabels, fontsize_titles, multiplier=multiplier, units=units, cmap=cmap, vrange=vrange, linewidth=0.5)
+      ims.append(im)
+      cbs.append(cb)
+
+      irrigated_types = [x for x in found_types if "irrigated" in x]
+      ax = fig.add_subplot(ny,nx,nx*c+2,projection=ccrs.PlateCarree())
+      axes.append(ax)
+      thisCrop = "irrigated_" + thisCrop_main
+      im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize_ticklabels, fontsize_titles, multiplier=multiplier, units=units, cmap=cmap, vrange=vrange, linewidth=0.5)
+      ims.append(im)
+      cbs.append(cb)
+
+   if not vrange:
+      equalize_colorbars(cbs, ims)
+
+   fig.suptitle(suptitle,
+               y = suptitle_ypos,
+               fontsize = 24) ;
    
-   thisCrop = "spring_wheat"
-   ax = fig.add_subplot(ny,nx,nx*c+1,projection=ccrs.PlateCarree())
-   axes.append(ax)
-   im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), thisCrop.replace("_"," "), fontsize_ticklabels, fontsize_titles, multiplier=multiplier, units=units, cmap=cmap, vrange=vrange, linewidth=0.5)
-   ims.append(im)
-   cbs.append(cb)
+   fig.savefig(outDir_figs + "Map " + suptitle + f" {thisCrop_main}.png",
+               bbox_inches='tight', facecolor='white', dpi=dpi)
 
-   thisCrop = "irrigated_spring_wheat"
-   ax = fig.add_subplot(ny,nx,nx*c+2,projection=ccrs.PlateCarree())
-   axes.append(ax)
-   im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), thisCrop.replace("_"," "), fontsize_ticklabels, fontsize_titles, multiplier=multiplier, units=units, cmap=cmap, vrange=vrange, linewidth=0.5)
-   ims.append(im)
-   cbs.append(cb)
-
-if not vrange:
-   equalize_colorbars(cbs, ims)
-
-fig.suptitle(suptitle,
-             y = suptitle_ypos,
-             fontsize = 24) ;
 
 
