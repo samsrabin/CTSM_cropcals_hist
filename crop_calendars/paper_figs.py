@@ -837,8 +837,10 @@ finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outD
 # %% Make maps of individual crops (rainfed, irrigated)
 
 # Define reference case, if you want to plot differences
-# ref_case = None
-ref_casename = 'ctsm5.1.dev092'
+ref_casename = None
+# ref_casename = 'ctsm5.1.dev092'
+
+overwrite = False
 
 varList = {
    'GDDHARV': {
@@ -953,7 +955,22 @@ for (this_var, var_info) in varList.items():
    clm_types = np.unique([x.replace('irrigated_', '') for x in clm_types_rfir])
 
    for thisCrop_main in clm_types:
-      print(f'   {thisCrop_main}...')
+      
+      # Get the name we'll use in output text/filenames
+      thisCrop_out = thisCrop_main
+      if "soybean" in thisCrop_out and "tropical" not in thisCrop_out:
+         thisCrop_out = thisCrop_out.replace("soy", "temperate_soy")
+      
+      # Skip if file exists and we're not overwriting
+      diff_txt = ""
+      if ref_casename:
+         diff_txt = f" Diff {ref_casename}"
+      fig_outfile = outDir_figs + "Map " + suptitle + diff_txt + f" {thisCrop_out}.png"
+      if os.path.exists(fig_outfile) and not overwrite:
+         print(f'   Skipping {thisCrop_out} (file exists).')
+         continue
+      
+      print(f'   {thisCrop_out}...')
       c = -1
       fig = plt.figure(figsize=figsize)
       ims = []
@@ -1059,9 +1076,6 @@ for (this_var, var_info) in varList.items():
          axes[a].yaxis.set_label_coords(-0.05, 0.5)
 
       # Add column labels
-      thisCrop = thisCrop_main
-      if "soybean" in thisCrop and "tropical" not in thisCrop:
-         thisCrop = thisCrop.replace("soy", "temperate_soy")
       topmost = np.arange(nx)
       column_labels = ['rainfed', 'irrigated']
       for a, ax in enumerate(axes):
@@ -1069,7 +1083,7 @@ for (this_var, var_info) in varList.items():
             nearest_topmost = a % nx
             axes[a].sharex(axes[nearest_topmost])
       for i, a in enumerate(topmost):
-         axes[a].set_title(f"{thisCrop} ({column_labels[i]})",
+         axes[a].set_title(f"{thisCrop_out} ({column_labels[i]})",
                            fontsize=fontsize['titles'],
                            y=1.1)
       
@@ -1082,10 +1096,7 @@ for (this_var, var_info) in varList.items():
       
       plt.subplots_adjust(bottom=new_sp_bottom, left=new_sp_left)
       
-      diff_txt = ""
-      if ref_casename:
-         diff_txt = f" Diff {ref_casename}"
-      fig.savefig(outDir_figs + "Map " + suptitle + diff_txt + f" {thisCrop}.png",
+      fig.savefig(fig_outfile,
                   bbox_inches='tight', facecolor='white', dpi=dpi)
       plt.close()
    
