@@ -100,7 +100,7 @@ print("Import output sowing and harvest dates...")
 y1_import_str = f"{y1+1}-01-01"
 yN_import_str = f"{yN+2}-01-01"
 
-print(f"Importing netCDF time steps {y1_import_str} through {yN_import_str}")
+print(f"Importing netCDF time steps {y1_import_str} through {yN_import_str} (years are +1 because of CTSM output naming)")
 
 # Get file list
 if indir[-1] != os.path.sep:
