@@ -882,7 +882,7 @@ def save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx):
     gdd_maps_ds["time_bounds"] = sdates_rx.time_bounds
 
     # Save cultivar GDDs
-    gdd_maps_ds.to_netcdf(outfile, mode="a", format="NETCDF3_CLASSIC")
+    gdd_maps_ds.to_netcdf(outfile, mode="w", format="NETCDF3_CLASSIC")
 
 save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx)
 save_gdds(sdate_inFile, hdate_inFile, outfile_fill0, gdd_fill0_maps_ds, sdates_rx)
