@@ -435,8 +435,8 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
         thisCrop_gany = thisCrop_map_to_patches(lon_points, lat_points, grows_across_newyear, vegtype_int)
         
         if isinstance(gddaccum_yp_list[v], type(None)):
-            gddaccum_yp_list[v] = np.full((Nyears, len(thisCrop_full_patchlist)), np.nan)
-            if save_figs: gddharv_yp_list[v] = np.full((Nyears, len(thisCrop_full_patchlist)), np.nan)
+            gddaccum_yp_list[v] = np.full((Nyears+1, len(thisCrop_full_patchlist)), np.nan)
+            if save_figs: gddharv_yp_list[v] = np.full((Nyears+1, len(thisCrop_full_patchlist)), np.nan)
         
         # Get the accumulated GDDs at each prescribed harvest date
         gddaccum_atharv_p = np.full(thisCrop_hdates_rx.shape, np.nan)
