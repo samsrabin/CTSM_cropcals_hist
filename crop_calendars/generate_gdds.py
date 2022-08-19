@@ -247,6 +247,7 @@ gddaccum_ds = None
 gddharv_ds = None
 incorrectly_daily = False
 skip_patches_for_isel_nan_lastyear = np.ndarray([])
+gddharv_in_h3 = False
 for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
     print(f'netCDF year {thisYear}...')
     
@@ -381,10 +382,20 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
     print(f"   Importing accumulated GDDs...")
     clm_gdd_var = "GDDACCUM"
     myVars = [clm_gdd_var]
-    if save_figs:
+    if save_figs and not gddharv_in_h3:
         myVars.append("GDDHARV")
-    h1_ds = utils.import_ds(glob.glob(indir + f"*h1.{thisYear-1}-01-01*"), myVars=myVars, myVegtypes=utils.define_mgdcrop_list())
-    
+    h1_ds = utils.import_ds(glob.glob(indir + f"*h1.{thisYear-1}-01-01*"), myVars=myVars, myVegtypes=utils.define_mgdcrop_list(), myVars_missing_ok=['GDDHARV'])
+    if save_figs and 'GDDHARV' not in h1_ds:
+        if not gddharv_in_h3:
+            print('Trying to get GDDHARV from h3 file(s) instead.')
+        try:
+            h3_ds = utils.import_ds(glob.glob(indir + f"*h3.{thisYear-1}-01-01*"), myVars=['GDDHARV'], myVegtypes=utils.define_mgdcrop_list())
+            h1_ds['GDDHARV'] = h3_ds['GDDHARV']
+            print('Success! Will look in h3 files from now on.')
+        except:
+            print('Unable to import GDDHARV from h1 or h3 files. Disabling save_figs.')
+            save_figs = False
+
     # Restrict to patches we're including
     if skipping_patches_for_isel_nan:
         if not np.array_equal(dates_ds.patch.values, h1_ds.patch.values):
