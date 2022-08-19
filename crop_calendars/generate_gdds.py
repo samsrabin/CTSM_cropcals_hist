@@ -38,10 +38,10 @@ indir = "/glade/scratch/samrabin/archive/cropcals.f19-g17.rx_crop_calendars2.IHi
 
 # sdate_inFile = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
 # hdate_inFile = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.20220602_230029.nc"
-# sdate_inFile = "/glade/u/home/samrabin/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
-# hdate_inFile = "/glade/u/home/samrabin/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
-sdate_inFile = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
-hdate_inFile = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
+sdate_inFile = "/glade/u/home/samrabin/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
+hdate_inFile = "/glade/u/home/samrabin/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
+# sdate_inFile = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
+# hdate_inFile = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
 
 
 # Directory to save output netCDF
@@ -205,6 +205,7 @@ def yp_list_to_ds(yp_list, daily_ds, daily_incl_ds, dates_rx, longname_prefix):
         if isinstance(ra, type(None)):
             continue
         thisCrop_str = daily_incl_ds.vegtype_str.values[c]
+        print(f'   {thisCrop_str}...')
         newVar = f"gdd1_{utils.ivt_str2int(thisCrop_str)}"
         ds = daily_ds.isel(patch=np.where(daily_ds.patches1d_itype_veg_str.values==thisCrop_str)[0])
         template_da = ds.patches1d_itype_veg_str
@@ -492,8 +493,6 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
         if save_figs: gddharv_yp_list[v][y, thisYear_active_patch_indices] = tmp_gddharv
         
     skip_patches_for_isel_nan_lastyear = skip_patches_for_isel_nan
-    if y==1:
-        break
 
 print("Done")
 
