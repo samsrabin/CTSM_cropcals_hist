@@ -319,7 +319,7 @@ def yp_list_to_ds(yp_list, daily_ds, daily_incl_ds, dates_rx, longname_prefix):
 
 
 
-# %% Import output sowing and harvest dates
+# %% Import and process
 
 # Keep 1 extra year to avoid incomplete final growing season for crops harvested after Dec. 31.
 y1_import_str = f"{y1+1}-01-01"
@@ -649,6 +649,82 @@ gdd_fill0_maps_ds = add_lonlat_attrs(gdd_fill0_maps_ds)
 if save_figs: gddharv_maps_ds = add_lonlat_attrs(gddharv_maps_ds)
 
 print("Done.")
+    
+
+# %% Check that all cells that had sdates are represented
+print("Checking that all cells that had sdates are represented...")
+
+sdates_grid = utils.grid_one_variable(dates_incl_ds, 'SDATES')
+vegtypes_included = h1_ds.vegtype_str.values[[i for i,c in enumerate(gddaccum_yp_list) if not isinstance(c,type(None))]]
+
+
+all_ok = True
+for vt_str in vegtypes_included:
+    vt_int = utils.ivt_str2int(vt_str)
+    # print(f"{vt_int}: {vt_str}")
+    
+    map_gdd = gdd_maps_ds[f"gdd1_{vt_int}"].isel(time=0, drop=True)
+    map_sdate = sdates_grid.isel(mxsowings=0, drop=True).sel(ivt_str=vt_str, drop=True)
+    if "time" in map_sdate.dims:
+        map_sdate = map_sdate.isel(time=0, drop=True)
+    
+    ok_gdd = map_gdd.where(map_gdd >= 0).notnull().values
+    ok_sdate = map_sdate.where(map_sdate > 0).notnull().values
+    missing_both = np.bitwise_and(np.bitwise_not(ok_gdd), np.bitwise_not(ok_sdate))
+    ok_both = np.bitwise_and(ok_gdd, ok_sdate)
+    ok_both = np.bitwise_or(ok_both, missing_both)
+    if np.any(np.bitwise_not(ok_both)):
+        all_ok = False
+        gdd_butnot_sdate = np.bitwise_and(ok_gdd, np.bitwise_not(ok_sdate))
+        sdate_butnot_gdd = np.bitwise_and(ok_sdate, np.bitwise_not(ok_gdd))
+        if np.any(gdd_butnot_sdate):
+            print(f"   {vt_int} {vt_str}: {np.sum(gdd_butnot_sdate)} cells in GDD but not sdate")
+        if np.any(sdate_butnot_gdd):
+            print(f"   {vt_int} {vt_str}: {np.sum(sdate_butnot_gdd)} cells in sdate but not GDD")
+
+if not all_ok:
+    print("❌ Mismatch between sdate and GDD outputs")
+else:
+    print("✅ All sdates have GDD and vice versa")
+
+
+# %% Save to netCDF
+print("Saving...")
+
+# Get output file path
+if not os.path.exists(outdir):
+    os.makedirs(outdir)
+datestr = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+outfile = outdir + "gdds_" + datestr + ".nc"
+outfile_fill0 = outdir + "gdds_fill0_" + datestr + ".nc"
+
+def save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx):
+    # Set up output file from template (i.e., prescribed sowing dates).
+    template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
+    for v in template_ds:
+        if "sdate" in v:
+            template_ds = template_ds.drop(v)
+    template_ds.to_netcdf(path=outfile, format="NETCDF3_CLASSIC")
+    template_ds.close()
+
+    # Add global attributes
+    comment = f"Derived from CLM run plus crop calendar input files {os.path.basename(sdate_inFile) and {os.path.basename(hdate_inFile)}}."
+    gdd_maps_ds.attrs = {\
+        "author": "Sam Rabin (sam.rabin@gmail.com)",
+        "comment": comment,
+        "created": dt.datetime.now().astimezone().isoformat()
+        }
+
+    # Add time_bounds
+    gdd_maps_ds["time_bounds"] = sdates_rx.time_bounds
+
+    # Save cultivar GDDs
+    gdd_maps_ds.to_netcdf(outfile, mode="w", format="NETCDF3_CLASSIC")
+
+save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx)
+save_gdds(sdate_inFile, hdate_inFile, outfile_fill0, gdd_fill0_maps_ds, sdates_rx)
+
+print("Done saving.")
 
 
 # %% Save before/after map and boxplot figures, if doing so
@@ -661,8 +737,6 @@ lat_bin_edges = np.arange(0, 91, bin_width)
 fontsize_titles = 18
 fontsize_axislabels = 15
 fontsize_ticklabels = 15
-
-vegtypes_included = h1_ds.vegtype_str.values[[i for i,c in enumerate(gddaccum_yp_list) if not isinstance(c,type(None))]]
 
 def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles): 
     im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
@@ -814,89 +888,3 @@ if save_figs:
         plt.close()
 
     print("Done.")
-    
-
-# %% Check that all cells that had sdates are represented
-print("Checking that all cells that had sdates are represented...")
-
-sdates_grid = utils.grid_one_variable(dates_incl_ds, 'SDATES')
-
-all_ok = True
-for vt_str in vegtypes_included:
-    vt_int = utils.ivt_str2int(vt_str)
-    # print(f"{vt_int}: {vt_str}")
-    
-    map_gdd = gdd_maps_ds[f"gdd1_{vt_int}"].isel(time=0, drop=True)
-    map_sdate = sdates_grid.isel(mxsowings=0, drop=True).sel(ivt_str=vt_str, drop=True)
-    if "time" in map_sdate.dims:
-        map_sdate = map_sdate.isel(time=0, drop=True)
-    
-    ok_gdd = map_gdd.where(map_gdd >= 0).notnull().values
-    ok_sdate = map_sdate.where(map_sdate > 0).notnull().values
-    missing_both = np.bitwise_and(np.bitwise_not(ok_gdd), np.bitwise_not(ok_sdate))
-    ok_both = np.bitwise_and(ok_gdd, ok_sdate)
-    ok_both = np.bitwise_or(ok_both, missing_both)
-    if np.any(np.bitwise_not(ok_both)):
-        all_ok = False
-        gdd_butnot_sdate = np.bitwise_and(ok_gdd, np.bitwise_not(ok_sdate))
-        sdate_butnot_gdd = np.bitwise_and(ok_sdate, np.bitwise_not(ok_gdd))
-        if np.any(gdd_butnot_sdate):
-            print(f"   {vt_int} {vt_str}: {np.sum(gdd_butnot_sdate)} cells in GDD but not sdate")
-        if np.any(sdate_butnot_gdd):
-            print(f"   {vt_int} {vt_str}: {np.sum(sdate_butnot_gdd)} cells in sdate but not GDD")
-
-if not all_ok:
-    print("❌ Mismatch between sdate and GDD outputs")
-else:
-    print("✅ All sdates have GDD and vice versa")
-
-
-# %% Save to netCDF
-print("Saving...")
-
-# Get output file path
-if not os.path.exists(outdir):
-    os.makedirs(outdir)
-datestr = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-outfile = outdir + "gdds_" + datestr + ".nc"
-outfile_fill0 = outdir + "gdds_fill0_" + datestr + ".nc"
-
-def save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx):
-    # Set up output file from template (i.e., prescribed sowing dates).
-    template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
-    for v in template_ds:
-        if "sdate" in v:
-            template_ds = template_ds.drop(v)
-    template_ds.to_netcdf(path=outfile, format="NETCDF3_CLASSIC")
-    template_ds.close()
-
-    # Add global attributes
-    comment = f"Derived from CLM run plus crop calendar input files {os.path.basename(sdate_inFile) and {os.path.basename(hdate_inFile)}}."
-    gdd_maps_ds.attrs = {\
-        "author": "Sam Rabin (sam.rabin@gmail.com)",
-        "comment": comment,
-        "created": dt.datetime.now().astimezone().isoformat()
-        }
-
-    # Add time_bounds
-    gdd_maps_ds["time_bounds"] = sdates_rx.time_bounds
-
-    # Save cultivar GDDs
-    gdd_maps_ds.to_netcdf(outfile, mode="w", format="NETCDF3_CLASSIC")
-
-save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx)
-save_gdds(sdate_inFile, hdate_inFile, outfile_fill0, gdd_fill0_maps_ds, sdates_rx)
-
-print("All done!")
-
-
-# %% Misc.
-
-# # %% View GDD for a single crop and cell
-
-# tmp = accumGDD_ds[clm_gdd_var].values
-# incl = np.bitwise_and(accumGDD_ds.patches1d_lon.values==270, accumGDD_ds.patches1d_lat.values==40)
-# tmp2 = tmp[:,incl]
-# plt.plot(tmp2)
-
-
