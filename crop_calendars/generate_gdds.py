@@ -305,7 +305,7 @@ def yp_list_to_ds(yp_list, daily_ds, daily_incl_ds, dates_rx, longname_prefix):
         da = xr.DataArray(data = ra,
                           coords = template_da.coords,
                           attrs = {'units': 'GDD',
-                                   'long_name': f'{longname_prefix}{vegtype_str}'})
+                                   'long_name': f'{longname_prefix}{thisCrop_str}'})
         
         # Grid this crop
         ds['tmp'] = da
@@ -607,7 +607,13 @@ print("Adding dummy variables...")
 template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
 all_vars = [v.replace("sdate","gdd") for v in template_ds if "sdate" in v]
 all_longnames = [template_ds[v].attrs["long_name"].replace("Planting day ", longname_prefix) + " (dummy)" for v in template_ds if "sdate" in v]
-dummy_vars = [v for v in all_vars if v not in gdd_maps_ds]
+dummy_vars = []
+dummy_longnames = []
+for v, thisVar in enumerate(all_vars):
+    if thisVar not in gdd_maps_ds:
+        dummy_vars.append(thisVar)
+        dummy_longnames.append(all_longnames[v])
+
 def make_dummy(thisCrop_gridded, addend):
     dummy_gridded = thisCrop_gridded
     dummy_gridded.values = dummy_gridded.values*0 + addend
@@ -623,10 +629,10 @@ for v, thisVar in enumerate(dummy_vars):
     if thisVar in gdd_maps_ds:
         raise RuntimeError(f'{thisVar} is already in gdd_maps_ds. Why overwrite it with dummy?')
     dummy_gridded.name = thisVar
-    dummy_gridded.attrs["long_name"] = all_longnames[v]
+    dummy_gridded.attrs["long_name"] = dummy_longnames[v]
     gdd_maps_ds[thisVar] = dummy_gridded
     dummy_gridded0.name = thisVar
-    dummy_gridded0.attrs["long_name"] = all_longnames[v]
+    dummy_gridded0.attrs["long_name"] = dummy_longnames[v]
     gdd_fill0_maps_ds[thisVar] = dummy_gridded0
 
 # Add lon/lat attributes
