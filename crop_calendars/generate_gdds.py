@@ -285,6 +285,38 @@ def setup_output_ds(in_ds, thisVar, Nyears, new_dt_axis):
     del out_ds[thisVar]
     return out_ds
 
+# Get and grid mean GDDs in GGCMI growing season
+def yp_list_to_ds(yp_list, daily_ds, daily_incl_ds, dates_rx, longname_prefix):
+    
+    # Get means
+    warnings.filterwarnings("ignore", message="Mean of empty slice") # Happens when you do np.nanmean() of an all-NaN array (or slice, if doing selected axis/es)
+    p_list = [np.nanmean(x, axis=0) if not isinstance(x, type(None)) else x for x in yp_list]
+    warnings.filterwarnings("always", message="Mean of empty slice")
+    
+    # Grid
+    ds_out = xr.Dataset()
+    for c, ra in enumerate(p_list):
+        if isinstance(ra, type(None)):
+            continue
+        thisCrop_str = daily_incl_ds.vegtype_str.values[c]
+        newVar = f"gdd1_{utils.ivt_str2int(thisCrop_str)}"
+        ds = daily_ds.isel(patch=np.where(daily_ds.patches1d_itype_veg_str.values==thisCrop_str)[0])
+        template_da = ds.patches1d_itype_veg_str
+        da = xr.DataArray(data = ra,
+                          coords = template_da.coords,
+                          attrs = {'units': 'GDD',
+                                   'long_name': f'{longname_prefix}{vegtype_str}'})
+        
+        # Grid this crop
+        ds['tmp'] = da
+        da_gridded = utils.grid_one_variable(ds, 'tmp', vegtype=thisCrop_str).squeeze(drop=True)
+        
+        # Add singleton time dimension and save to output Dataset
+        da_gridded = da_gridded.expand_dims(time = dates_rx.time)
+        ds_out[newVar] = da_gridded
+        
+    return ds_out
+
 
 
 # %% Import output sowing and harvest dates
@@ -465,7 +497,8 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
     time_indsP1 = np.arange(Nyears + 1)
     
     if y==0:
-        veg_arrs_yp = [None for vegtype_str in h1_incl_ds.vegtype_str.values]
+        gddaccum_yp_list = [None for vegtype_str in h1_incl_ds.vegtype_str.values]
+        if save_figs: gddharv_yp_list = [None for vegtype_str in h1_incl_ds.vegtype_str.values]
     
     incl_vegtype_indices = []
     for v, vegtype_str in enumerate(h1_incl_ds.vegtype_str.values):
@@ -475,8 +508,9 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
         
         # Get time series for each patch of this type
         thisCrop_ds = utils.xr_flexsel(h1_incl_ds, vegtype=vegtype_str)
-        thisCrop_da = thisCrop_ds[clm_gdd_var]
-        if not thisCrop_da.size:
+        thisCrop_gddaccum_da = thisCrop_ds[clm_gdd_var]
+        if save_figs: thisCrop_gddharv_da = thisCrop_ds['GDDHARV']
+        if not thisCrop_gddaccum_da.size:
             continue
         print(f"      {vegtype_str}...")
         incl_vegtype_indices = incl_vegtype_indices + [v]
@@ -488,11 +522,13 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
         # Get "grows across new year?" for these patches
         thisCrop_gany = thisCrop_map_to_patches(lon_points, lat_points, grows_across_newyear, vegtype_int)
         
-        if isinstance(veg_arrs_yp[v], type(None)):
-            veg_arrs_yp[v] = np.full((Nyears, len(thisCrop_full_patchlist)), np.nan)
+        if isinstance(gddaccum_yp_list[v], type(None)):
+            gddaccum_yp_list[v] = np.full((Nyears, len(thisCrop_full_patchlist)), np.nan)
+            if save_figs: gddharv_yp_list[v] = np.full((Nyears, len(thisCrop_full_patchlist)), np.nan)
         
         # Get the accumulated GDDs at each prescribed harvest date
         gddaccum_atharv_p = np.full(thisCrop_hdates_rx.shape, np.nan)
+        if save_figs: gddharv_atharv_p = np.full(thisCrop_hdates_rx.shape, np.nan)
         unique_rx_hdates = np.unique(thisCrop_hdates_rx.values)
         # Build an indexing tuple
         patches = []
@@ -500,36 +536,49 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
         i_times = []
         for i, hdate in enumerate(unique_rx_hdates):
             here = np.where(thisCrop_hdates_rx.values == hdate)[0]
-            patches += list(thisCrop_da.patch.values[here])
+            patches += list(thisCrop_gddaccum_da.patch.values[here])
             i_patches += list(here)
             i_times += list(np.full((len(here),), int(hdate-1)))
         # Select using the indexing tuple
-        gddaccum_atharv_p = thisCrop_da.values[(i_times, i_patches)]
+        gddaccum_atharv_p = thisCrop_gddaccum_da.values[(i_times, i_patches)]
+        if save_figs: gddharv_atharv_p = thisCrop_gddharv_da.values[(i_times, i_patches)]
         if np.any(np.isnan(gddaccum_atharv_p)):
             print(f"         ❗ {np.sum(np.isnan(gddaccum_atharv_p))}/{len(gddaccum_atharv_p)} NaN after extracting GDDs accumulated at harvest")
+        if save_figs and np.any(np.isnan(gddharv_atharv_p)):
+            print(f"         ❗ {np.sum(np.isnan(gddharv_atharv_p))}/{len(gddharv_atharv_p)} NaN after extracting GDDHARV")
         # Sort patches back to correct order
-        if not np.all(thisCrop_da.patch.values[:-1] <= thisCrop_da.patch.values[1:]):
+        if not np.all(thisCrop_gddaccum_da.patch.values[:-1] <= thisCrop_gddaccum_da.patch.values[1:]):
             raise RuntimeError("This code depends on DataArray patch list being sorted.")
         sortorder = np.argsort(patches)
         gddaccum_atharv_p = gddaccum_atharv_p[np.array(sortorder)]
+        if save_figs: gddharv_atharv_p = gddharv_atharv_p[np.array(sortorder)]
                 
         # Assign these to growing seasons based on whether gs crossed new year
         thisYear_active_patch_indices = [thisCrop_full_patchlist.index(x) for x in thisCrop_ds.patch.values]
         thisCrop_sdates_rx = thisCrop_map_to_patches(lon_points, lat_points, sdates_rx, vegtype_int)
-        tmp = np.full(thisCrop_sdates_rx.shape, np.nan)
         where_gs_thisyr = np.where(thisCrop_sdates_rx < thisCrop_hdates_rx)[0]
-        tmp[where_gs_thisyr] = gddaccum_atharv_p[where_gs_thisyr]
+        tmp_gddaccum = np.full(thisCrop_sdates_rx.shape, np.nan)
+        tmp_gddaccum[where_gs_thisyr] = gddaccum_atharv_p[where_gs_thisyr]
+        if save_figs:
+            tmp_gddharv = np.full(tmp_gddaccum.shape, np.nan)
+            tmp_gddharv[where_gs_thisyr] = gddharv_atharv_p[where_gs_thisyr]
         if y > 0:
             where_gs_lastyr = np.where(thisCrop_sdates_rx > thisCrop_hdates_rx)[0]
             # Make sure we're not about to overwrite any existing values.
-            if np.any(~np.isnan(tmp[where_gs_lastyr])):
+            if np.any(~np.isnan(tmp_gddaccum[where_gs_lastyr])):
                 raise RuntimeError("Unexpected non-NaN for last season's GDD accumulation")
+            if save_figs and np.any(~np.isnan(tmp_gddharv[where_gs_lastyr])):
+                raise RuntimeError("Unexpected non-NaN for last season's GDDHARV")
             # Fill.
-            tmp[where_gs_lastyr] = gddaccum_atharv_p[where_gs_lastyr]
+            tmp_gddaccum[where_gs_lastyr] = gddaccum_atharv_p[where_gs_lastyr]
+            if save_figs: tmp_gddharv[where_gs_lastyr] = gddharv_atharv_p[where_gs_lastyr]
             # Last year's season should be filled out now; make sure.
-            if np.any(np.isnan(tmp[where_gs_lastyr])):
+            if np.any(np.isnan(tmp_gddaccum[where_gs_lastyr])):
                 raise RuntimeError("Unexpected NaN for last season's GDD accumulation. Maybe because it was inactive last year?")
-        veg_arrs_yp[v][y, thisYear_active_patch_indices] = tmp
+            if save_figs and np.any(np.isnan(tmp_gddharv[where_gs_lastyr])):
+                raise RuntimeError("Unexpected NaN for last season's GDDHARV. Maybe because it was inactive last year?")
+        gddaccum_yp_list[v][y, thisYear_active_patch_indices] = tmp_gddaccum
+        if save_figs: gddharv_yp_list[v][y, thisYear_active_patch_indices] = tmp_gddharv
         
     skip_patches_for_isel_nan_lastyear = skip_patches_for_isel_nan
     if y==1:
@@ -538,145 +587,20 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
 print("Done")
 
 
-
-
 # %% Get and grid mean GDDs in GGCMI growing season
 
-# Get means
-warnings.filterwarnings("ignore", message="Mean of empty slice") # Happens when you do np.nanmean() of an all-NaN array (or slice, if doing selected axis/es)
-veg_arrs_p = [np.nanmean(x, axis=0) if not isinstance(x, type(None)) else x for x in veg_arrs_yp]
-warnings.filterwarnings("always", message="Mean of empty slice")
-
-# Grid
-ds_out = xr.Dataset()
-for c, mean_gdds in enumerate(veg_arrs_p):
-    if isinstance(mean_gdds, type(None)):
-        continue
-    thisCrop_str = h1_incl_ds.vegtype_str.values[c]
-    newVar = f"gdd1_{utils.ivt_str2int(thisCrop_str)}"
-    ds = h1_ds.copy().isel(patch=np.where(h1_ds.patches1d_itype_veg_str.values==thisCrop_str)[0])
-    template_da = ds.patches1d_itype_veg_str
-    da = xr.DataArray(data = mean_gdds,
-                      coords = template_da.coords)
-    ds['mean_gdds'] = da
-    da_gridded = utils.grid_one_variable(ds, 'mean_gdds', vegtype=thisCrop_str).squeeze(drop=True)
-    ds_out[newVar] = da_gridded
-
-
-#%% Import previous GDD requirements for harvest
-        if save_figs:
-            gddharv_da = get_values_at_harvest(thisCrop_hdates_rx, thisCrop_ds["GDDHARV"], time_indsP1, new_dt_axis, newVar)
-            
-        # Change attributes of gdds_da
-        gdds_da = gdds_da.assign_attrs({"long_name": f"{longname_prefix}{vegtype_str}"})
-        del gdds_da.attrs["cell_methods"]
-        
-        # Add to gdds_ds
-        warnings.filterwarnings("ignore", message="Increasing number of chunks by factor of 30")
-        with warnings.catch_warnings():
-            gddaccum_ds[newVar] = gdds_da
-            if save_figs:
-                gddharv_ds[newVar] = gddharv_da
-
-
-# Set up output Dataset(s)
-gddaccum_ds = setup_output_ds(h1_ds, clm_gdd_var, Nyears, new_dt_axis)
 longname_prefix = "GDD harvest target for "
-if save_figs:
-    gddharv_ds = setup_output_ds(h1_ds, "GDDHARV", Nyears, new_dt_axis)
-    
-incl_vegtype_indices = []
-for v, vegtype_str in enumerate(h1_ds.vegtype_str.values):
-    vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
-    newVar = f"gdd1_{vegtype_int}"
-    
-    # Get time series for each patch of this type
-    thisCrop_ds = utils.xr_flexsel(h1_ds, vegtype=vegtype_str)
-    thisCrop_da = thisCrop_ds[clm_gdd_var]
-    if not thisCrop_da.size:
-        continue
-    print(f"{vegtype_str}...")
-    incl_vegtype_indices = incl_vegtype_indices + [v]
-    
-    # Get prescribed harvest dates for these patches
-    lon_points = thisCrop_ds.patches1d_lon.values
-    lat_points = thisCrop_ds.patches1d_lat.values
-    thisCrop_hdates_rx = thisCrop_map_to_patches(lon_points, lat_points, hdates_rx, vegtype_int)
-    # Get "grows across new year?" for these patches
-    thisCrop_gany = thisCrop_map_to_patches(lon_points, lat_points, grows_across_newyear, vegtype_int)
-    
-    # Get the accumulated GDDs at each prescribed harvest date
-    gdds_da = get_values_at_harvest(thisCrop_hdates_rx, thisCrop_da, time_indsP1, new_dt_axis, newVar)
-    
-    # Import previous GDD requirements for harvest
-    if save_figs:
-        gddharv_da = get_values_at_harvest(thisCrop_hdates_rx, thisCrop_ds["GDDHARV"], time_indsP1, new_dt_axis, newVar)
-        
-    # Change attributes of gdds_da
-    gdds_da = gdds_da.assign_attrs({"long_name": f"{longname_prefix}{vegtype_str}"})
-    del gdds_da.attrs["cell_methods"]
-    
-    # Add to gdds_ds
-    warnings.filterwarnings("ignore", message="Increasing number of chunks by factor of 30")
-    with warnings.catch_warnings():
-        gddaccum_ds[newVar] = gdds_da
-        if save_figs:
-            gddharv_ds[newVar] = gddharv_da
-    
+
+print('Getting and gridding mean GDDs...')
+gdd_maps_ds = yp_list_to_ds(gddaccum_yp_list, h1_ds, h1_incl_ds, sdates_rx, longname_prefix)
+if save_figs: gddharv_maps_ds = yp_list_to_ds(gddharv_yp_list, h1_ds, h1_incl_ds, sdates_rx, longname_prefix)
+
 # Fill NAs with dummy values
 dummy_fill = -1
-gdds_fill0_ds = gddaccum_ds.fillna(0)
-gddaccum_ds = gddaccum_ds.fillna(dummy_fill)
+gdd_fill0_maps_ds = gdd_maps_ds.fillna(0)
+gdd_maps_ds = gdd_maps_ds.fillna(dummy_fill)
+print('Done getting and gridding means.')
 
-# Remove unused vegetation types
-gddaccum_ds = gddaccum_ds.isel(ivt=incl_vegtype_indices)
-gdds_fill0_ds = gdds_fill0_ds.isel(ivt=incl_vegtype_indices)
-
-# Take mean
-gdds_mean_ds = gddaccum_ds.mean(dim="time", keep_attrs=True)
-gdds_fill0_mean_ds = gdds_fill0_ds.mean(dim="time", keep_attrs=True)
-if save_figs:
-    gddharv_mean_ds = gddharv_ds.mean(dim="time", keep_attrs=True)
-    
-print("Done getting means")
-
-
-# %% Grid
-
-# Fill value
-fillValue = -1
-
-for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
-    vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
-    thisVar = f"gdd1_{vegtype_int}"
-    print(f"Gridding {vegtype_str} ({vegtype_int})...")
-    
-    # Grid
-    thisCrop_gridded = utils.grid_one_variable(gdds_mean_ds, thisVar, \
-        fillValue=fillValue, vegtype=vegtype_int).squeeze(drop=True)
-    thisCrop_fill0_gridded = utils.grid_one_variable(gdds_fill0_mean_ds, thisVar, \
-        vegtype=vegtype_int).squeeze(drop=True)
-    thisCrop_fill0_gridded = thisCrop_fill0_gridded.fillna(0)
-    thisCrop_fill0_gridded.attrs["_FillValue"] = fillValue
-    if save_figs:
-        gddharv_gridded = utils.grid_one_variable(gddharv_mean_ds, thisVar, \
-            fillValue=fillValue, vegtype=vegtype_int).squeeze(drop=True)
-    
-    # Add singleton time dimension
-    thisCrop_gridded = thisCrop_gridded.expand_dims(time = sdates_rx.time)
-    thisCrop_fill0_gridded = thisCrop_fill0_gridded.expand_dims(time = sdates_rx.time)
-    
-    # Add to Dataset
-    if v==0:
-        gdd_maps_ds = thisCrop_gridded.to_dataset()
-        gdd_fill0_maps_ds = thisCrop_fill0_gridded.to_dataset()
-        if save_figs:
-            gddharv_maps_ds = gddharv_gridded.to_dataset()
-    gdd_maps_ds[thisVar] = thisCrop_gridded
-    gdd_fill0_maps_ds[thisVar] = thisCrop_fill0_gridded
-    if save_figs:
-        gddharv_maps_ds[thisVar] = gddharv_gridded
-    
 # Add dummy variables for crops not actually simulated
 print("Adding dummy variables...")
 # Unnecessary?
@@ -688,10 +612,16 @@ def make_dummy(thisCrop_gridded, addend):
     dummy_gridded = thisCrop_gridded
     dummy_gridded.values = dummy_gridded.values*0 + addend
     return dummy_gridded
+for v in gdd_maps_ds:
+    thisCrop_gridded = gdd_maps_ds[v].copy()
+    thisCrop_fill0_gridded = gdd_fill0_maps_ds[v].copy()
+    break
 dummy_gridded = make_dummy(thisCrop_gridded, -1)
 dummy_gridded0 = make_dummy(thisCrop_fill0_gridded, 0)
 
 for v, thisVar in enumerate(dummy_vars):
+    if thisVar in gdd_maps_ds:
+        raise RuntimeError(f'{thisVar} is already in gdd_maps_ds. Why overwrite it with dummy?')
     dummy_gridded.name = thisVar
     dummy_gridded.attrs["long_name"] = all_longnames[v]
     gdd_maps_ds[thisVar] = dummy_gridded
@@ -710,7 +640,7 @@ def add_lonlat_attrs(ds):
     return ds
 gdd_maps_ds = add_lonlat_attrs(gdd_maps_ds)
 gdd_fill0_maps_ds = add_lonlat_attrs(gdd_fill0_maps_ds)
-gddharv_maps_ds = add_lonlat_attrs(gddharv_maps_ds)
+if save_figs: gddharv_maps_ds = add_lonlat_attrs(gddharv_maps_ds)
 
 print("Done.")
 
