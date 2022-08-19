@@ -277,7 +277,7 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
     # Just work with non-NaN patches for now
     skip_patches_for_isel_nan = np.where(sdates_all_nan)[0]
     incl_patches_for_isel_nan = np.where(~sdates_all_nan)[0]
-    different_nan_mask = y > 0 and ~np.array_equal(skip_patches_for_isel_nan_lastyear, skip_patches_for_isel_nan)
+    different_nan_mask = y > 0 and not np.array_equal(skip_patches_for_isel_nan_lastyear, skip_patches_for_isel_nan)
     if different_nan_mask:
         print('   Different NaN mask than last year')
         incl_thisyr_but_nan_lastyr = [dates_ds.patch.values[p] for p in incl_patches_for_isel_nan if p in skip_patches_for_isel_nan_lastyear]
