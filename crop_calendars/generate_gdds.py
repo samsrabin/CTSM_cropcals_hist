@@ -813,16 +813,20 @@ if save_figs:
 # %% Check that all cells that had sdates are represented
 print("Checking that all cells that had sdates are represented...")
 
+sdates_grid = utils.grid_one_variable(dates_incl_ds, 'SDATES')
+
 all_ok = True
 for vt_str in vegtypes_included:
     vt_int = utils.ivt_str2int(vt_str)
     # print(f"{vt_int}: {vt_str}")
     
     map_gdd = gdd_maps_ds[f"gdd1_{vt_int}"].isel(time=0, drop=True)
-    map_sdate = sdates_grid.isel(time=0, mxsowings=0, drop=True).sel(ivt_str=vt_str, drop=True)
+    map_sdate = sdates_grid.isel(mxsowings=0, drop=True).sel(ivt_str=vt_str, drop=True)
+    if "time" in map_sdate.dims:
+        map_sdate = map_sdate.isel(time=0, drop=True)
     
-    ok_gdd = map_gdd.where(map_gdd >= 0).notnull()
-    ok_sdate = map_sdate.where(map_sdate > 0).notnull()
+    ok_gdd = map_gdd.where(map_gdd >= 0).notnull().values
+    ok_sdate = map_sdate.where(map_sdate > 0).notnull().values
     missing_both = np.bitwise_and(np.bitwise_not(ok_gdd), np.bitwise_not(ok_sdate))
     ok_both = np.bitwise_and(ok_gdd, ok_sdate)
     ok_both = np.bitwise_or(ok_both, missing_both)
@@ -831,9 +835,9 @@ for vt_str in vegtypes_included:
         gdd_butnot_sdate = np.bitwise_and(ok_gdd, np.bitwise_not(ok_sdate))
         sdate_butnot_gdd = np.bitwise_and(ok_sdate, np.bitwise_not(ok_gdd))
         if np.any(gdd_butnot_sdate):
-            print(f"{vt_int} {vt_str}: {np.sum(gdd_butnot_sdate)} cells in GDD but not sdate")
+            print(f"   {vt_int} {vt_str}: {np.sum(gdd_butnot_sdate)} cells in GDD but not sdate")
         if np.any(sdate_butnot_gdd):
-            print(f"{vt_int} {vt_str}: {np.sum(sdate_butnot_gdd)} cells in sdate but not GDD")
+            print(f"   {vt_int} {vt_str}: {np.sum(sdate_butnot_gdd)} cells in sdate but not GDD")
 
 if not all_ok:
     print("❌ Mismatch between sdate and GDD outputs")
