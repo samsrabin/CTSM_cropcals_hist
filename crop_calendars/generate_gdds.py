@@ -645,8 +645,7 @@ if save_figs: gddharv_maps_ds = add_lonlat_attrs(gddharv_maps_ds)
 print("Done.")
 
 
-# %% 
-# Save before/after map and boxplot figures, if doing so
+# %% Save before/after map and boxplot figures, if doing so
 
 # layout = "3x1"
 layout = "2x2"
@@ -656,6 +655,8 @@ lat_bin_edges = np.arange(0, 91, bin_width)
 fontsize_titles = 18
 fontsize_axislabels = 15
 fontsize_ticklabels = 15
+
+vegtypes_included = h1_ds.vegtype_str.values[[i for i,c in enumerate(gddaccum_yp_list) if not isinstance(c,type(None))]]
 
 def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles): 
     im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
@@ -712,7 +713,7 @@ if save_figs:
     ny = 3
     nx = 1
     print("Making before/after maps...")
-    for v, vegtype_str in enumerate(gdds_mean_ds.vegtype_str.values):
+    for v, vegtype_str in enumerate(vegtypes_included):
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         thisVar = f"gdd1_{vegtype_int}"
         print(f"   {vegtype_str} ({vegtype_int})...")
@@ -721,9 +722,11 @@ if save_figs:
         # Maps #####################
         
         gdd_map = gdd_maps_ds[thisVar].isel(time=0, drop=True)
-        gdd_map_yx = gdd_map.where(gdd_map != fillValue)
+        gdd_map_yx = gdd_map.where(gdd_map != dummy_fill)
         gddharv_map = gddharv_maps_ds[thisVar]
-        gddharv_map_yx = gddharv_map.where(gddharv_map != fillValue)
+        if "time" in gddharv_map.dims:
+            gddharv_map = gddharv_map.isel(time=0, drop=True)
+        gddharv_map_yx = gddharv_map.where(gddharv_map != dummy_fill)
                 
         vmax = max(np.max(gdd_map_yx), np.max(gddharv_map_yx))
         
@@ -739,8 +742,8 @@ if save_figs:
         else:
             raise RuntimeError(f"layout {layout} not recognized")
         
-        thisMin = int(np.round(np.min(gddharv_map_yx)))
-        thisMax = int(np.round(np.max(gddharv_map_yx)))
+        thisMin = int(np.round(np.nanmin(gddharv_map_yx)))
+        thisMax = int(np.round(np.nanmax(gddharv_map_yx)))
         thisTitle = f"{vegtype_str}: Old (range {thisMin}–{thisMax})"
         make_map(ax, gddharv_map_yx, thisTitle, vmax, bin_width,
                  fontsize_ticklabels, fontsize_titles)
@@ -751,16 +754,16 @@ if save_figs:
             ax = fig.add_subplot(spec[1,0],projection=ccrs.PlateCarree())
         else:
             raise RuntimeError(f"layout {layout} not recognized")
-        thisMin = int(np.round(np.min(gdd_map_yx)))
-        thisMax = int(np.round(np.max(gdd_map_yx)))
+        thisMin = int(np.round(np.nanmin(gdd_map_yx)))
+        thisMax = int(np.round(np.nanmax(gdd_map_yx)))
         thisTitle = f"{vegtype_str}: New (range {thisMin}–{thisMax})"
         make_map(ax, gdd_map_yx, thisTitle, vmax, bin_width,
                  fontsize_ticklabels, fontsize_titles)
         
         # Boxplots #####################
         
-        gdd_vector = get_non_nans(gdd_map, fillValue)
-        gddharv_vector = get_non_nans(gddharv_map, fillValue)
+        gdd_vector = get_non_nans(gdd_map, dummy_fill)
+        gddharv_vector = get_non_nans(gddharv_map, dummy_fill)
         
         lat_abs = np.abs(gdd_map.lat.values)
         gdd_bybin_old = [gddharv_vector]
@@ -770,8 +773,8 @@ if save_figs:
             upper = lat_bin_edges[b+1]
             lat_inds = np.where((lat_abs>=lower) & (lat_abs<upper))[0]
             # gdd_map_thisBin = gdd_map.where(gdd_map.lat>=lower )
-            gdd_vector_thisBin = get_non_nans(gdd_map[lat_inds,:], fillValue)
-            gddharv_vector_thisBin = get_non_nans(gddharv_map[lat_inds,:], fillValue)
+            gdd_vector_thisBin = get_non_nans(gdd_map[lat_inds,:], dummy_fill)
+            gddharv_vector_thisBin = get_non_nans(gddharv_map[lat_inds,:], dummy_fill)
             gdd_bybin_old.append(gddharv_vector_thisBin)
             gdd_bybin_new.append(gdd_vector_thisBin)
                 
