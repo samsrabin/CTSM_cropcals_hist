@@ -463,6 +463,11 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
             patches += list(thisCrop_gddaccum_da.patch.values[here])
             i_patches += list(here)
             i_times += list(np.full((len(here),), int(hdate-1)))
+        # Sort patches back to correct order
+        if not np.all(thisCrop_gddaccum_da.patch.values[:-1] <= thisCrop_gddaccum_da.patch.values[1:]):
+            raise RuntimeError("This code depends on DataArray patch list being sorted.")
+        sortorder = np.argsort(patches)
+        i_patches = list(np.array(i_patches)[np.array(sortorder)])
         # Select using the indexing tuple
         gddaccum_atharv_p = thisCrop_gddaccum_da.values[(i_times, i_patches)]
         if save_figs: gddharv_atharv_p = thisCrop_gddharv_da.values[(i_times, i_patches)]
@@ -470,12 +475,6 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
             print(f"         ❗ {np.sum(np.isnan(gddaccum_atharv_p))}/{len(gddaccum_atharv_p)} NaN after extracting GDDs accumulated at harvest")
         if save_figs and np.any(np.isnan(gddharv_atharv_p)):
             print(f"         ❗ {np.sum(np.isnan(gddharv_atharv_p))}/{len(gddharv_atharv_p)} NaN after extracting GDDHARV")
-        # Sort patches back to correct order
-        if not np.all(thisCrop_gddaccum_da.patch.values[:-1] <= thisCrop_gddaccum_da.patch.values[1:]):
-            raise RuntimeError("This code depends on DataArray patch list being sorted.")
-        sortorder = np.argsort(patches)
-        gddaccum_atharv_p = gddaccum_atharv_p[np.array(sortorder)]
-        if save_figs: gddharv_atharv_p = gddharv_atharv_p[np.array(sortorder)]
                 
         # Assign these to growing seasons based on whether gs crossed new year
         thisYear_active_patch_indices = [thisCrop_full_patchlist.index(x) for x in thisCrop_ds.patch.values]
