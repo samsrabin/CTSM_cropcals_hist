@@ -260,6 +260,8 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
                 print("   ℹ️ You saved SDATES and HDATES daily, but you only needed annual. Fixing.")
             incorrectly_daily = True
             dates_ds = dates_ds.isel(time=-1)
+    else:
+        dates_ds = dates_ds.isel(time=0)
     
     # Make sure NaN masks match
     sdates_all_nan = np.sum(~np.isnan(dates_ds.SDATES.values), axis=dates_ds.SDATES.dims.index('mxsowings')) == 0
@@ -267,6 +269,8 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
     N_unmatched_nans = np.sum(sdates_all_nan != hdates_all_nan)
     if N_unmatched_nans > 0:
         raise RuntimeError("Output SDATE and HDATE NaN masks do not match.")
+    if np.sum(~np.isnan(dates_ds.SDATES.values)) == 0:
+        raise RuntimeError("All SDATES are NaN!")
     
     # Just work with non-NaN patches for now
     skip_patches_for_isel_nan = np.where(sdates_all_nan)[0]
@@ -283,6 +287,9 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
         dates_incl_ds = dates_ds.isel(patch=incl_patches_for_isel_nan)
     else:
         dates_incl_ds = dates_ds
+        
+    if np.sum(~np.isnan(dates_incl_ds.SDATES.values)) == 0:
+        raise RuntimeError("All SDATES are NaN after ignoring those patches!")
     
     # Some patches can have -1 sowing date?? Hopefully just an artifact of me incorrectly saving SDATES/HDATES daily.
     mxsowings = dates_ds.dims['mxharvests']
