@@ -34,6 +34,7 @@ else:
 # indir = "/glade/scratch/samrabin/archive/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1950-2013.ggcmi2/lnd/hist"
 # indir = "/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1950-2013.ggcmi2"
 indir = "/glade/scratch/samrabin/archive/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddgen/lnd/hist"
+# indir = "/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddgen"
 
 # sdate_inFile = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
 # hdate_inFile = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.20220602_230029.nc"
@@ -93,103 +94,13 @@ def import_rx_dates(s_or_h, date_inFile, dates_ds):
     
     return ds
 
+
 def thisCrop_map_to_patches(lon_points, lat_points, map_ds, vegtype_int):
     # xarray pointwise indexing; see https://xarray.pydata.org/en/stable/user-guide/indexing.html#more-advanced-indexing
     return map_ds[f"gs1_{vegtype_int}"].sel( \
         lon=xr.DataArray(lon_points, dims="patch"),
         lat=xr.DataArray(lat_points, dims="patch")).squeeze(drop=True)
     
-    
-# Check that, during period of interest, simulated harvest always happens the day before sowing
-# Could vectorize this, but it gets complicated because some cells are sown Jan. 1 and some aren't.
-def check_harvest_daybefore_sowing(dates_ds):
-    print("   Checking that harvest is always the day before sowing...")
-    verbose = True
-
-    patchList = dates_ds.patch.values
-    ok_p = np.full((dates_ds.dims["patch"]), True)
-
-    for p, thisPatch in enumerate(patchList):
-        
-        if (p+1) % 10000 == 0:
-            print(f"{p+1} / {len(patchList)}")
-            
-        thisLon = dates_ds.patches1d_lon.values[p]
-        thisLat = dates_ds.patches1d_lat.values[p]
-        # thisLon = np.round(dates_ds.patches1d_lon.values[p], decimals=2)
-        # thisLat = np.round(dates_ds.patches1d_lat.values[p], decimals=2)
-        thisCrop = dates_ds.patches1d_itype_veg_str.values[p]
-        thisIVT = dates_ds.patches1d_itype_veg.values[p]
-        thisStr = f"Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop} ({thisIVT})"
-        sim_sp = dates_ds["SDATES"].sel(patch=thisPatch).values
-        sim_hp = dates_ds["HDATES"].sel(patch=thisPatch).values
-        
-        if "time" in dates_ds.dims and dates_ds.dims["time"] == 1:
-            thisYear = dates_ds["time"].values[0].year
-        else:
-            thisYear = None
-        
-        # There should be no missing sowings
-        if any(sim_sp < 1):
-            ok_p[p] = False
-            if verbose:
-                if np.all(sim_sp < 1):
-                    print(f"{thisStr}: Sowing never happened")
-                elif thisYear:
-                    print(f"{thisStr}: Sowing didn't happen in {thisYear}")
-                else:
-                    print(f"{thisStr}: Sowing didn't happen some year(s); first {y1+int(np.argwhere(sim_sp < 1)[0])}")
-            continue
-
-        # Should only need to consider one sowing and one harvest
-        if (sim_sp.ndim > 1):
-            if (sim_sp.shape[1] > 1):
-                ok_p[p] = False
-                if verbose: print(f"{thisStr}: Expected mxsowings 1 but found {sim_sp.shape[1]}")
-                continue
-            sim_sp = sim_sp[:,0]
-        if (sim_sp.ndim > 1):
-            if np.any(sim_hp[:,1:] > 0):
-                ok_p[p] = False
-                if verbose: print(f"{thisStr}: More than 1 harvest found in some year(s)")
-                continue
-            sim_hp = sim_hp[:,0]
-
-        # Align
-        if sim_sp[0] > 1:
-            sim_hp = sim_hp[1:]
-        else:
-            sim_hp = sim_hp[0:-1]
-        sim_sp = sim_sp[0:-1]
-
-        # We're going to be comparing each harvest to the sowing that FOLLOWS it.
-        sim_sp = sim_sp[1:]
-        sim_hp = sim_hp[0:-1]
-            
-        # There should no longer be any missing harvests
-        if any(sim_hp < 1):
-            ok_p[p] = False
-            if verbose:
-                if np.all(sim_hp < 1):
-                    print(f"{thisStr}: Harvest never happened")
-                elif thisYear:
-                    print(f"{thisStr}: Harvest didn't happen in {thisYear}")
-                else:
-                    print(f"{thisStr}: Harvest didn't happen some growing season(s); first {y1+int(np.argwhere(sim_hp < 1)[0])}")
-            continue
-
-        # Harvest should always happen the day before the next sowing.
-        exp_hp = ((sim_sp - 2)%365) + 1
-        if not np.array_equal(sim_hp, exp_hp):
-            ok_p[p] = False
-            if verbose: print(f"{thisStr}: Not every harvest happens the day before next sowing")
-            continue
-        
-    if np.all(ok_p):
-        print("   ✅ CLM output sowing and harvest dates look good.")
-    else:
-        raise RuntimeError(f"   ❌ {sum(np.bitwise_not(ok_p))} patch(es) had problem(s) with CLM output sowing and/or harvest dates.")
-
 
 def check_sdates(dates_ds, sdates_rx, verbose=False):
     print("   Checking that input and output sdates match...")
@@ -280,13 +191,6 @@ def get_values_at_harvest(thisCrop_hdates_rx, in_da, time_indsP1, new_dt_axis, n
     return out_da
 
 
-# Set up output Dataset(s)
-def setup_output_ds(in_ds, thisVar, Nyears, new_dt_axis):
-    out_ds = in_ds.isel(time=np.arange(Nyears))
-    out_ds = out_ds.assign_coords(time=new_dt_axis)
-    del out_ds[thisVar]
-    return out_ds
-
 # Get and grid mean GDDs in GGCMI growing season
 def yp_list_to_ds(yp_list, daily_ds, daily_incl_ds, dates_rx, longname_prefix):
     
@@ -318,7 +222,6 @@ def yp_list_to_ds(yp_list, daily_ds, daily_incl_ds, dates_rx, longname_prefix):
         ds_out[newVar] = da_gridded
         
     return ds_out
-
 
 
 # %% Import and process
@@ -358,7 +261,6 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
             incorrectly_daily = True
             dates_ds = dates_ds.isel(time=-1)
     
-    # check_harvest_daybefore_sowing(dates_ds)
     # Make sure NaN masks match
     sdates_all_nan = np.sum(~np.isnan(dates_ds.SDATES.values), axis=dates_ds.SDATES.dims.index('mxsowings')) == 0
     hdates_all_nan = np.sum(~np.isnan(dates_ds.HDATES.values), axis=dates_ds.HDATES.dims.index('mxharvests')) == 0
