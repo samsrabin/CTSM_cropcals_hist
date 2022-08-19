@@ -40,12 +40,62 @@ warnings.filterwarnings("ignore", message="This figure includes Axes that are no
 
 # %% Define functions
 
-def adjust_grainC(da):
+def adjust_grainC(da_in, patches1d_itype_veg_str):
    # Parameters from Danica's 2020 paper
    fyield = 0.85 # 85% harvest efficiency (Kucharik & Brye, 2003)
-   cgrain = 0.45 # 45% of biomass is C (Monfreda et al., 2008)
-   da = da * fyield / cgrain
-   return da
+   cgrain = 0.45 # 45% of dry biomass is C (Monfreda et al., 2008)
+   
+   # Dry matter fraction from Wirsenius (2000) Table A1.II except as noted
+   drymatter_fractions = {
+      'corn': 0.88,
+      'cotton': 0.912, # Table A1.III, "Seed cotton", incl. lint, seed, and "other (ginning waste)"
+      'miscanthus': 0.0,  # Not included in Wirsenius, but also not simulated, so I don't care
+      'rice': 0.87,
+      'soybean': 0.91,
+      'sugarcane': 1-0.745, # Irvine, Cane Sugar Handbook, 10th ed., 1977, P. 16. (see sugarcane.py)
+      'wheat': 0.88,
+   }
+   
+   # Convert patches1d_itype_veg_str to needed format
+   if isinstance(patches1d_itype_veg_str, xr.DataArray):
+      patches1d_itype_veg_str = patches1d_itype_veg_str.values
+   if not isinstance(patches1d_itype_veg_str[0], str):
+      patches1d_itype_veg_int = patches1d_itype_veg_str
+      patches1d_itype_veg_str = [utils.ivt_int2str(x) for x in patches1d_itype_veg_int]
+   
+   # Create new array with patch as the first dimension. This allows us to use Ellipsis when filling.
+   patch_dim = da_in.dims.index('patch')
+   wet_tp = np.full(da_in.shape, np.nan)
+   wet_tp = np.moveaxis(wet_tp, patch_dim, 0)
+   
+   # Fill new array   
+   drymatter_cropList = []
+   da_in.load()
+   for thisCrop, dm_frac in drymatter_fractions.items():
+      drymatter_cropList.append(thisCrop)
+      i_thisCrop = [i for i,x in enumerate(patches1d_itype_veg_str) if thisCrop in x]
+      
+      tmp = da_in.isel(patch=i_thisCrop).values
+      if dm_frac != None:
+         tmp /= dm_frac
+      elif np.any(tmp > 0):
+         raise RuntimeError(f"You need to get a real dry-matter fraction for {thisCrop}")
+      
+      wet_tp[i_thisCrop, ...] = np.moveaxis(tmp, patch_dim, 0)
+   
+   # Move patch dimension (now in 0th position) back to where it should be.
+   wet_tp = np.moveaxis(wet_tp, 0, patch_dim)
+   
+   # Make sure NaN mask is unchanged
+   if not np.array_equal(np.isnan(wet_tp), np.isnan(da_in.values)):
+      missing_croptypes = [x for x in np.unique(patches1d_itype_veg_str) if x not in drymatter_cropList]
+      raise RuntimeError(f'Failed to completely fill wet_tp. Missing crop types: {missing_croptypes}')
+
+   # Save to output DataArray
+   da_out = xr.DataArray(data = wet_tp * fyield / cgrain,
+                         coords = da_in.coords,
+                         attrs = da_in.attrs)
+   return da_out
 
 
 # Rounding errors can result in differences of up to lon/lat_tolerance. Tolerate those by replacing the value in the gridded dataset.
@@ -254,10 +304,10 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    this_ds_gs["GSLEN"] = get_gs_len_da(this_ds_gs["HDATES"] - this_ds_gs["SDATES"])
    
    # Get *biomass* *actually harvested*
-   this_ds["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_ANN"])
-   this_ds["GRAINC_TO_FOOD_PERHARV"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_PERHARV"])
-   this_ds_gs["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD_ANN"])
-   this_ds_gs["GRAIN_HARV_TOFOOD"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD"])
+   this_ds["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
+   this_ds["GRAINC_TO_FOOD_PERHARV"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_PERHARV"], this_ds.patches1d_itype_veg_str)
+   this_ds_gs["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
+   this_ds_gs["GRAIN_HARV_TOFOOD"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD"], this_ds.patches1d_itype_veg_str)
    
    # Avoid tiny negative values
    varList_no_negative = ["GRAIN", "REASON", "GDD", "HUI", "YEAR", "DATE", "GSLEN"]
@@ -494,7 +544,7 @@ for i, (casename, case) in enumerate(cases.items()):
       this_ds = xr.open_dataset(case['filepath'])
 
       # Convert gC/m2 to g/m2 actually harvested
-      this_ds["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds.GRAINC_TO_FOOD)
+      this_ds["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds.GRAINC_TO_FOOD, this_ds.patches1d_itype_veg)
 
       # Rework to match what we already have
       this_ds = this_ds.assign_coords({"ivt": np.arange(np.min(this_ds.patches1d_itype_veg.values),
