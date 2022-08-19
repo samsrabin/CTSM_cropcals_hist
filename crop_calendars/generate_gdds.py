@@ -67,6 +67,7 @@ import warnings
 warnings.filterwarnings("ignore", message="__len__ for multi-part geometries is deprecated and will be removed in Shapely 2.0. Check the length of the `geoms` property instead to get the  number of parts of a multi-part geometry.")
 warnings.filterwarnings("ignore", message="Iteration over multi-part geometries is deprecated and will be removed in Shapely 2.0. Use the `geoms` property to access the constituent parts of a multi-part geometry.")
 
+
 def import_rx_dates(s_or_h, date_inFile, dates_ds):
     # Get run info:
     # Max number of growing seasons per year
@@ -727,16 +728,24 @@ save_gdds(sdate_inFile, hdate_inFile, outfile_fill0, gdd_fill0_maps_ds, sdates_r
 print("Done saving.")
 
 
-# %% Save before/after map and boxplot figures, if doing so
+# %% Save things needed for mapmaking
 
-# layout = "3x1"
-layout = "2x2"
-bin_width = 15
-lat_bin_edges = np.arange(0, 91, bin_width)
+def add_attrs_to_map_ds(map_ds, vegtypes_included, dummy_fill, outdir_figs, y1, yN):
+    return map_ds.assign_attrs({'vegtypes_included': vegtypes_included,
+                                'dummy_fill': dummy_fill,
+                                'outdir_figs': outdir_figs,
+                                'y1': y1,
+                                'yN': yN})
 
-fontsize_titles = 18
-fontsize_axislabels = 15
-fontsize_ticklabels = 15
+if save_figs:
+    gdd_maps_ds = add_attrs_to_map_ds(gdd_maps_ds, vegtypes_included, dummy_fill, outdir_figs, y1, yN)
+    gddharv_maps_ds = add_attrs_to_map_ds(gddharv_maps_ds, vegtypes_included, dummy_fill, outdir_figs, y1, yN)
+    
+    gdd_maps_ds.to_netcdf(outdir_figs + "gdd_maps.nc")
+    gddharv_maps_ds.to_netcdf(outdir_figs + "gddharv_maps.nc")
+
+
+# %% Save before/after map and boxplot figures
 
 def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles): 
     im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
@@ -769,15 +778,6 @@ def set_boxplot_props(bp, color):
     plt.setp(bp['medians'], color=color, linewidth=linewidth)
     plt.setp(bp['fliers'], markeredgecolor=color, markersize=6, linewidth=linewidth, markeredgewidth=linewidth/2)
 
-Nbins = len(lat_bin_edges)-1
-bin_names = ["All"]
-for b in np.arange(Nbins):
-    lower = lat_bin_edges[b]
-    upper = lat_bin_edges[b+1]
-    bin_names.append(f"{lower}–{upper}")
-    
-color_old = '#beaed4'
-color_new = '#7fc97f'
 def make_plot(data, offset):
     linewidth = 1.5
     offset = 0.4*offset
@@ -787,8 +787,42 @@ def make_plot(data, offset):
                       flierprops=dict(markeredgewidth=0.5))
     return bpl
 
-if save_figs:
-    
+def make_figures(thisDir=None, gdd_maps_ds=None, gddharv_maps_ds=None):
+    if not gdd_maps_ds:
+        if not thisDir:
+            raise RuntimeError('If not providing gdd_maps_ds, you must provide thisDir (location of gdd_maps.nc)')
+        gdd_maps_ds = xr.open_dataset(thisDir + 'gdd_maps.nc')
+    if not gddharv_maps_ds:
+        if not thisDir:
+            raise RuntimeError('If not providing gddharv_maps_ds, you must provide thisDir (location of gddharv_maps.nc)')
+        gddharv_maps_ds = xr.open_dataset(thisDir + 'gdd_maps.nc')
+
+    # Get info
+    vegtypes_included = gdd_maps_ds.attrs['vegtypes_included']
+    dummy_fill = gdd_maps_ds.attrs['dummy_fill']
+    outdir_figs = gdd_maps_ds.attrs['outdir_figs']
+    y1 = gdd_maps_ds.attrs['y1']
+    yN = gdd_maps_ds.attrs['yN']
+
+    # layout = "3x1"
+    layout = "2x2"
+    bin_width = 15
+    lat_bin_edges = np.arange(0, 91, bin_width)
+
+    fontsize_titles = 18
+    fontsize_axislabels = 15
+    fontsize_ticklabels = 15
+
+    Nbins = len(lat_bin_edges)-1
+    bin_names = ["All"]
+    for b in np.arange(Nbins):
+        lower = lat_bin_edges[b]
+        upper = lat_bin_edges[b+1]
+        bin_names.append(f"{lower}–{upper}")
+        
+    color_old = '#beaed4'
+    color_new = '#7fc97f'
+
     # Maps
     ny = 3
     nx = 1
@@ -852,7 +886,6 @@ if save_figs:
             lower = lat_bin_edges[b]
             upper = lat_bin_edges[b+1]
             lat_inds = np.where((lat_abs>=lower) & (lat_abs<upper))[0]
-            # gdd_map_thisBin = gdd_map.where(gdd_map.lat>=lower )
             gdd_vector_thisBin = get_non_nans(gdd_map[lat_inds,:], dummy_fill)
             gddharv_vector_thisBin = get_non_nans(gddharv_map[lat_inds,:], dummy_fill)
             gdd_bybin_old.append(gddharv_vector_thisBin)
@@ -881,10 +914,13 @@ if save_figs:
         plt.xlabel("|latitude| zone", fontsize=fontsize_axislabels)
         plt.ylabel("Growing degree-days", fontsize=fontsize_axislabels)
         plt.title(f"Zonal changes: {vegtype_str}", fontsize=fontsize_titles)
-        
         outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}.png"
-        plt.savefig(outfile, dpi=300, transparent=False, facecolor='white', \
-            bbox_inches='tight')
+        plt.savefig(outfile, dpi=300, transparent=False, facecolor='white',
+                    bbox_inches='tight')
         plt.close()
 
     print("Done.")
+
+make_figures(gdd_maps_ds=gdd_maps_ds, gddharv_maps_ds=gdd_maps_ds)
+
+
