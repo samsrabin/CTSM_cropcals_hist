@@ -534,6 +534,10 @@ cases['ctsm5.1.dev092'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cr
 cases['mycode_clmcals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1950-2013.clm/2022-08-09/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1950-2013.clm.clm2.h1.1950-01-01-00000.nc',
                     'constantVars': None,
                     'res': 'f19_g17'}
+# My run with rx_crop_calendars2 code and GGCMI calendars
+cases['mycode_ggcmicals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddforced/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddforced.clm2.h1.1950-01-01-00000.nc',
+                    'constantVars': None,  # Would be SDATES, but land use changes over time
+                    'res': 'f19_g17'}
 
 # Note that _PERHARV will be stripped off upon import
 myVars = ['GRAINC_TO_FOOD_PERHARV', 'GRAINC_TO_FOOD_ANN', 'SDATES', 'SDATES_PERHARV', 'SYEARS_PERHARV', 'HDATES', 'HYEARS', 'GDDHARV_PERHARV', 'GDDACCUM_PERHARV', 'HUI_PERHARV', 'SOWING_REASON_PERHARV', 'HARVEST_REASON_PERHARV']
@@ -596,7 +600,7 @@ for i, (resname, res) in enumerate(reses.items()):
       
 print("Done importing land use.")
 
-# %%Harmonize LU and cases
+# Harmonize LU and cases
 print("Harmonizing LU data and case datasets:")
 for i, (casename, case) in enumerate(cases.items()):
    print(casename + "...")
@@ -891,8 +895,8 @@ finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outD
 # %% Make maps of individual crops (rainfed, irrigated)
 
 # Define reference case, if you want to plot differences
-ref_casename = None
-# ref_casename = 'ctsm5.1.dev092'
+# ref_casename = None
+ref_casename = 'mycode_clmcals'
 
 overwrite = False
 
@@ -991,6 +995,13 @@ for (this_var, var_info) in varList.items():
       new_sp_left = None
    elif ny == 3:
       figsize = (14, 10)    # width, height
+      suptitle_xpos = 0.55
+      suptitle_ypos = 1
+      cbar_pos = [0.2, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
+      new_sp_bottom = 0.11 # default: 0.1
+      new_sp_left = 0.125
+   elif ny == 4:
+      figsize = (22, 16)    # width, height
       suptitle_xpos = 0.55
       suptitle_ypos = 1
       cbar_pos = [0.2, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
