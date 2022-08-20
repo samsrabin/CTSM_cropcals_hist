@@ -272,12 +272,12 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
       for v in constantVars:
          ok = True
 
-         t1_yr = this_ds.gs.values[t1]
-         t1_vals = np.squeeze(this_ds[v].isel(gs=t1).values)
+         t1_yr = this_ds.time.values[t1]
+         t1_vals = np.squeeze(this_ds[v].isel(time=t1).values)
 
-         for t in np.arange(t1+1, this_ds.dims["gs"]):
-            t_yr = this_ds.gs.values[t]
-            t_vals = np.squeeze(this_ds[v].isel(gs=t).values)
+         for t in np.arange(t1+1, this_ds.dims["time"]):
+            t_yr = this_ds.time.values[t]
+            t_vals = np.squeeze(this_ds[v].isel(time=t).values)
             ok_p = np.squeeze(t1_vals == t_vals)
             if not np.all(ok_p):
                   if ok:
@@ -298,7 +298,7 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
                      print(f"{v} timestep {t} does not match timestep {t1}")
 
          if ok:
-            print(f"✅ CLM output {v} do not vary through {this_ds.dims['gs'] - t1} growing seasons of output.")
+            print(f"✅ CLM output {v} do not vary through {this_ds.dims['time'] - t1} years of output.")
    
    # Convert time*mxharvests axes to growingseason axis
    this_ds_gs = convert_axis_time2gs(this_ds, verbose=verbose, incl_orig=False)
