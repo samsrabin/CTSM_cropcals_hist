@@ -298,7 +298,7 @@ def make_plot(data, offset):
                       flierprops=dict(markeredgewidth=0.5))
     return bpl
 
-def make_figures(thisDir=None, gdd_maps_ds=None, gddharv_maps_ds=None):
+def make_figures(thisDir=None, gdd_maps_ds=None, gddharv_maps_ds=None, outdir_figs=None):
     if not gdd_maps_ds:
         if not thisDir:
             raise RuntimeError('If not providing gdd_maps_ds, you must provide thisDir (location of gdd_maps.nc)')
@@ -311,7 +311,8 @@ def make_figures(thisDir=None, gdd_maps_ds=None, gddharv_maps_ds=None):
     # Get info
     incl_vegtypes_str = gdd_maps_ds.attrs['incl_vegtypes_str']
     dummy_fill = gdd_maps_ds.attrs['dummy_fill']
-    outdir_figs = gdd_maps_ds.attrs['outdir_figs']
+    if not outdir_figs:
+        outdir_figs = gdd_maps_ds.attrs['outdir_figs']
     y1 = gdd_maps_ds.attrs['y1']
     yN = gdd_maps_ds.attrs['yN']
 
