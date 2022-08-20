@@ -309,8 +309,9 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
         try:
             h3_ds = utils.import_ds(glob.glob(indir + f"*h3.{thisYear-1}-01-01*"), myVars=['GDDHARV'], myVegtypes=utils.define_mgdcrop_list())
             h1_ds['GDDHARV'] = h3_ds['GDDHARV']
-            print('Success! Will look in h3 files from now on.')
-            gddharv_in_h3 = True
+            if not gddharv_in_h3:
+                print('Success! Will look in h3 files from now on.')
+                gddharv_in_h3 = True
         except:
             print('Unable to import GDDHARV from h1 or h3 files. Disabling save_figs.')
             save_figs = False
