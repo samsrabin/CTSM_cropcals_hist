@@ -1058,9 +1058,12 @@ for (this_var, var_info) in varList.items():
          
          found_types = [x for x in this_ds.vegtype_str.values if thisCrop_main in x]
 
-         # Grid, if needed
+         # Grid the included vegetation types, if needed
          if "lon" not in this_map.dims:
             this_map = utils.grid_one_variable(this_ds, this_var, vegtype=found_types)
+         # If not, select the included vegetation types
+         else:
+            this_map = this_map.sel(ivt_str=found_types)
             
          # Get mean, set colormap
          units = var_info['units']
