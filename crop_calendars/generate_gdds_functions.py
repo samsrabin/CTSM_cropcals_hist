@@ -336,6 +336,11 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
     
     incl_vegtype_indices = []
     for v, vegtype_str in enumerate(h1_incl_ds.vegtype_str.values):
+
+        # Skipping Miscanthus because it seems to never be harvested even though it is sown. This causes problems in NaN mask check.
+        if 'miscanthus' in vegtype_str:
+            print(f'      SKIPPING {vegtype_str}')
+            continue
         
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         thisCrop_full_patchlist = list(utils.xr_flexsel(h1_ds, vegtype=vegtype_str).patch.values)
