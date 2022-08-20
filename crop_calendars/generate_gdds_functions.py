@@ -215,8 +215,8 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
         raise RuntimeError("All SDATES are NaN after ignoring those patches!")
     
     # Some patches can have -1 sowing date?? Hopefully just an artifact of me incorrectly saving SDATES/HDATES daily.
-    mxsowings = dates_ds.dims['mxharvests']
-    mxsowings_dim = dates_ds.HDATES.dims.index('mxharvests')
+    mxsowings = dates_ds.dims['mxsowings']
+    mxsowings_dim = dates_ds.SDATES.dims.index('mxsowings')
     skip_patches_for_isel_sdatelt1 = np.where(dates_incl_ds.SDATES.values < 1)[1]
     skipping_patches_for_isel_sdatelt1 = len(skip_patches_for_isel_sdatelt1) > 0
     if skipping_patches_for_isel_sdatelt1:
