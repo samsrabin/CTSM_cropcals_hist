@@ -101,15 +101,13 @@ gddharv_in_h3 = False
 gddaccum_yp_list = []
 gddharv_yp_list = []
 incl_vegtypes_str = None
+h1_ds_file = None
 for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
-    h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, dates_incl_ds, skip_patches_for_isel_nan_lastyear, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str = gddfn.import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str)
+    h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str = gddfn.import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str, h1_ds_file)
 
 incl_vegtypes_str = incl_vegtypes_str[[i for i,c in enumerate(gddaccum_yp_list) if not isinstance(c,type(None))]]
 
 print("Done")
-
-
-
 
 
 
@@ -175,42 +173,6 @@ gdd_fill0_maps_ds = add_lonlat_attrs(gdd_fill0_maps_ds)
 if save_figs: gddharv_maps_ds = add_lonlat_attrs(gddharv_maps_ds)
 
 print("Done.")
-    
-
-# %% Check that all cells that had sdates are represented
-print("Checking that all cells that had sdates are represented...")
-
-sdates_grid = utils.grid_one_variable(dates_incl_ds, 'SDATES')
-
-
-all_ok = True
-for vt_str in incl_vegtypes_str:
-    vt_int = utils.ivt_str2int(vt_str)
-    # print(f"{vt_int}: {vt_str}")
-    
-    map_gdd = gdd_maps_ds[f"gdd1_{vt_int}"].isel(time=0, drop=True)
-    map_sdate = sdates_grid.isel(mxsowings=0, drop=True).sel(ivt_str=vt_str, drop=True)
-    if "time" in map_sdate.dims:
-        map_sdate = map_sdate.isel(time=0, drop=True)
-    
-    ok_gdd = map_gdd.where(map_gdd >= 0).notnull().values
-    ok_sdate = map_sdate.where(map_sdate > 0).notnull().values
-    missing_both = np.bitwise_and(np.bitwise_not(ok_gdd), np.bitwise_not(ok_sdate))
-    ok_both = np.bitwise_and(ok_gdd, ok_sdate)
-    ok_both = np.bitwise_or(ok_both, missing_both)
-    if np.any(np.bitwise_not(ok_both)):
-        all_ok = False
-        gdd_butnot_sdate = np.bitwise_and(ok_gdd, np.bitwise_not(ok_sdate))
-        sdate_butnot_gdd = np.bitwise_and(ok_sdate, np.bitwise_not(ok_gdd))
-        if np.any(gdd_butnot_sdate):
-            print(f"   {vt_int} {vt_str}: {np.sum(gdd_butnot_sdate)} cells in GDD but not sdate")
-        if np.any(sdate_butnot_gdd):
-            print(f"   {vt_int} {vt_str}: {np.sum(sdate_butnot_gdd)} cells in sdate but not GDD")
-
-if not all_ok:
-    print("❌ Mismatch between sdate and GDD outputs")
-else:
-    print("✅ All sdates have GDD and vice versa")
 
 
 # %% Save to netCDF

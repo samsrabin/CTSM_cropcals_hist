@@ -150,7 +150,7 @@ def yp_list_to_ds(yp_list, daily_ds, incl_vegtypes_str, dates_rx, longname_prefi
 
 
 
-def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str_in, h1_ds_file, dates_incl_ds_file):
+def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str_in, h1_ds_file):
     print(f'netCDF year {thisYear}...')
     
     # Get h2 file (list)
@@ -421,6 +421,12 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
         gddaccum_yp_list[v][y, thisYear_active_patch_indices] = tmp_gddaccum
         if save_figs: gddharv_yp_list[v][y, thisYear_active_patch_indices] = tmp_gddharv
         
+        # Make sure that NaN masks are the same for this year's sdates and 'filled-out' GDDs from last year
+        if y>0:
+            nanmask_output_sdates = np.isnan(dates_ds.SDATES.isel(mxsowings=0, patch=np.where(dates_ds.patches1d_itype_veg_str==vegtype_str)[0]).values)
+            nanmask_output_gdds_lastyr = np.isnan(gddaccum_yp_list[v][y-1,:])
+            if not np.array_equal(nanmask_output_gdds_lastyr, nanmask_output_sdates):
+                raise RuntimeError("NaN masks differ between this year's sdates and 'filled-out' GDDs from last year")
     skip_patches_for_isel_nan_lastyear = skip_patches_for_isel_nan
     
-    return h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, dates_incl_ds, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str
+    return h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str
