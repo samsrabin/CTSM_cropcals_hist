@@ -58,7 +58,6 @@ def check_sdates(dates_ds, sdates_rx, verbose=False):
             print(out_map_notnan[here][0:4])
             print("diff:")
             print(diff_map_notnan[here][0:4])
-            ieboeurbeo
             all_ok = False
 
     if not (any_found):
