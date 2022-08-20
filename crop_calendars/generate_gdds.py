@@ -433,6 +433,6 @@ def make_figures(thisDir=None, gdd_maps_ds=None, gddharv_maps_ds=None, outdir_fi
 
     print("Done.")
 
-if save_figs: make_figures(gdd_maps_ds=gdd_maps_ds, gddharv_maps_ds=gdd_maps_ds)
+if save_figs: make_figures(gdd_maps_ds=gdd_maps_ds, gddharv_maps_ds=gddharv_maps_ds)
 
 
