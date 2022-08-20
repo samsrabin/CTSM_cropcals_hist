@@ -334,17 +334,8 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
     if not np.any(h1_incl_ds[clm_gdd_var].values != 0):
         raise RuntimeError(f"All {clm_gdd_var} values are zero!")
     
-    # Get day of year for each day in time axis
-    doy = np.array([t.timetuple().tm_yday for t in h1_incl_ds.time.values])
-    
     # Get standard datetime axis for outputs
-    t1 = h1_incl_ds.time.values[0]
     Nyears = yN - y1 + 1
-    new_dt_axis = np.array([cftime.datetime(y, 1, 1, 
-                                            calendar=t1.calendar,
-                                            has_year_zero=t1.has_year_zero)
-                            for y in np.arange(y1, yN+1)])
-    time_indsP1 = np.arange(Nyears + 1)
     
     if len(gddaccum_yp_list)==0:
         gddaccum_yp_list = [None for vegtype_str in h1_incl_ds.vegtype_str.values]
@@ -369,8 +360,6 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
         lon_points = thisCrop_ds.patches1d_lon.values
         lat_points = thisCrop_ds.patches1d_lat.values
         thisCrop_hdates_rx = thisCrop_map_to_patches(lon_points, lat_points, hdates_rx, vegtype_int)
-        # Get "grows across new year?" for these patches
-        thisCrop_gany = thisCrop_map_to_patches(lon_points, lat_points, grows_across_newyear, vegtype_int)
         
         if isinstance(gddaccum_yp_list[v], type(None)):
             gddaccum_yp_list[v] = np.full((Nyears+1, len(thisCrop_full_patchlist)), np.nan)
