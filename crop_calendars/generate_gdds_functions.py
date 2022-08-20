@@ -149,7 +149,7 @@ def yp_list_to_ds(yp_list, daily_ds, incl_vegtypes_str, dates_rx, longname_prefi
 
 
 
-def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str_in, h1_ds_file):
+def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str_in, h1_ds_file):
     print(f'netCDF year {thisYear}...')
     
     # Get h2 file (list)
@@ -330,6 +330,7 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
     Nyears = yN - y1 + 1
     
     if len(gddaccum_yp_list)==0:
+        lastYear_active_patch_indices_list = [None for vegtype_str in h1_incl_ds.vegtype_str.values]
         gddaccum_yp_list = [None for vegtype_str in h1_incl_ds.vegtype_str.values]
         if save_figs: gddharv_yp_list = [None for vegtype_str in h1_incl_ds.vegtype_str.values]
     
@@ -393,6 +394,7 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
             tmp_gddharv = np.full(tmp_gddaccum.shape, np.nan)
             tmp_gddharv[where_gs_thisyr] = gddharv_atharv_p[where_gs_thisyr]
         if y > 0:
+            lastYear_active_patch_indices = lastYear_active_patch_indices_list[v]
             where_gs_lastyr = np.where(thisCrop_sdates_rx > thisCrop_hdates_rx)[0]
             active_thisYear_where_gs_lastyr_indices = [thisYear_active_patch_indices[x] for x in where_gs_lastyr]
             if not np.array_equal(lastYear_active_patch_indices, thisYear_active_patch_indices):
@@ -419,12 +421,12 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
             nanmask_output_gdds_lastyr = np.isnan(gddaccum_yp_list[v][y-1,:])
             if not np.array_equal(nanmask_output_gdds_lastyr, nanmask_output_sdates):
                 raise RuntimeError("NaN masks differ between this year's sdates and 'filled-out' GDDs from last year")
+        lastYear_active_patch_indices_list[v] = thisYear_active_patch_indices
                 
     skip_patches_for_isel_nan_lastyear = skip_patches_for_isel_nan
-    lastYear_active_patch_indices = thisYear_active_patch_indices
     
     # Could save space by only saving variables needed for gridding
     print('   Saving h1_ds...')
     h1_ds.to_netcdf(h1_ds_file)
         
-    return h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings
+    return h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings

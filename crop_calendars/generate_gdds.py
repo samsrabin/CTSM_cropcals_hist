@@ -98,7 +98,7 @@ pickle_file = indir + f'/{y1}-{yN}.pickle'
 h1_ds_file = indir + f'/{y1}-{yN}.h1_ds.nc'
 if os.path.exists(pickle_file):
     with open(pickle_file, 'rb') as f:
-        y1, yN, pickle_year, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = pickle.load(f)
+        y1, yN, pickle_year, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = pickle.load(f)
     print(f'Will resume import at {pickle_year+1}')
     h1_ds = None
 else:
@@ -109,7 +109,7 @@ else:
     gddaccum_yp_list = []
     gddharv_yp_list = []
     incl_vegtypes_str = None
-    lastYear_active_patch_indices = None
+    lastYear_active_patch_indices_list = None
 sdates_rx = sdate_inFile
 hdates_rx = hdate_inFile
 
@@ -118,16 +118,16 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
     if thisYear <= pickle_year:
         continue
     
-    h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = gddfn.import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str, h1_ds_file)
+    h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = gddfn.import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str, h1_ds_file)
      
     print(f'   Saving pickle file ({pickle_file})...')
     with open(pickle_file, 'wb') as f:
-        pickle.dump([y1, yN, thisYear, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings], f, protocol=-1)
+        pickle.dump([y1, yN, thisYear, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings], f, protocol=-1)
         
 
 if isinstance(incl_vegtypes_str, list):
     incl_vegtypes_str = np.array(incl_vegtypes_str)
-incl_vegtypes_str = incl_vegtypes_str[[i for i,c in enumerate(gddaccum_yp_list) if not isinstance(c,type(None))]]
+plot_vegtypes_str = incl_vegtypes_str[[i for i,c in enumerate(gddaccum_yp_list) if not isinstance(c,type(None))]]
 
 print("Done")
 
@@ -249,8 +249,8 @@ def add_attrs_to_map_ds(map_ds, incl_vegtypes_str, dummy_fill, outdir_figs, y1, 
                                 'yN': yN})
 
 if save_figs:
-    gdd_maps_ds = add_attrs_to_map_ds(gdd_maps_ds, incl_vegtypes_str, dummy_fill, outdir_figs, y1, yN)
-    gddharv_maps_ds = add_attrs_to_map_ds(gddharv_maps_ds, incl_vegtypes_str, dummy_fill, outdir_figs, y1, yN)
+    gdd_maps_ds = add_attrs_to_map_ds(gdd_maps_ds, plot_vegtypes_str, dummy_fill, outdir_figs, y1, yN)
+    gddharv_maps_ds = add_attrs_to_map_ds(gddharv_maps_ds, plot_vegtypes_str, dummy_fill, outdir_figs, y1, yN)
     
     gdd_maps_ds.to_netcdf(outdir_figs + "gdd_maps.nc")
     gddharv_maps_ds.to_netcdf(outdir_figs + "gddharv_maps.nc")
