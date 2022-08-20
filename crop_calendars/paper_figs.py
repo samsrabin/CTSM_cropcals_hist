@@ -68,7 +68,7 @@ def adjust_grainC(da_in, patches1d_itype_veg_str):
    wet_tp = np.full(da_in.shape, np.nan)
    wet_tp = np.moveaxis(wet_tp, patch_dim, 0)
    
-   # Fill new array   
+   # Fill new array, increasing to include water weight
    drymatter_cropList = []
    da_in.load()
    for thisCrop, dm_frac in drymatter_fractions.items():
@@ -80,6 +80,10 @@ def adjust_grainC(da_in, patches1d_itype_veg_str):
          tmp /= dm_frac
       elif np.any(tmp > 0):
          raise RuntimeError(f"You need to get a real dry-matter fraction for {thisCrop}")
+      
+      # For sugarcane, also account for the fact that sugar is only 43% of dry matter
+      if thisCrop == "sugarcane":
+         tmp /= 1 - 0.43
       
       wet_tp[i_thisCrop, ...] = np.moveaxis(tmp, patch_dim, 0)
    
