@@ -80,16 +80,15 @@ def check_sdates(dates_ds, sdates_rx, verbose=False):
         raise RuntimeError("   ❌ Input and output sdates differ.")
 
 
-def import_rx_dates(s_or_h, date_inFile, dates_ds):
-    # Get run info:
-    # Max number of growing seasons per year
-    if "mxsowings" in dates_ds:
-        mxsowings = dates_ds.dims["mxsowings"]
-    else:
-        mxsowings = 1
-        
+def import_rx_dates(s_or_h, date_inFile, incl_patches1d_itype_veg, mxsowings):
+    
+    if isinstance(date_inFile, xr.Dataset):
+        return date_inFile
+    elif not isinstance(date_inFile, str):
+        raise RuntimeError(f'Importing {s_or_h}dates_rx: Expected date_inFile to be str or DataArray, not {type(date_inFile)}')
+    
     # Which vegetation types were simulated?
-    itype_veg_toImport = np.unique(dates_ds.patches1d_itype_veg)
+    itype_veg_toImport = np.unique(incl_patches1d_itype_veg)
 
     date_varList = []
     for i in itype_veg_toImport:
@@ -199,6 +198,7 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
         dates_incl_ds = dates_ds.isel(patch=incl_patches_for_isel_nan)
     else:
         dates_incl_ds = dates_ds
+    incl_patches1d_itype_veg = dates_incl_ds.patches1d_itype_veg
     
     if y==0:
         incl_vegtypes_str = dates_incl_ds.vegtype_str.values
@@ -288,20 +288,12 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
         raise RuntimeError(f"Not all sdates-hdates are 1: {np.unique(diffdates_clm)}")
         
     # Import expected sowing dates. This will also be used as our template output file.
-    if isinstance(sdates_rx, str):
-        print("   Importing expected sowing dates...")
-        sdates_rx = import_rx_dates("s", sdates_rx, dates_incl_ds)
-    elif not isinstance(sdates_rx, xr.Dataset):
-        raise RuntimeError(f'Expected sdates_rx to be str or DataArray, not {type(sdates_rx)}')
+    sdates_rx = import_rx_dates("s", sdates_rx, incl_patches1d_itype_veg, mxsowings)
         
     check_sdates(dates_incl_ds, sdates_rx)
     
     # Import hdates, if needed
-    if isinstance(hdates_rx, str):
-        print("   Importing prescribed harvest dates...")
-        hdates_rx = import_rx_dates("h", hdates_rx, dates_incl_ds)
-    elif not isinstance(hdates_rx, xr.Dataset):
-        raise RuntimeError(f'Expected hdates_rx to be str or DataArray, not {type(hdates_rx)}')
+    hdates_rx = import_rx_dates("h", hdates_rx, incl_patches1d_itype_veg, mxsowings) # Yes, mxsowings even when importing harvests
     # Determine cells where growing season crosses new year
     grows_across_newyear = hdates_rx < sdates_rx
         
@@ -427,12 +419,12 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
             nanmask_output_gdds_lastyr = np.isnan(gddaccum_yp_list[v][y-1,:])
             if not np.array_equal(nanmask_output_gdds_lastyr, nanmask_output_sdates):
                 raise RuntimeError("NaN masks differ between this year's sdates and 'filled-out' GDDs from last year")
-        
+                
     skip_patches_for_isel_nan_lastyear = skip_patches_for_isel_nan
     lastYear_active_patch_indices = thisYear_active_patch_indices
     
     # Could save space by only saving variables needed for gridding
     print('   Saving h1_ds...')
     h1_ds.to_netcdf(h1_ds_file)
-    
-    return h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str
+        
+    return h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings
