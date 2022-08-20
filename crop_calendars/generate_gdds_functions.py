@@ -427,6 +427,12 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
             nanmask_output_gdds_lastyr = np.isnan(gddaccum_yp_list[v][y-1,:])
             if not np.array_equal(nanmask_output_gdds_lastyr, nanmask_output_sdates):
                 raise RuntimeError("NaN masks differ between this year's sdates and 'filled-out' GDDs from last year")
+        
     skip_patches_for_isel_nan_lastyear = skip_patches_for_isel_nan
+    lastYear_active_patch_indices = thisYear_active_patch_indices
+    
+    # Could save space by only saving variables needed for gridding
+    print('   Saving h1_ds...')
+    h1_ds.to_netcdf(h1_ds_file)
     
     return h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str

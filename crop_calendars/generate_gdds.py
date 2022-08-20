@@ -72,6 +72,7 @@ import matplotlib.pyplot as plt
 import warnings
 import cartopy.crs as ccrs
 import datetime as dt
+import pickle
 
 import warnings
 warnings.filterwarnings("ignore", message="__len__ for multi-part geometries is deprecated and will be removed in Shapely 2.0. Check the length of the `geoms` property instead to get the  number of parts of a multi-part geometry.")
@@ -93,22 +94,42 @@ print(f"Importing netCDF time steps {y1_import_str} through {yN_import_str} (yea
 import importlib
 importlib.reload(gddfn)
 
+pickle_file = indir + f'/{y1}-{yN}.pickle'
+h1_ds_file = indir + f'/{y1}-{yN}.h1_ds.nc'
+if os.path.exists(pickle_file):
+    with open(pickle_file, 'rb') as f:
+        y1, yN, pickle_year, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str = pickle.load(f)
+    print(f'Will resume import at {pickle_year+1}')
+    h1_ds = None
+else:
+    incorrectly_daily = False
+    skip_patches_for_isel_nan_lastyear = np.ndarray([])
+    gddharv_in_h3 = False
+    pickle_year = -np.inf
+    gddaccum_yp_list = []
+    gddharv_yp_list = []
+    incl_vegtypes_str = None
+    lastYear_active_patch_indices = None
 sdates_rx = sdate_inFile
 hdates_rx = hdate_inFile
-incorrectly_daily = False
-skip_patches_for_isel_nan_lastyear = np.ndarray([])
-gddharv_in_h3 = False
-gddaccum_yp_list = []
-gddharv_yp_list = []
-incl_vegtypes_str = None
-h1_ds_file = None
-for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
-    h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str = gddfn.import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str, h1_ds_file)
 
+for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
+    
+    if thisYear <= pickle_year:
+        continue
+    
+    h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str = gddfn.import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str, h1_ds_file)
+     
+    print(f'   Saving pickle file ({pickle_file})...')
+    with open(pickle_file, 'wb') as f:
+        pickle.dump([y1, yN, thisYear, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str], f, protocol=-1)
+    
 incl_vegtypes_str = incl_vegtypes_str[[i for i,c in enumerate(gddaccum_yp_list) if not isinstance(c,type(None))]]
 
 print("Done")
 
+if not h1_ds:
+    h1_ds = xr.open_dataset(h1_ds_file)
 
 
 # %% Get and grid mean GDDs in GGCMI growing season
