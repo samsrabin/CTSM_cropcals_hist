@@ -150,7 +150,7 @@ def yp_list_to_ds(yp_list, daily_ds, incl_vegtypes_str, dates_rx, longname_prefi
 
 
 
-def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str_in):
+def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str_in, h1_ds_file, dates_incl_ds_file):
     print(f'netCDF year {thisYear}...')
     
     # Get h2 file (list)
@@ -402,22 +402,25 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
             tmp_gddharv[where_gs_thisyr] = gddharv_atharv_p[where_gs_thisyr]
         if y > 0:
             where_gs_lastyr = np.where(thisCrop_sdates_rx > thisCrop_hdates_rx)[0]
+            active_thisYear_where_gs_lastyr_indices = [thisYear_active_patch_indices[x] for x in where_gs_lastyr]
+            if not np.array_equal(lastYear_active_patch_indices, thisYear_active_patch_indices):
+                raise RuntimeError("This year's active patch indices differ from last year's.")
             # Make sure we're not about to overwrite any existing values.
-            if np.any(~np.isnan(tmp_gddaccum[where_gs_lastyr])):
+            if np.any(~np.isnan(gddaccum_yp_list[v][y-1, active_thisYear_where_gs_lastyr_indices])):
                 raise RuntimeError("Unexpected non-NaN for last season's GDD accumulation")
-            if save_figs and np.any(~np.isnan(tmp_gddharv[where_gs_lastyr])):
+            if save_figs and np.any(~np.isnan(gddharv_yp_list[v][y-1, active_thisYear_where_gs_lastyr_indices])):
                 raise RuntimeError("Unexpected non-NaN for last season's GDDHARV")
             # Fill.
-            tmp_gddaccum[where_gs_lastyr] = gddaccum_atharv_p[where_gs_lastyr]
-            if save_figs: tmp_gddharv[where_gs_lastyr] = gddharv_atharv_p[where_gs_lastyr]
+            gddaccum_yp_list[v][y-1, active_thisYear_where_gs_lastyr_indices] = gddaccum_atharv_p[where_gs_lastyr]
+            if save_figs: gddharv_yp_list[v][y-1, active_thisYear_where_gs_lastyr_indices] = gddharv_atharv_p[where_gs_lastyr]
             # Last year's season should be filled out now; make sure.
-            if np.any(np.isnan(tmp_gddaccum[where_gs_lastyr])):
+            if np.any(np.isnan(gddaccum_yp_list[v][y-1, active_thisYear_where_gs_lastyr_indices])):
                 raise RuntimeError("Unexpected NaN for last season's GDD accumulation. Maybe because it was inactive last year?")
-            if save_figs and np.any(np.isnan(tmp_gddharv[where_gs_lastyr])):
+            if save_figs and np.any(np.isnan(gddharv_yp_list[v][y-1, active_thisYear_where_gs_lastyr_indices])):
                 raise RuntimeError("Unexpected NaN for last season's GDDHARV. Maybe because it was inactive last year?")
         gddaccum_yp_list[v][y, thisYear_active_patch_indices] = tmp_gddaccum
         if save_figs: gddharv_yp_list[v][y, thisYear_active_patch_indices] = tmp_gddharv
         
     skip_patches_for_isel_nan_lastyear = skip_patches_for_isel_nan
     
-    return h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, dates_incl_ds, skip_patches_for_isel_nan_lastyear, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str
+    return h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, dates_incl_ds, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str
