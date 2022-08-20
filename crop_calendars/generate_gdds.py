@@ -14,14 +14,23 @@ import socket
 hostname = socket.gethostname()
 
 # Import the CTSM Python utilities
+import sys
 if hostname == "Sams-2021-MacBook-Pro.local":
-    my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
-    import sys
-    sys.path.append(my_ctsm_python_gallery)
+    sys.path.append("/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/")
     import utils
 else:
     # Only possible because I have export PYTHONPATH=$HOME in my .bash_profile
     from ctsm_python_gallery_myfork.ctsm_py import utils
+
+# Import the generate_gdds functions
+import os
+if hostname == "Sams-2021-MacBook-Pro.local":
+    sys.path.append("/Users/sam/Documents/git_repos/CTSM_cropcals_hist/crop_calendars")
+    import generate_gdds_functions as gddfn
+else:
+    # Only possible because I have export PYTHONPATH=$HOME in my .bash_profile
+    from CTSM_cropcals_hist.crop_calendars import generate_gdds_functions as gddfn
+
 
 # Directory where input file(s) can be found (figure files will be saved in subdir here)
 # indir = "/Users/Shared/CESM_runs/f10_f10_mg37_1850/"
@@ -68,161 +77,6 @@ import datetime as dt
 import warnings
 warnings.filterwarnings("ignore", message="__len__ for multi-part geometries is deprecated and will be removed in Shapely 2.0. Check the length of the `geoms` property instead to get the  number of parts of a multi-part geometry.")
 warnings.filterwarnings("ignore", message="Iteration over multi-part geometries is deprecated and will be removed in Shapely 2.0. Use the `geoms` property to access the constituent parts of a multi-part geometry.")
-
-
-def import_rx_dates(s_or_h, date_inFile, dates_ds):
-    # Get run info:
-    # Max number of growing seasons per year
-    if "mxsowings" in dates_ds:
-        mxsowings = dates_ds.dims["mxsowings"]
-    else:
-        mxsowings = 1
-        
-    # Which vegetation types were simulated?
-    itype_veg_toImport = np.unique(dates_ds.patches1d_itype_veg)
-
-    date_varList = []
-    for i in itype_veg_toImport:
-        for g in np.arange(mxsowings):
-            thisVar = f"{s_or_h}date{g+1}_{i}"
-            date_varList = date_varList + [thisVar]
-
-    ds = utils.import_ds(date_inFile, myVars=date_varList)
-    
-    for v in ds:
-        ds = ds.rename({v: v.replace(f"{s_or_h}date","gs")})
-    
-    return ds
-
-
-def thisCrop_map_to_patches(lon_points, lat_points, map_ds, vegtype_int):
-    # xarray pointwise indexing; see https://xarray.pydata.org/en/stable/user-guide/indexing.html#more-advanced-indexing
-    return map_ds[f"gs1_{vegtype_int}"].sel( \
-        lon=xr.DataArray(lon_points, dims="patch"),
-        lat=xr.DataArray(lat_points, dims="patch")).squeeze(drop=True)
-    
-
-def check_sdates(dates_ds, sdates_rx, verbose=False):
-    print("   Checking that input and output sdates match...")
-
-    sdates_grid = utils.grid_one_variable(\
-        dates_ds, 
-        "SDATES")
-
-    all_ok = True
-    any_found = False
-    vegtypes_skipped = []
-    vegtypes_included = []
-    for i, vt_str in enumerate(dates_ds.vegtype_str.values):
-        
-        # Input
-        vt = dates_ds.ivt.values[i]
-        thisVar = f"gs1_{vt}"
-        if thisVar not in sdates_rx:
-            vegtypes_skipped = vegtypes_skipped + [vt_str]
-            # print(f"    {vt_str} ({vt}) SKIPPED...")
-            continue
-        vegtypes_included = vegtypes_included + [vt_str]
-        any_found = True
-        if verbose: print(f"    {vt_str} ({vt})...")
-        in_map = sdates_rx[thisVar].squeeze(drop=True)
-        
-        # Output
-        out_map = sdates_grid.sel(ivt_str=vt_str).squeeze(drop=True)
-        
-        # Check for differences
-        diff_map = out_map - in_map
-        diff_map_notnan = diff_map.values[np.invert(np.isnan(diff_map.values))]
-        if np.any(diff_map_notnan):
-            print(f"Difference(s) found in {vt_str}")
-            here = np.where(diff_map_notnan)
-            print("in:")
-            in_map_notnan = in_map.values[np.invert(np.isnan(diff_map.values))]
-            print(in_map_notnan[here][0:4])
-            out_map_notnan = out_map.values[np.invert(np.isnan(diff_map.values))]
-            print("out:")
-            print(out_map_notnan[here][0:4])
-            print("diff:")
-            print(diff_map_notnan[here][0:4])
-            ieboeurbeo
-            all_ok = False
-
-    if not (any_found):
-        raise RuntimeError("No matching variables found in sdates_rx!")
-
-    # Sanity checks for included vegetation types
-    vegtypes_skipped = np.unique([x.replace("irrigated_","") for x in vegtypes_skipped])
-    vegtypes_skipped_weird = [x for x in vegtypes_skipped if x in vegtypes_included]
-    if np.array_equal(vegtypes_included, [x.replace("irrigated_","") for x in vegtypes_included]):
-        print("\nWARNING: No irrigated crops included!!!\n")
-    elif vegtypes_skipped_weird:
-        print(f"\nWarning: Some crop types had output rainfed patches but no irrigated patches: {vegtypes_skipped_weird}")
-        
-    if all_ok:
-        print("   ✅ Input and output sdates match!")
-    else:
-        raise RuntimeError("   ❌ Input and output sdates differ.")
-
-
-def get_values_at_harvest(thisCrop_hdates_rx, in_da, time_indsP1, new_dt_axis, newVar):
-    # There's almost certainly a more efficient way to do this than looping through patches!
-    for p in np.arange(thisCrop_hdates_rx.size):
-        thisPatch_da = in_da.isel(patch=p)
-        
-        # Extract time range of interest plus extra year for cells where growing season crosses the new year
-        thisCell_gdds_da = thisPatch_da.isel(time=np.where(doy==thisCrop_hdates_rx.sel(patch=p).values)[0])
-        
-        # Extract the actual time range of interest for this cell, depending on whether its growing season crosses the new year
-        if thisCrop_gany[p]:
-            thisCell_gdds_da = thisCell_gdds_da.isel(time=time_indsP1[1:])
-        else:
-            thisCell_gdds_da = thisCell_gdds_da.isel(time=time_indsP1[:-1])
-        
-        # Set to standard datetime axis for outputs
-        thisCell_gdds_da = thisCell_gdds_da.assign_coords(time=new_dt_axis)
-        
-        # Add to new DataArray
-        if p==0:
-            out_da = thisCell_gdds_da
-            out_da = out_da.rename(newVar)
-        else:
-            out_da = xr.concat([out_da, thisCell_gdds_da], dim="patch")
-        
-    return out_da
-
-
-# Get and grid mean GDDs in GGCMI growing season
-def yp_list_to_ds(yp_list, daily_ds, daily_incl_ds, dates_rx, longname_prefix):
-    
-    # Get means
-    warnings.filterwarnings("ignore", message="Mean of empty slice") # Happens when you do np.nanmean() of an all-NaN array (or slice, if doing selected axis/es)
-    p_list = [np.nanmean(x, axis=0) if not isinstance(x, type(None)) else x for x in yp_list]
-    warnings.filterwarnings("always", message="Mean of empty slice")
-    
-    # Grid
-    ds_out = xr.Dataset()
-    for c, ra in enumerate(p_list):
-        if isinstance(ra, type(None)):
-            continue
-        thisCrop_str = daily_incl_ds.vegtype_str.values[c]
-        print(f'   {thisCrop_str}...')
-        newVar = f"gdd1_{utils.ivt_str2int(thisCrop_str)}"
-        ds = daily_ds.isel(patch=np.where(daily_ds.patches1d_itype_veg_str.values==thisCrop_str)[0])
-        template_da = ds.patches1d_itype_veg_str
-        da = xr.DataArray(data = ra,
-                          coords = template_da.coords,
-                          attrs = {'units': 'GDD',
-                                   'long_name': f'{longname_prefix}{thisCrop_str}'})
-        
-        # Grid this crop
-        ds['tmp'] = da
-        da_gridded = utils.grid_one_variable(ds, 'tmp', vegtype=thisCrop_str).squeeze(drop=True)
-        
-        # Add singleton time dimension and save to output Dataset
-        da_gridded = da_gridded.expand_dims(time = dates_rx.time)
-        ds_out[newVar] = da_gridded
-        
-    return ds_out
 
 
 # %% Import and process
@@ -369,13 +223,13 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
     # Import expected sowing dates. This will also be used as our template output file.
     if not sdates_rx:
         print("   Importing expected sowing dates...")
-        sdates_rx = import_rx_dates("s", sdate_inFile, dates_incl_ds)
+        sdates_rx = gddfn.import_rx_dates("s", sdate_inFile, dates_incl_ds)
         
-    check_sdates(dates_incl_ds, sdates_rx)
+    gddfn.check_sdates(dates_incl_ds, sdates_rx)
     
     if not hdates_rx:
         print("   Importing prescribed harvest dates...")
-        hdates_rx = import_rx_dates("h", hdate_inFile, dates_incl_ds)
+        hdates_rx = gddfn.import_rx_dates("h", hdate_inFile, dates_incl_ds)
         # Determine cells where growing season crosses new year
         grows_across_newyear = hdates_rx < sdates_rx
         
@@ -442,9 +296,9 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
         # Get prescribed harvest dates for these patches
         lon_points = thisCrop_ds.patches1d_lon.values
         lat_points = thisCrop_ds.patches1d_lat.values
-        thisCrop_hdates_rx = thisCrop_map_to_patches(lon_points, lat_points, hdates_rx, vegtype_int)
+        thisCrop_hdates_rx = gddfn.thisCrop_map_to_patches(lon_points, lat_points, hdates_rx, vegtype_int)
         # Get "grows across new year?" for these patches
-        thisCrop_gany = thisCrop_map_to_patches(lon_points, lat_points, grows_across_newyear, vegtype_int)
+        thisCrop_gany = gddfn.thisCrop_map_to_patches(lon_points, lat_points, grows_across_newyear, vegtype_int)
         
         if isinstance(gddaccum_yp_list[v], type(None)):
             gddaccum_yp_list[v] = np.full((Nyears+1, len(thisCrop_full_patchlist)), np.nan)
@@ -478,7 +332,7 @@ for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
                 
         # Assign these to growing seasons based on whether gs crossed new year
         thisYear_active_patch_indices = [thisCrop_full_patchlist.index(x) for x in thisCrop_ds.patch.values]
-        thisCrop_sdates_rx = thisCrop_map_to_patches(lon_points, lat_points, sdates_rx, vegtype_int)
+        thisCrop_sdates_rx = gddfn.thisCrop_map_to_patches(lon_points, lat_points, sdates_rx, vegtype_int)
         where_gs_thisyr = np.where(thisCrop_sdates_rx < thisCrop_hdates_rx)[0]
         tmp_gddaccum = np.full(thisCrop_sdates_rx.shape, np.nan)
         tmp_gddaccum[where_gs_thisyr] = gddaccum_atharv_p[where_gs_thisyr]
@@ -513,8 +367,8 @@ print("Done")
 longname_prefix = "GDD harvest target for "
 
 print('Getting and gridding mean GDDs...')
-gdd_maps_ds = yp_list_to_ds(gddaccum_yp_list, h1_ds, h1_incl_ds, sdates_rx, longname_prefix)
-if save_figs: gddharv_maps_ds = yp_list_to_ds(gddharv_yp_list, h1_ds, h1_incl_ds, sdates_rx, longname_prefix)
+gdd_maps_ds = gddfn.yp_list_to_ds(gddaccum_yp_list, h1_ds, h1_incl_ds, sdates_rx, longname_prefix)
+if save_figs: gddharv_maps_ds = gddfn.yp_list_to_ds(gddharv_yp_list, h1_ds, h1_incl_ds, sdates_rx, longname_prefix)
 
 # Fill NAs with dummy values
 dummy_fill = -1
