@@ -398,20 +398,35 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
             where_gs_lastyr = np.where(thisCrop_sdates_rx > thisCrop_hdates_rx)[0]
             active_thisYear_where_gs_lastyr_indices = [thisYear_active_patch_indices[x] for x in where_gs_lastyr]
             if not np.array_equal(lastYear_active_patch_indices, thisYear_active_patch_indices):
-                raise RuntimeError("This year's active patch indices differ from last year's.")
+                if incorrectly_daily:
+                    print("         ❗ This year's active patch indices differ from last year's. Allowing because this might just be an artifact of incorrectly daily outputs, BUT RESULTS MUST NOT BE TRUSTED.")
+                else:
+                    raise RuntimeError("This year's active patch indices differ from last year's.")
             # Make sure we're not about to overwrite any existing values.
             if np.any(~np.isnan(gddaccum_yp_list[v][y-1, active_thisYear_where_gs_lastyr_indices])):
-                raise RuntimeError("Unexpected non-NaN for last season's GDD accumulation")
+                if incorrectly_daily:
+                    print("         ❗ Unexpected non-NaN for last season's GDD accumulation. Allowing because this might just be an artifact of incorrectly daily outputs, BUT RESULTS MUST NOT BE TRUSTED.")
+                else:
+                    raise RuntimeError("Unexpected non-NaN for last season's GDD accumulation")
             if save_figs and np.any(~np.isnan(gddharv_yp_list[v][y-1, active_thisYear_where_gs_lastyr_indices])):
-                raise RuntimeError("Unexpected non-NaN for last season's GDDHARV")
+                if incorrectly_daily:
+                    print("         ❗ Unexpected non-NaN for last season's GDDHARV. Allowing because this might just be an artifact of incorrectly daily outputs, BUT RESULTS MUST NOT BE TRUSTED.")
+                else:
+                    raise RuntimeError("Unexpected non-NaN for last season's GDDHARV")
             # Fill.
             gddaccum_yp_list[v][y-1, active_thisYear_where_gs_lastyr_indices] = gddaccum_atharv_p[where_gs_lastyr]
             if save_figs: gddharv_yp_list[v][y-1, active_thisYear_where_gs_lastyr_indices] = gddharv_atharv_p[where_gs_lastyr]
             # Last year's season should be filled out now; make sure.
             if np.any(np.isnan(gddaccum_yp_list[v][y-1, active_thisYear_where_gs_lastyr_indices])):
-                raise RuntimeError("Unexpected NaN for last season's GDD accumulation. Maybe because it was inactive last year?")
+                if incorrectly_daily:
+                    print("         ❗ Unexpected NaN for last season's GDD accumulation. Allowing because this might just be an artifact of incorrectly daily outputs, BUT RESULTS MUST NOT BE TRUSTED.")
+                else:
+                    raise RuntimeError("Unexpected NaN for last season's GDD accumulation.")
             if save_figs and np.any(np.isnan(gddharv_yp_list[v][y-1, active_thisYear_where_gs_lastyr_indices])):
-                raise RuntimeError("Unexpected NaN for last season's GDDHARV. Maybe because it was inactive last year?")
+                if incorrectly_daily:
+                    print("         ❗ Unexpected NaN for last season's GDDHARV. Allowing because this might just be an artifact of incorrectly daily outputs, BUT RESULTS MUST NOT BE TRUSTED.")
+                else:
+                    raise RuntimeError("Unexpected NaN for last season's GDDHARV.")
         gddaccum_yp_list[v][y, thisYear_active_patch_indices] = tmp_gddaccum
         if save_figs: gddharv_yp_list[v][y, thisYear_active_patch_indices] = tmp_gddharv
         
@@ -420,7 +435,10 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
             nanmask_output_sdates = np.isnan(dates_ds.SDATES.isel(mxsowings=0, patch=np.where(dates_ds.patches1d_itype_veg_str==vegtype_str)[0]).values)
             nanmask_output_gdds_lastyr = np.isnan(gddaccum_yp_list[v][y-1,:])
             if not np.array_equal(nanmask_output_gdds_lastyr, nanmask_output_sdates):
-                raise RuntimeError("NaN masks differ between this year's sdates and 'filled-out' GDDs from last year")
+                if incorrectly_daily:
+                    print("         ❗ NaN masks differ between this year's sdates and 'filled-out' GDDs from last year. Allowing because this might just be an artifact of incorrectly daily outputs, BUT RESULTS MUST NOT BE TRUSTED.")
+                else:
+                    raise RuntimeError("NaN masks differ between this year's sdates and 'filled-out' GDDs from last year")
         lastYear_active_patch_indices_list[v] = thisYear_active_patch_indices
                 
     skip_patches_for_isel_nan_lastyear = skip_patches_for_isel_nan
