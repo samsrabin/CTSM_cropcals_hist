@@ -16,7 +16,7 @@ import utils
 outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures/"
 
 import numpy as np
-from scipy import stats
+from scipy import stats, signal
 import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -125,6 +125,42 @@ def adjust_gridded_lonlats(patches1d_lonlat, patches1d_ij, lu_dsg_lonlat_da, thi
       lu_dsg_lonlat_da = xr.DataArray(data = new_gridded_lonlats,
                                       coords = {"lat": new_gridded_lonlats})
       return lu_dsg_lonlat_da, patches1d_ij
+
+
+def detrend(ps_in):
+   # Can't detrend if NaNs are present, so...
+   
+   if isinstance(ps_in, xr.DataArray):
+      ps_in = ps_in.values
+   
+   unique_Nnans = np.unique(np.sum(np.isnan(ps_in), axis=1))
+   Ngs = case_ds.dims['gs']
+
+   for n in unique_Nnans:
+      
+      # Don't need to detrend patches with <2 non-NaN seasons, and "detrending" 2 points will just set them both to zero.
+      if n >= Ngs-2:
+         continue
+      
+      # Get the patches with this number of NaN seasons
+      ok = np.where(np.sum(np.isnan(ps_in), axis=1)==n)[0]
+      Nok = len(ok)
+      thisNok_ps = ps_in[ok,:]
+      where_notnan = np.where(~np.isnan(thisNok_ps))
+      
+      # Get the non-NaN seasons of each such patch
+      thisNok_notnan = thisNok_ps[where_notnan]
+      thisNok_notnan_ps = np.reshape(thisNok_notnan, (Nok, Ngs-n))
+      
+      # Detrend these patches
+      thisNok_notnan_dt_ps = signal.detrend(thisNok_notnan_ps, axis=1)
+      
+      # Save the detrended time series back to our output
+      thisNok_dt_ps = np.copy(thisNok_ps)
+      thisNok_dt_ps[where_notnan] = np.reshape(thisNok_notnan_dt_ps, (-1))
+      ps_in[ok,:] = thisNok_dt_ps
+         
+   return ps_in
 
 
 def equalize_colorbars(ims):
@@ -494,6 +530,14 @@ def round_lonlats_to_match_ds(ds_a, ds_b, which_coord, tolerance):
    return ds_a, ds_b, tolerance
 
 
+def subtract_mean(in_ps):
+   warnings.filterwarnings("ignore", message="Mean of empty slice") # Happens when you do np.nanmean() of an all-NaN 
+   mean_p = np.nanmean(in_ps, axis=1)
+   warnings.filterwarnings("always", message="Mean of empty slice")
+   out_ps = in_ps - np.expand_dims(mean_p, axis=1)
+   return out_ps
+
+
 def time_units_and_trim(ds, y1, yN, dt_type):
    
    # Convert to dt_type
@@ -772,6 +816,8 @@ f_prod, axes_prod = plt.subplots(ny, nx, figsize=figsize)
 axes_prod = axes_prod.flatten()
 f_yield, axes_yield = plt.subplots(ny, nx, figsize=figsize)
 axes_yield = axes_yield.flatten()
+f_yield_dt, axes_yield_dt = plt.subplots(ny, nx, figsize=figsize)
+axes_yield_dt = axes_yield_dt.flatten()
 
 fig_caselist = ["FAOSTAT"]
 this_earthstat_res = "f09_g17"
@@ -810,6 +856,7 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
    ax_area = axes_area[c]
    ax_prod = axes_prod[c]
    ax_yield = axes_yield[c]
+   ax_yield_dt = axes_yield_dt[c]
    
    # FAOSTAT
    if thisCrop_clm == "Total (no sgc)":
@@ -885,11 +932,13 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
    make_1crop_plot(ax_area, ydata_area, fig_caselist, thisCrop_clm, "Mha", y1, yN)
    make_1crop_plot(ax_prod, ydata_prod, fig_caselist, thisCrop_clm, "Mt", y1, yN)
    make_1crop_plot(ax_yield, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", y1, yN)
+   make_1crop_plot(ax_yield_dt, detrend(ydata_yield), fig_caselist, thisCrop_clm, "t/ha", y1, yN)
    
 # Finish up and save
 finishup_allcrops_plot(c, ny, nx, axes_area, f_area, "Global crop area", outDir_figs)
 finishup_allcrops_plot(c, ny, nx, axes_prod, f_prod, "Global crop production", outDir_figs)
-finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outDir_figs)   
+finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outDir_figs)
+finishup_allcrops_plot(c, ny, nx, axes_yield_dt, f_yield_dt, "Global crop yield (detrended)", outDir_figs) 
 
 
 # %% Make maps of individual crops (rainfed, irrigated)
@@ -1169,3 +1218,5 @@ for (this_var, var_info) in varList.items():
       plt.close()
    
 print('Done making maps.')
+
+
