@@ -1125,6 +1125,7 @@ for (this_var, var_info) in varList.items():
             if plotting_diffs:
                this_map_vals = (this_map - refcase_map).values
                this_map_vals[this_map_vals > 365/2] -= 365
+               this_map_vals[this_map_vals < -365/2] += 365
                this_map = xr.DataArray(data = this_map_vals,
                                        coords = this_map.coords,
                                        attrs = this_map.attrs)
