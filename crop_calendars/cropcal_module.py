@@ -384,7 +384,7 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     if discrepancy == 0:
         this_ds_gs = set_up_ds_with_gs_axis(this_ds)
         for v in this_ds.data_vars:
-            if this_ds[v].dims != ('time', 'mxharvests', 'patch') and (not myVars or v in myVars): 
+            if this_ds[v].dims != ('time', 'mxharvests', 'patch') or (myVars and v not in myVars):
                 continue
             
             # Set invalid values to NaN
