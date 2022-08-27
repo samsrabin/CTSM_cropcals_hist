@@ -131,9 +131,11 @@ def detrend(ps_in):
    # Can't detrend if NaNs are present, so...
    
    if isinstance(ps_in, xr.DataArray):
-      ps_in = ps_in.values
+      ps_out = ps_in.values
+   else:
+      ps_out = ps_in
    
-   unique_Nnans = np.unique(np.sum(np.isnan(ps_in), axis=1))
+   unique_Nnans = np.unique(np.sum(np.isnan(ps_out), axis=1))
    Ngs = ps_in.shape[1]
 
    for n in unique_Nnans:
@@ -143,9 +145,9 @@ def detrend(ps_in):
          continue
       
       # Get the patches with this number of NaN seasons
-      ok = np.where(np.sum(np.isnan(ps_in), axis=1)==n)[0]
+      ok = np.where(np.sum(np.isnan(ps_out), axis=1)==n)[0]
       Nok = len(ok)
-      thisNok_ps = ps_in[ok,:]
+      thisNok_ps = ps_out[ok,:]
       where_notnan = np.where(~np.isnan(thisNok_ps))
       
       # Get the non-NaN seasons of each such patch
@@ -158,9 +160,14 @@ def detrend(ps_in):
       # Save the detrended time series back to our output
       thisNok_dt_ps = np.copy(thisNok_ps)
       thisNok_dt_ps[where_notnan] = np.reshape(thisNok_notnan_dt_ps, (-1))
-      ps_in[ok,:] = thisNok_dt_ps
+      ps_out[ok,:] = thisNok_dt_ps
+   
+   if isinstance(ps_in, xr.DataArray):
+      ps_out = xr.DataArray(data = ps_out,
+                            coords = ps_in.coords,
+                            attrs = ps_in.attrs)
          
-   return ps_in
+   return ps_out
 
 
 def equalize_colorbars(ims):
