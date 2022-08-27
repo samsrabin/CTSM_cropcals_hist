@@ -7,9 +7,10 @@ import inspect
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
-from cropcal_module import *
+import cropcal_module as cc
 
 # Import general CTSM Python utilities
+my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
 sys.path.append(my_ctsm_python_gallery)
 import utils
 
@@ -26,7 +27,6 @@ from matplotlib import cm
 import datetime as dt
 import re
 import importlib
-from cropcal_module import *
 import pandas as pd
 import cftime
 
@@ -314,11 +314,11 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    
    # Trim to years of interest (do not include extra year needed for finishing last growing season)
    if y1 and yN:
-      this_ds = check_and_trim_years(y1, yN, this_ds)
+      this_ds = cc.check_and_trim_years(y1, yN, this_ds)
    else: # Assume including all growing seasons except last complete one are "of interest"
       y1 = this_ds.time.values[0].year
       yN = this_ds.time.values[-1].year - 2
-      this_ds = check_and_trim_years(y1, yN, this_ds)
+      this_ds = cc.check_and_trim_years(y1, yN, this_ds)
       
    # What vegetation types are included?
    vegtype_list = [x for x in this_ds.vegtype_str.values if x in this_ds.patches1d_itype_veg_str.values]
@@ -428,11 +428,11 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
             print(f"✅ CLM output {v} do not vary through {this_ds.dims['time'] - t1} years of output.")
    
    # Convert time*mxharvests axes to growingseason axis
-   this_ds_gs = convert_axis_time2gs(this_ds, verbose=verbose, incl_orig=False)
+   this_ds_gs = cc.convert_axis_time2gs(this_ds, verbose=verbose, incl_orig=False)
    
    # Get growing season length
-   this_ds["GSLEN_PERHARV"] = get_gs_len_da(this_ds["HDATES"] - this_ds["SDATES_PERHARV"])
-   this_ds_gs["GSLEN"] = get_gs_len_da(this_ds_gs["HDATES"] - this_ds_gs["SDATES"])
+   this_ds["GSLEN_PERHARV"] = cc.get_gs_len_da(this_ds["HDATES"] - this_ds["SDATES_PERHARV"])
+   this_ds_gs["GSLEN"] = cc.get_gs_len_da(this_ds_gs["HDATES"] - this_ds_gs["SDATES"])
    
    # Get *biomass* *actually harvested*
    this_ds["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
@@ -452,13 +452,13 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    for vars in [["GDDACCUM", "HUI"],
                 ["SYEARS", "HYEARS"]]:
       if all(v in this_ds_gs for v in vars):
-         check_v0_le_v1(this_ds_gs, vars, both_nan_ok=True, throw_error=True)
+         cc.check_v0_le_v1(this_ds_gs, vars, both_nan_ok=True, throw_error=True)
       
    # Check that prescribed calendars were obeyed
    if sdates_rx_ds:
-      check_rx_obeyed(vegtype_list, sdates_rx_ds, this_ds, 0, "SDATES")
+      cc.check_rx_obeyed(vegtype_list, sdates_rx_ds, this_ds, 0, "SDATES")
    if gdds_rx_ds:
-      check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, 0, "SDATES", "GDDHARV", gdd_min=gdd_min)
+      cc.check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, 0, "SDATES", "GDDHARV", gdd_min=gdd_min)
    
    # Convert time axis to integer year
    this_ds_gs = this_ds_gs.assign_coords({"time": [t.year for t in this_ds.time_bounds.values[:,0]]})
