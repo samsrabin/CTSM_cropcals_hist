@@ -131,13 +131,20 @@ def check_constant_vars(this_ds, constantVars, ignore_nan, verbose=True, throw_e
     any_bad = False
     for v in constantVars:
         ok = True
+        
+        if "gs" in this_ds[v].dims:
+            time_coord = "gs"
+        elif "time" in this_ds[v].dims:
+            time_coord = "time"
+        else:
+            raise RuntimeError(f"Which of these is the time coordinate? {this_ds[v].dims}")
 
-        t1_yr = this_ds.gs.values[t1]
-        t1_vals = np.squeeze(this_ds[v].isel(gs=t1).values)
+        t1_yr = this_ds[time_coord].values[t1]
+        t1_vals = np.squeeze(this_ds[v].isel({time_coord: t1}).values)
 
-        for t in np.arange(t1+1, this_ds.dims["gs"]):
-            t_yr = this_ds.gs.values[t]
-            t_vals = np.squeeze(this_ds[v].isel(gs=t).values)
+        for t in np.arange(t1+1, this_ds.dims[time_coord]):
+            t_yr = this_ds[time_coord].values[t]
+            t_vals = np.squeeze(this_ds[v].isel({time_coord: t}).values)
             ok_p = t1_vals == t_vals
             
             # If allowed, ignore where either t or t1 is NaN. Should only be used for runs where land use varies over time.
@@ -164,7 +171,7 @@ def check_constant_vars(this_ds, constantVars, ignore_nan, verbose=True, throw_e
                     print(f"{v} timestep {t} does not match timestep {t1}")
 
         if ok:
-            print(f"✅ CLM output {v} do not vary through {this_ds.dims['gs'] - t1} growing seasons of output.")
+            print(f"✅ CLM output {v} do not vary through {this_ds.dims[time_coord] - t1} growing seasons of output.")
 
     if any_bad and throw_error:
         raise RuntimeError('Stopping due to failed check_constant_vars().')
