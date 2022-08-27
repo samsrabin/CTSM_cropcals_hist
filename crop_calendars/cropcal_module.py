@@ -770,7 +770,7 @@ def import_rx_dates(var_prefix, date_inFile, dates_ds):
     return ds
 
 
-def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegtypes=utils.define_mgdcrop_list(), 
+def import_output(filename, myVars, y1=None, yN=None, constantVars=None, constantGSs=None, myVegtypes=utils.define_mgdcrop_list(), 
                   sdates_rx_ds=None, gdds_rx_ds=None, verbose=False):
    
    # Minimum harvest threshold allowed in PlantCrop()
@@ -862,40 +862,6 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    varList_no_zero = ["DATE", "YEAR"]
    check_no_zeros(this_ds, varList_no_zero, "original file")
    
-   # Check that some things are constant across years
-   if constantVars:
-      t1 = 0 # 0-indexed
-      for v in constantVars:
-         ok = True
-
-         t1_yr = this_ds.time.values[t1]
-         t1_vals = np.squeeze(this_ds[v].isel(time=t1).values)
-
-         for t in np.arange(t1+1, this_ds.dims["time"]):
-            t_yr = this_ds.time.values[t]
-            t_vals = np.squeeze(this_ds[v].isel(time=t).values)
-            ok_p = np.squeeze(t1_vals == t_vals)
-            if not np.all(ok_p):
-                  if ok:
-                     print(f"❌ CLM output {v} unexpectedly vary over time:")
-                  ok = False
-                  if verbose:
-                     for thisPatch in np.where(np.bitwise_not(ok_p))[0]:
-                        thisLon = this_ds.patches1d_lon.values[thisPatch]
-                        thisLat = this_ds.patches1d_lat.values[thisPatch]
-                        thisCrop = this_ds.patches1d_itype_veg_str.values[thisPatch]
-                        thisCrop_int = this_ds.patches1d_itype_veg.values[thisPatch]
-                        thisStr = f"   Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop} ({thisCrop_int})"
-                        if v == "SDATES":
-                              print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
-                        else:
-                              print(f"{thisStr}: {t1_yr} {v} {int(t1_vals[thisPatch])}, {t_yr} {v} {int(t_vals[thisPatch])}")
-                  else:
-                     print(f"{v} timestep {t} does not match timestep {t1}")
-
-         if ok:
-            print(f"✅ CLM output {v} do not vary through {this_ds.dims['time'] - t1} years of output.")
-   
    # Convert time*mxharvests axes to growingseason axis
    this_ds_gs = convert_axis_time2gs(this_ds, verbose=verbose, incl_orig=False)
    
@@ -931,6 +897,18 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegty
    
    # Convert time axis to integer year
    this_ds_gs = this_ds_gs.assign_coords({"time": [t.year for t in this_ds.time_bounds.values[:,0]]})
+   
+   # Check that some things are constant across years
+   if constantVars:
+       throw_error = False
+       if constantGSs:
+           gs0 = this_ds_gs.gs.values[0]
+           gsN = this_ds_gs.gs.values[-1]
+           if constantGSs.start > gs0 or constantGSs.stop < gsN:
+               print(f'❗ Only checking constantVars over {constantGSs.start}-{constantGSs.stop} (run includes {gs0}-{gsN})')
+           check_constant_vars(this_ds_gs.sel(gs=constantGSs), constantVars, ignore_nan=True, throw_error=throw_error)
+       else:
+           check_constant_vars(this_ds_gs, constantVars, ignore_nan=True, throw_error=throw_error)
    
    return this_ds_gs
 
