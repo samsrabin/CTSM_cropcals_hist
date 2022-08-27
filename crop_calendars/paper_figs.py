@@ -1248,39 +1248,40 @@ print('Done making maps.')
 
 # %% Import country map and key
 
-# First, import the more restricted set
-countries_a = xr.open_dataset('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_ssr/ne_10m_admin_0_countries_ssrIDs_f19.nc')
+# Half-degree countries from Brendan
+countries = xr.open_dataset('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_brendan/gadm0.mask.nc4')
 
-# Next, import the expanded set
-countries_at = xr.open_dataset('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_ssr/ne_10m_admin_0_countries_ssrIDs_at_f19.nc')
+# Nearest-neighbor remap countries to LU resolutions
+for resname, res in reses.items():
+   res['dsg']['countries'] = utils.lon_idl2pm(countries).interp_like(res['dsg']['AREA'], method='nearest')['gadm0']
+   
+countries_key = pd.read_csv('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_brendan/Nation_ID.csv',
+                               header=None,
+                               names=['num', 'name'])
 
-# Make a new set, where ocean/missing cells in the restricted set are filled with values from the expanded set. This will result in very blobby-looking coastlines because of the expanded set! For example, Russia touches Alaska. But the point is that every gridcell that's touched by a continent has an associated country.
-new_map = countries_a.copy().Band1.values
-new_map[np.where(new_map==0)] = countries_at.copy().Band1.values[np.where(new_map==0)]
-countries = xr.Dataset(data_vars = {'ADM_ID_SSR': xr.DataArray(data = new_map,
-                                                               coords = countries_a.coords)})
+fao_all_ctry = pd.read_csv("/Users/sam/Documents/git_repos/CTSM_cropcals_hist/crop_calendar_MATLAB/FAOSTAT_data_en_8-21-2022_byCountry.csv")
+fao_all_ctry = preproc_fao_data(fao_all_ctry)
+
+# Replace some countries' names in key to match FAO data
+countries_key = countries_key.replace({'China': 'China, mainland',   # Because it also has Taiwan
+                                       'Turkey': 'Türkiye',
+                                       'Vietnam': 'Viet Nam'})
+# Replace some countries' names in FAO data to match key (to keep them short for figs)
+fao_all_ctry = fao_all_ctry.replace({'Bolivia (Plurinational State of)': 'Bolivia',
+                                     'Russian Federation': 'Russia',
+                                     'Syrian Arab Republic': 'Syria',
+                                     'United States of America': 'United States'})
+
+# Make sure every country in map is in key
+for i, x in enumerate(np.unique(countries.gadm0.values)):
+   if not np.isnan(x) and not np.any(countries_key.num.values == x):
+      print(f'❗ {x} not found in key')
 
 
-# Nearest-neighbor remap countries to LU resolution. 
-countries = utils.lon_idl2pm(countries)
-countries = countries.interp_like(reses['f19_g17']['dsg']['AREA'], method='nearest')
 
-# Set missing to NaN
-countries['ADM_ID_SSR'] = countries['ADM_ID_SSR'].where(countries['ADM_ID_SSR']>0)
-countries['ADM_ID_SSR'].plot()
 
-# Import key (only needed columns)
-countries_key = pd.read_csv("/Users/Shared/PLUM/crop_calib_data/countries/ne_10m_admin_0_countries_ssrIDs.csv", sep = '\t').loc[:,['ADMIN', 'ADM_ID_SSR']]
-countries_key.head()
 
-# %% Test country map and key
-# Remember, coastlines will be blobby!
 
-# thisCountry = "India"
-thisCountry = "United States of America"
-# thisCountry = "Germany"
-thisID = countries_key.ADM_ID_SSR[countries_key["ADMIN"]==thisCountry].values
-if len(thisID) != 1:
-   raise RuntimeError(f'Expected 1 match of {thisCountry}, found {len(thisID)}')
 
-countries['ADM_ID_SSR'].where(countries['ADM_ID_SSR']==thisID).plot()
+
+
