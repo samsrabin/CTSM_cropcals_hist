@@ -1314,10 +1314,297 @@ for i, x in enumerate(np.unique(countries.gadm0.values)):
       print(f'❗ {x} not found in key')
 
 
+# %% Make scatter plots, FAOSTAT vs. CLM, of top 10 countries for each crop
 
+# top_y1 = 1961 # First year of FAO data
+top_y1 = 1992 # Pre-1992, you start getting USSR, which isn't in map
+top_yN = 2009
+overwrite = True
 
+topYears = np.arange(top_y1, top_yN+1)
+NtopYears = len(topYears)
+fao_mean_byCountry = get_mean_byCountry(fao_all_ctry, top_y1, top_yN)
 
+fao_crops = np.unique(fao_all_ctry.Crop.values)
+Ntop = 10
+topN_list = []
+countries_in_topNs = []
+for thisCrop in fao_crops:
+   topN = fao_mean_byCountry[thisCrop]['Production'].nlargest(Ntop)
+   topN_list.append(topN)
+   countries_in_topNs = countries_in_topNs + list(topN.keys())
 
+# Which countries in our top 10 lists are not found in our countries key?
+countries_in_topNs = np.unique(countries_in_topNs)
+any_ctry_notfound = False
+for thisCountry in countries_in_topNs:
+   if thisCountry not in countries_key.name.values:
+      print(f'❗ {thisCountry} not in countries_key')
+      any_ctry_notfound = True
+if any_ctry_notfound:
+   raise RuntimeError('At least one country in FAO not found in key')
+      
+i_theseYears_earthstat = [i for i, x in enumerate(earthstats['f09_g17'].time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
 
+for c, thisCrop in enumerate(fao_crops):
+      
+   thisCrop_clm = cropnames_fao2clm(thisCrop)
+   topN = topN_list[c]
+   
+   suptitle = f"{thisCrop}, FAOSTAT vs CLM ({top_y1}-{top_yN})"
+   fig_outfile = outDir_figs + "Yield anom scatter top 10 " + suptitle + ".pdf"
+   if os.path.exists(fig_outfile) and not overwrite:
+      print(f'   Skipping {thisCrop_out} (file exists).')
+      continue
+   
+   prod_ar = np.full((len(cases), NtopYears, Ntop), np.nan)
+   area_ar = np.full((len(cases), NtopYears, Ntop), np.nan)
+   prod_faostat_yc = np.full((NtopYears, Ntop), np.nan)
+   area_faostat_yc = np.full((NtopYears, Ntop), np.nan)
+   prod_earthstat_yc = np.full((NtopYears, Ntop), np.nan)
+   area_earthstat_yc = np.full((NtopYears, Ntop), np.nan)
+   
+   for i_case, (casename, case) in enumerate(cases.items()):
+      case_ds = case['ds']
+      lu_ds = reses[case['res']]['dsg']
+      countries_map = lu_ds['countries'].load()
 
+      i_theseYears_case = [i for i, x in enumerate(case_ds.time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
+      i_theseYears_lu = [i for i, x in enumerate(lu_ds.time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
+      
+      # Find this crop in production and area data
+      i_thisCrop_case = [i for i, x in enumerate(case_ds.vegtype_str.values) if thisCrop_clm in x]
+      if len(i_thisCrop_case) == 0:
+         raise RuntimeError(f'No matches found for {thisCrop} in case_ds.vegtype_str')
+      i_thisCrop_lu = [i for i, x in enumerate(lu_ds.cft.values) if thisCrop_clm in utils.ivt_int2str(x)]
+      if len(i_thisCrop_lu) == 0:
+         raise RuntimeError(f'No matches found for {thisCrop} in lu_ds.cft')
+      
+      # Get each top-N country's time series for this crop
+      for c, country in enumerate(topN.keys()):
+         country_id = countries_key.query(f'name == "{country}"')['num'].values
+         if len(country_id) != 1:
+            raise RuntimeError(f'Expected 1 match of {country} in countries_key; got {len(country_id)}')
+         
+         # Yield...
+         yield_da = case_ds['GRAIN_HARV_TOFOOD_ANN_GD']\
+            .isel(ivt_str=i_thisCrop_case, time=i_theseYears_case)\
+            .sum(dim='ivt_str')\
+            .where(countries_map == country_id)\
+            * 1e-6 * 1e4 # g/m2 to tons/ha
+                     
+         # Area...
+         area_da = lu_ds['AREA_CFT']\
+            .isel(cft=i_thisCrop_lu, time=i_theseYears_lu)\
+            .sum(dim='cft')\
+            .where(countries_map == country_id)\
+            * 1e-4 # m2 to ha
+         area_ar[i_case,:,c] = area_da.sum(dim=['lon', 'lat']).values 
+         
+         # Production (tons)
+         prod_ar[i_case,:,c] = (yield_da * area_da).sum(dim=['lon', 'lat'])
+            
+         # FAOSTAT
+         if i_case == 0:
+            # Production (tons)
+            prod_faostat_yc[:,c] = fao_all_ctry.query(f'Area == "{country}" & Crop == "{thisCrop}" & Element == "Production" & Year >= {top_y1} & Year <= {top_yN}')['Value'].values
+            # Area (ha)
+            area_faostat_yc[:,c] = fao_all_ctry.query(f'Area == "{country}" & Crop == "{thisCrop}" & Element == "Area harvested" & Year >= {top_y1} & Year <= {top_yN}')['Value'].values
+         
+         # EarthStat
+         if np.all(np.isnan(prod_earthstat_yc[:,c])) and case['res']=='f09_g17':
+            prod_earthstat_yc[:,c] = earthstats[case['res']]['Production']\
+               .interp_like(countries_map)\
+               .sel(crop=thisCrop_clm.title())\
+               .isel(time=i_theseYears_earthstat)\
+               .where(countries_map == country_id)\
+               .sum(dim=['lon', 'lat'])\
+               .values
+            area_earthstat_yc[:,c] = earthstats[case['res']]['HarvestArea']\
+               .interp_like(countries_map)\
+               .sel(crop=thisCrop_clm.title())\
+               .isel(time=i_theseYears_earthstat)\
+               .where(countries_map == country_id)\
+               .sum(dim=['lon', 'lat'])\
+               .values
 
+   new_coords = {'Case': caselist,
+                 'Year': topYears,
+                 'Country': topN.keys().values}
+   prod_da = xr.DataArray(data = prod_ar,
+                          coords = new_coords,
+                          attrs = {'units': 'tons'})
+   area_da = xr.DataArray(data = area_ar,
+                          coords = new_coords,
+                          attrs = {'units': 'tons'})
+   yield_da = prod_da / area_da
+   yield_da = yield_da.assign_attrs({'units': 'tons/ha'})
+   prod_faostat_da = xr.DataArray(data = prod_faostat_yc,
+                                  coords = {'Year': topYears,
+                                           'Country': topN.keys().values},
+                                  attrs = {'units': 'tons'})
+   area_faostat_da = xr.DataArray(data = area_faostat_yc,
+                                  coords = {'Year': topYears,
+                                           'Country': topN.keys().values},
+                                  attrs = {'units': 'ha'})
+   yield_faostat_da = prod_faostat_da / area_faostat_da
+   yield_faostat_da = yield_faostat_da.assign_attrs({'units': 'tons/ha'})
+   prod_earthstat_da = xr.DataArray(data = prod_earthstat_yc,
+                                    coords = {'Year': topYears,
+                                              'Country': topN.keys().values},)
+   area_earthstat_da = xr.DataArray(data = area_earthstat_yc,
+                                    coords = {'Year': topYears,
+                                              'Country': topN.keys().values})
+   yield_earthstat_da = prod_earthstat_da / area_earthstat_da
+   
+   topN_ds = xr.Dataset(data_vars = {'Production': prod_da,
+                                     'Production (FAOSTAT)': prod_faostat_da,
+                                     'Production (EarthStat)': prod_earthstat_da,
+                                     'Area': area_da,
+                                     'Area (FAOSTAT)': area_faostat_da,
+                                     'Area (EarthStat)': area_earthstat_da,
+                                     'Yield': yield_da,
+                                     'Yield (FAOSTAT)': yield_faostat_da,
+                                     'Yield (EarthStat)': yield_earthstat_da})
+   
+   # Detrend and get yield anomalies
+   topN_dt_ds = xr.Dataset()
+   topN_ya_ds = xr.Dataset()
+   for i, v in enumerate(topN_ds):
+      # Could make this cleaner by being smart in detrend()
+      if "Case" in topN_ds[v].dims:
+         tmp_dt_cyC = topN_ds[v].copy().values
+         tmp_ya_cyC = topN_ds[v].copy().values
+         for C, country in enumerate(topN.keys()):
+            tmp_dt_cy = tmp_dt_cyC[:,:,C]
+            tmp_dt_cy = detrend(tmp_dt_cy)
+            tmp_dt_cyC[:,:,C] = tmp_dt_cy
+         topN_dt_ds[v] = xr.DataArray(data = tmp_dt_cyC,
+                                      coords = topN_ds[v].coords,
+                                      attrs = topN_ds[v].attrs)
+         for C, country in enumerate(topN.keys()):
+            tmp_ya_cy = tmp_ya_cyC[:,:,C]
+            tmp_ya_cy = yield_anomalies(tmp_ya_cy)
+            tmp_ya_cyC[:,:,C] = tmp_ya_cy
+         topN_ya_ds[v] = xr.DataArray(data = tmp_ya_cyC,
+                                      coords = topN_ds[v].coords,
+                                      attrs = topN_ds[v].attrs)
+      else:
+         tmp_dt_Cy = np.transpose(topN_ds[v].copy().values)
+         tmp_dt_Cy = detrend(tmp_dt_Cy)
+         topN_dt_ds[v] = xr.DataArray(data = np.transpose(tmp_dt_Cy),
+                                      coords = topN_ds[v].coords,
+                                      attrs = topN_ds[v].attrs)
+         tmp_ya_Cy = np.transpose(topN_ds[v].copy().values)
+         tmp_ya_Cy = yield_anomalies(tmp_ya_Cy)
+         topN_ya_ds[v] = xr.DataArray(data = np.transpose(tmp_ya_Cy),
+                                      coords = topN_ds[v].coords,
+                                      attrs = topN_ds[v].attrs)
+      topN_ya_ds[v].attrs['units'] = 'anomalies (unitless)'
+         
+
+   # plot_ds = topN_ds
+   # plot_ds = topN_dt_ds
+   plot_ds = topN_ya_ds
+
+   ny = 4
+   nx = 3
+
+   figsize = (10, 16)
+   f, axes = plt.subplots(ny, nx, figsize=figsize)
+   axes = axes.flatten()
+
+   # This one will have hollow circles
+   i_h = caselist.index('mycode_clmcals')
+
+   # Text describing R2 changes for each country
+   r2_change_text = ""
+
+   for c, country in enumerate(plot_ds.Country.values):
+      ax = axes[c]
+      sc = xr.plot.scatter(plot_ds.sel(Country=country),
+                           x='Yield (FAOSTAT)',
+                           y='Yield',
+                           hue='Case',
+                           ax=ax)
+      
+      for case in caselist:
+         lr = stats.linregress(x = plot_ds['Yield (FAOSTAT)'].sel(Country=country),
+                              y = plot_ds['Yield'].sel(Country=country, Case=case))
+         if case == "mycode_clmcals":
+            t = country + ": " + "{r1:.3g} $\\rightarrow$ "
+            r2_change_text += t.format(r1=lr.rvalue**2)
+         elif case == "mycode_ggcmicals":
+            r2_change_text += "{r2:.3g}\n".format(r2=lr.rvalue**2)
+      # Set this one to have hollow circles
+      color = sc[i_h].get_facecolor()
+      sc[i_h].set_facecolor('none')
+      sc[i_h].set_edgecolor(color)
+      
+      xlims = list(ax.get_xlim())
+      ylims = list(ax.get_ylim())
+      newlims = [min(xlims[0], ylims[0]), max(xlims[1], ylims[1])]
+      ax.set_xlim(newlims)
+      ax.set_ylim(newlims)
+      # ax.set_aspect('equal')
+      ax.get_legend().remove()
+      ax.set_xlabel(None)
+      ax.set_ylabel(None)
+      if c == Ntop-1:
+         ax.legend(bbox_to_anchor=(3,0.5), loc='center')
+
+   # Delete unused axes, if any
+   for a in np.arange(c+1, ny*nx):
+      f.delaxes(axes[a])
+      
+   # Add row labels
+   leftmost = np.arange(0, nx*ny, nx)
+   for i, a in enumerate(leftmost):
+      axes[a].set_ylabel("Yield anomaly (CLM)", fontsize=12, fontweight='bold')
+      axes[a].yaxis.set_label_coords(-0.15, 0.5)
+
+   # Add column labels
+   bottommost = np.arange(Ntop)[-3:]
+   bottommost_cols = bottommost % nx
+   for i, a in enumerate(bottommost):
+      ax = axes[a]
+      x = np.mean(ax.get_xlim())
+      y = ax.get_ylim()[0] - 0.2*np.diff(ax.get_ylim()) # 20% below the bottom edge
+      ax.text(x=x, y=y,
+              s="Yield anomaly (FAOSTAT)",
+              fontsize=12,
+              ha='center',
+              fontweight='bold')
+
+   # Add figure title
+   suptitle_xpos = 0.5
+   suptitle_ypos = 0.91
+   f.suptitle(suptitle,
+              x = suptitle_xpos,
+              y = suptitle_ypos,
+              fontsize = 18,
+              fontweight='bold')
+
+   # Make square plots
+   for a, ax in enumerate(axes):
+      xlims = list(ax.get_xlim())
+      ylims = list(ax.get_ylim())
+      newlims = [min(xlims[0], ylims[0]), max(xlims[1], ylims[1])]
+      ax.set_xlim(newlims)
+      ax.set_ylim(newlims)
+      ax.set_aspect('equal')
+      
+   # Add "title" to text
+   r2_change_text = r"$\bf{R^2\/changes}\/CLM \rightarrow GGCMI}$" + "\n" + r2_change_text
+   # Add text to plot
+   ax = axes[Ntop-1]
+   x = ax.get_xlim()[1] + 0.2*np.diff(ax.get_xlim()) # 20% past the right edge
+   y = ax.get_ylim()[1]
+   ax.text(x, y, r2_change_text[:-1], va='top');
+   tmp = ax.get_children()[4]
+   
+   f.savefig(fig_outfile,
+             bbox_inches='tight', facecolor='white')
+   plt.close()
+   
+   
