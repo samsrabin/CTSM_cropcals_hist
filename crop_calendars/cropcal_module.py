@@ -129,6 +129,10 @@ def check_and_trim_years(y1, yN, ds_in):
 def check_constant_vars(this_ds, constantVars, ignore_nan, verbose=True, throw_error=True):
     t1 = 0 # 0-indexed
     any_bad = False
+    if throw_error:
+        emojus = '❌'
+    else:
+        emojus = '❗'
     if not isinstance(constantVars, list):
         constantVars = [constantVars]
     for v in constantVars:
@@ -156,7 +160,7 @@ def check_constant_vars(this_ds, constantVars, ignore_nan, verbose=True, throw_e
             if not np.all(ok_p):
                 any_bad = True
                 if ok:
-                    print(f"❌ CLM output {v} unexpectedly vary over time:")
+                    print(f"{emojus} CLM output {v} unexpectedly vary over time:")
                 ok = False
                 if verbose:
                     for thisPatch in np.where(np.bitwise_not(ok_p))[0]:
