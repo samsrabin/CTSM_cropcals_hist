@@ -134,7 +134,7 @@ def detrend(ps_in):
       ps_in = ps_in.values
    
    unique_Nnans = np.unique(np.sum(np.isnan(ps_in), axis=1))
-   Ngs = case_ds.dims['gs']
+   Ngs = ps_in.shape[1]
 
    for n in unique_Nnans:
       
