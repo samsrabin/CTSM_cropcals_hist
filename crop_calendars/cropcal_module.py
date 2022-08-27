@@ -126,28 +126,6 @@ def check_and_trim_years(y1, yN, ds_in):
     return ds_in
 
 
- # Make sure that, e.g., GDDACCUM_PERHARV is always <= HUI_PERHARV
-def check_v0_le_v1(this_ds, vars, msg_txt=" ", both_nan_ok = False, throw_error=False):
-    v0 = vars[0]
-    v1 = vars[1]
-    gdd_lt_hui = this_ds[v0] <= this_ds[v1]
-    if both_nan_ok:
-        gdd_lt_hui = gdd_lt_hui | (np.isnan(this_ds[v0]) & np.isnan(this_ds[v1]))
-    if np.all(gdd_lt_hui):
-        print(f"✅{msg_txt}{v0} always <= {v1}")
-    else: 
-        msg = f"❌{msg_txt}{v0} *not* always <= {v1}"
-        gdd_lt_hui_vals = gdd_lt_hui.values
-        p = np.where(~gdd_lt_hui_vals)[0][0]
-        msg = msg + f"\ne.g., patch {p}: {this_ds.patches1d_itype_veg_str.values[p]}, lon {this_ds.patches1d_lon.values[p]} lat {this_ds.patches1d_lat.values[p]}:"
-        msg = msg + f"\n{this_ds[v0].values[p,:]}"
-        msg = msg + f"\n{this_ds[v1].values[p,:]}"
-        if throw_error:
-            print(msg)
-        else:
-            raise RuntimeError(msg)
-
-
 def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min=None):
     all_ok = 2
     diff_str_list = []
@@ -200,24 +178,28 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
         print(f"🟨 dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable (diffs <= {gdd_tolerance})")
     else:
         print(f"❌ dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed. E.g., {diffs_eg_txt}")
-        
 
-# Set up empty Dataset with time axis as "gs" (growing season) instead of what CLM puts out.
-# Includes all the same variables as the input dataset, minus any that had dimensions mxsowings or mxharvests.
-def set_up_ds_with_gs_axis(ds_in):
-    # Get the data variables to include in the new dataset
-    data_vars = dict()
-    for v in ds_in.data_vars:
-        if not any([x in ["mxsowings", "mxharvests"] for x in ds_in[v].dims]):
-            data_vars[v] = ds_in[v]
-    # Set up the new dataset
-    gs_years = [t.year-1 for t in ds_in.time.values[:-1]]
-    coords = ds_in.coords
-    coords["gs"] = gs_years
-    ds_out = xr.Dataset(data_vars=data_vars,
-                        coords=coords,
-                        attrs=ds_in.attrs)
-    return ds_out
+
+ # Make sure that, e.g., GDDACCUM_PERHARV is always <= HUI_PERHARV
+def check_v0_le_v1(this_ds, vars, msg_txt=" ", both_nan_ok = False, throw_error=False):
+    v0 = vars[0]
+    v1 = vars[1]
+    gdd_lt_hui = this_ds[v0] <= this_ds[v1]
+    if both_nan_ok:
+        gdd_lt_hui = gdd_lt_hui | (np.isnan(this_ds[v0]) & np.isnan(this_ds[v1]))
+    if np.all(gdd_lt_hui):
+        print(f"✅{msg_txt}{v0} always <= {v1}")
+    else: 
+        msg = f"❌{msg_txt}{v0} *not* always <= {v1}"
+        gdd_lt_hui_vals = gdd_lt_hui.values
+        p = np.where(~gdd_lt_hui_vals)[0][0]
+        msg = msg + f"\ne.g., patch {p}: {this_ds.patches1d_itype_veg_str.values[p]}, lon {this_ds.patches1d_lon.values[p]} lat {this_ds.patches1d_lat.values[p]}:"
+        msg = msg + f"\n{this_ds[v0].values[p,:]}"
+        msg = msg + f"\n{this_ds[v1].values[p,:]}"
+        if throw_error:
+            print(msg)
+        else:
+            raise RuntimeError(msg)
 
 
 # Convert time*mxharvests axes to growingseason axis
@@ -1114,6 +1096,24 @@ def set_firstharv_nan(this_ds, this_var, firstharv_nan_inds):
     this_da.values = this_array
     this_ds[this_var] = this_da
     return this_ds
+
+
+# Set up empty Dataset with time axis as "gs" (growing season) instead of what CLM puts out.
+# Includes all the same variables as the input dataset, minus any that had dimensions mxsowings or mxharvests.
+def set_up_ds_with_gs_axis(ds_in):
+    # Get the data variables to include in the new dataset
+    data_vars = dict()
+    for v in ds_in.data_vars:
+        if not any([x in ["mxsowings", "mxharvests"] for x in ds_in[v].dims]):
+            data_vars[v] = ds_in[v]
+    # Set up the new dataset
+    gs_years = [t.year-1 for t in ds_in.time.values[:-1]]
+    coords = ds_in.coords
+    coords["gs"] = gs_years
+    ds_out = xr.Dataset(data_vars=data_vars,
+                        coords=coords,
+                        attrs=ds_in.attrs)
+    return ds_out
 
 
 def subtract_mean(in_ps):
