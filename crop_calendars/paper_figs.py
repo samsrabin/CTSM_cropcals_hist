@@ -604,7 +604,7 @@ cases['mycode_clmcals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cr
                     'constantVars': None,
                     'res': 'f19_g17'}
 # My run with rx_crop_calendars2 code and GGCMI calendars
-cases['mycode_ggcmicals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddforced/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddforced.clm2.h1.1950-01-01-00000.nc',
+cases['mycode_ggcmicals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddforced2/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddforced2.clm2.h1.1950-01-01-00000.nc',
                     'constantVars': None,  # Would be SDATES, but land use changes over time
                     'res': 'f19_g17'}
 
