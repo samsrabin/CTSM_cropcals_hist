@@ -1221,3 +1221,41 @@ for (this_var, var_info) in varList.items():
 print('Done making maps.')
 
 
+# %% Import country map and key
+
+# First, import the more restricted set
+countries_a = xr.open_dataset('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_ssr/ne_10m_admin_0_countries_ssrIDs_f19.nc')
+
+# Next, import the expanded set
+countries_at = xr.open_dataset('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_ssr/ne_10m_admin_0_countries_ssrIDs_at_f19.nc')
+
+# Make a new set, where ocean/missing cells in the restricted set are filled with values from the expanded set. This will result in very blobby-looking coastlines because of the expanded set! For example, Russia touches Alaska. But the point is that every gridcell that's touched by a continent has an associated country.
+new_map = countries_a.copy().Band1.values
+new_map[np.where(new_map==0)] = countries_at.copy().Band1.values[np.where(new_map==0)]
+countries = xr.Dataset(data_vars = {'ADM_ID_SSR': xr.DataArray(data = new_map,
+                                                               coords = countries_a.coords)})
+
+
+# Nearest-neighbor remap countries to LU resolution. 
+countries = utils.lon_idl2pm(countries)
+countries = countries.interp_like(reses['f19_g17']['dsg']['AREA'], method='nearest')
+
+# Set missing to NaN
+countries['ADM_ID_SSR'] = countries['ADM_ID_SSR'].where(countries['ADM_ID_SSR']>0)
+countries['ADM_ID_SSR'].plot()
+
+# Import key (only needed columns)
+countries_key = pd.read_csv("/Users/Shared/PLUM/crop_calib_data/countries/ne_10m_admin_0_countries_ssrIDs.csv", sep = '\t').loc[:,['ADMIN', 'ADM_ID_SSR']]
+countries_key.head()
+
+# %% Test country map and key
+# Remember, coastlines will be blobby!
+
+# thisCountry = "India"
+thisCountry = "United States of America"
+# thisCountry = "Germany"
+thisID = countries_key.ADM_ID_SSR[countries_key["ADMIN"]==thisCountry].values
+if len(thisID) != 1:
+   raise RuntimeError(f'Expected 1 match of {thisCountry}, found {len(thisID)}')
+
+countries['ADM_ID_SSR'].where(countries['ADM_ID_SSR']==thisID).plot()
