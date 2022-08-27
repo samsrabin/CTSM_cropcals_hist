@@ -127,6 +127,24 @@ def adjust_gridded_lonlats(patches1d_lonlat, patches1d_ij, lu_dsg_lonlat_da, thi
       return lu_dsg_lonlat_da, patches1d_ij
 
 
+def yield_anomalies(ps_in):
+   if isinstance(ps_in, xr.DataArray):
+      ps_out = ps_in.values
+   else:
+      ps_out = ps_in
+   
+   # After Jägermeyr & Frieler (2018, Sci. Adv.)
+   ps_out = detrend(ps_out)
+   ps_out /= np.expand_dims(np.std(ps_out, axis=1), axis=1)
+   
+   if isinstance(ps_in, xr.DataArray):
+      ps_out = xr.DataArray(data = ps_out,
+                            coords = ps_in.coords,
+                            attrs = ps_in.attrs)
+         
+   return ps_out
+
+
 def detrend(ps_in):
    # Can't detrend if NaNs are present, so...
    
