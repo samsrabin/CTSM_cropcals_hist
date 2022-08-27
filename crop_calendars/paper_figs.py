@@ -125,6 +125,25 @@ def adjust_gridded_lonlats(patches1d_lonlat, patches1d_ij, lu_dsg_lonlat_da, thi
       lu_dsg_lonlat_da = xr.DataArray(data = new_gridded_lonlats,
                                       coords = {"lat": new_gridded_lonlats})
       return lu_dsg_lonlat_da, patches1d_ij
+   
+
+def cropnames_fao2clm(cropList_in):
+   def convert1(thisCrop):
+      thisCrop = thisCrop.lower().replace(' ', '')
+      thisCrop = thisCrop.replace(',paddy', '')
+      thisCrop = thisCrop.replace('seed', '')
+      thisCrop = thisCrop.replace('beans', 'bean')
+      thisCrop = thisCrop.replace('maize', 'corn')
+      return thisCrop
+   
+   if isinstance(cropList_in, (list, np.ndarray)):
+      cropList_out = [convert1(x) for x in cropList_in]
+      if isinstance(cropList_in, np.ndarray):
+         cropList_out = np.array(cropList_out)
+   else:
+      cropList_out = convert1(cropList_in)
+   
+   return cropList_out
 
 
 def yield_anomalies(ps_in):
@@ -197,6 +216,53 @@ def equalize_colorbars(ims):
       vmax = max(vmax, im.get_clim()[1])
    for i in np.arange(nims):
       ims[i].set_clim(vmin, vmax)
+
+
+def fao_data_get(fao_all, element):
+   fao_this = fao_all.copy().query(f"Element == '{element}'")
+
+   # Convert t to Mt
+   if element == 'Production':
+      fao_this.Value *= 1e-6
+
+   # Pivot and add Total column
+   fao_this = fao_this.copy().pivot(index="Year", columns="Crop", values="Value")
+   fao_this['Total'] = fao_this.sum(numeric_only=True, axis=1)
+
+   # Remove unneeded years
+   fao_this = fao_this.filter(items=np.arange(y1,yN+1), axis=0)
+
+   # Make no-sugarcane version
+   fao_this_nosgc = fao_this.drop(columns = ["Sugar cane", "Total"])
+   fao_this_nosgc['Total'] = fao_this_nosgc.sum(numeric_only=True, axis=1)
+   
+   return fao_this, fao_this_nosgc
+
+
+def fao_data_preproc(fao):
+   
+   # Because I always confuse Item vs. Element
+   fao.rename(columns={"Item": "Crop"}, inplace=True, errors="raise")
+   
+   # Combine "Maize" and "Maize, green"
+   fao.Crop.replace("Maize.*", "Maize", regex=True, inplace=True)
+   fao = fao.groupby(by=["Crop","Year","Element","Area","Unit"], as_index=False).agg("sum")
+
+   # Pick one rice
+   rice_to_keep = "Rice, paddy"
+   rice_to_drop = "Rice, paddy (rice milled equivalent)"
+   drop_this = [x == rice_to_drop for x in fao.Crop]
+   fao = fao.drop(fao[drop_this].index)
+   
+   # Filter out "China," which includes all Chinas
+   if "China" in fao.Area.values:
+      fao = fao.query('Area != "China"')
+   
+   return fao
+
+
+def get_mean_byCountry(fao, top_y1, top_yN):
+   return fao.query(f'Year>={top_y1} & Year<={top_yN}').groupby(['Crop','Element','Area'])['Value'].mean()
 
 
 def get_ts_prod_clm_yc_da(yield_gd, lu_ds, yearList, cropList_combined_clm):
@@ -704,40 +770,10 @@ print("Done.")
 # %% Get FAO data from CSV
 
 fao_all = pd.read_csv("/Users/sam/Documents/git_repos/CTSM_cropcals_hist/crop_calendar_MATLAB/FAOSTAT_data_6-15-2022.csv")
-fao_all.rename(columns={"Item": "Crop"}, inplace=True, errors="raise") # Because I always confuse Item vs. Element
 
-def get_fao_data(fao_all, element):
-   fao_this = fao_all.copy().query(f"Element == '{element}'")
-
-   # Combine "Maize" and "Maize, green"
-   fao_this.Crop.replace("Maize.*", "Maize", regex=True, inplace=True)
-   fao_this = fao_this.groupby(by=["Crop","Year","Element","Area","Unit"], as_index=False).agg("sum")
-
-   # Pick one rice
-   rice_to_keep = "Rice, paddy"
-   rice_to_drop = "Rice, paddy (rice milled equivalent)"
-   drop_this = [x == rice_to_drop for x in fao_this.Crop]
-   fao_this = fao_this.drop(fao_this[drop_this].index)
-
-   # Convert t to Mt
-   if element == 'Production':
-      fao_this.Value *= 1e-6
-
-   # Pivot and add Total column
-   fao_this = fao_this.copy().pivot(index="Year", columns="Crop", values="Value")
-   fao_this['Total'] = fao_this.sum(numeric_only=True, axis=1)
-
-   # Remove unneeded years
-   fao_this = fao_this.filter(items=np.arange(y1,yN+1), axis=0)
-
-   # Make no-sugarcane version
-   fao_this_nosgc = fao_this.drop(columns = ["Sugar cane", "Total"])
-   fao_this_nosgc['Total'] = fao_this_nosgc.sum(numeric_only=True, axis=1)
-   
-   return fao_this, fao_this_nosgc
-
-fao_prod, fao_prod_nosgc = get_fao_data(fao_all, 'Production')
-fao_area, fao_area_nosgc = get_fao_data(fao_all, 'Area harvested')
+fao_all = fao_data_preproc(fao_all)
+fao_prod, fao_prod_nosgc = fao_data_get(fao_all, 'Production')
+fao_area, fao_area_nosgc = fao_data_get(fao_all, 'Area harvested')
 
 
 # %% Get CLM crop production
@@ -1260,7 +1296,7 @@ countries_key = pd.read_csv('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalen
                                names=['num', 'name'])
 
 fao_all_ctry = pd.read_csv("/Users/sam/Documents/git_repos/CTSM_cropcals_hist/crop_calendar_MATLAB/FAOSTAT_data_en_8-21-2022_byCountry.csv")
-fao_all_ctry = preproc_fao_data(fao_all_ctry)
+fao_all_ctry = fao_data_preproc(fao_all_ctry)
 
 # Replace some countries' names in key to match FAO data
 countries_key = countries_key.replace({'China': 'China, mainland',   # Because it also has Taiwan
