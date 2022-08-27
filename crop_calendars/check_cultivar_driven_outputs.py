@@ -56,7 +56,7 @@ import inspect
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
-from cropcal_module import *
+import cropcal_module as cc
 
 import numpy as np
 from scipy import stats
@@ -184,12 +184,12 @@ myVars = ["SDATES", "HDATES", "GDDACCUM_PERHARV", "GDDHARV_PERHARV", "HARVEST_RE
 dates_ds1_orig = utils.import_ds(glob.glob(indirs[1]["path"] + "*h2.*"), \
     myVars=myVars + ["GRAINC_TO_FOOD_ACCUM_PERHARV"], 
     myVegtypes=utils.define_mgdcrop_list())
-dates_ds1_orig = check_and_trim_years(y1, yN, dates_ds1_orig)
+dates_ds1_orig = cc.check_and_trim_years(y1, yN, dates_ds1_orig)
 
-dates_ds0_orig = utils.import_ds(glob.glob(indirs[0]["path"] + "*h2.*"), \
+dates_ds0_orig = utils.import_ds(glob.glob(indirs[0]["path"] + "*h1.*"), \
     myVars=myVars, 
     myVegtypes=utils.define_mgdcrop_list())
-dates_ds0_orig = check_and_trim_years(y1, yN, dates_ds0_orig)
+dates_ds0_orig = cc.check_and_trim_years(y1, yN, dates_ds0_orig)
 
 # How many growing seasons can we use? Ignore last season because it can be incomplete for some gridcells.
 Ngs = dates_ds1_orig.dims['time'] - 1
@@ -216,25 +216,24 @@ print("Done.")
 
 # Import GGCMI sowing and harvest dates
 
-sdates_rx_ds = import_rx_dates("sdate", sdates_rx_file, dates_ds0_orig)
-hdates_rx_ds = import_rx_dates("hdate", hdates_rx_file, dates_ds0_orig)
-gdds_rx_ds = import_rx_dates("gdd", gdds_rx_file, dates_ds0_orig)
+sdates_rx_ds = cc.import_rx_dates("sdate", sdates_rx_file, dates_ds0_orig)
+hdates_rx_ds = cc.import_rx_dates("hdate", hdates_rx_file, dates_ds0_orig)
+gdds_rx_ds = cc.import_rx_dates("gdd", gdds_rx_file, dates_ds0_orig)
 
 gs_len_rx_ds = hdates_rx_ds.copy()
 for v in gs_len_rx_ds:
     if v == "time_bounds":
         continue
-    gs_len_rx_ds[v] = get_gs_len_da(hdates_rx_ds[v] - sdates_rx_ds[v])
+    gs_len_rx_ds[v] = cc.get_gs_len_da(hdates_rx_ds[v] - sdates_rx_ds[v])
 
 
 # Align output sowing and harvest dates/etc.
-
-dates_ds0 = convert_axis_time2gs(dates_ds0_orig, myVars=myVars)
-dates_ds1 = convert_axis_time2gs(dates_ds1_orig, myVars=myVars + ["GRAINC_TO_FOOD_ACCUM_PERHARV"])
+dates_ds0 = cc.convert_axis_time2gs(dates_ds0_orig, myVars=myVars)
+dates_ds1 = cc.convert_axis_time2gs(dates_ds1_orig, myVars=myVars)
 
 # Get growing season length
-dates_ds0["GSLEN"] = get_gs_len_da(dates_ds0["HDATES"] - dates_ds0["SDATES"])
-dates_ds1["GSLEN"] = get_gs_len_da(dates_ds1["HDATES"] - dates_ds1["SDATES"])
+dates_ds0["GSLEN"] = cc.get_gs_len_da(dates_ds0["HDATES"] - dates_ds0["SDATES"])
+dates_ds1["GSLEN"] = cc.get_gs_len_da(dates_ds1["HDATES"] - dates_ds1["SDATES"])
 
 
 # Check that some things are constant across years for ds1
@@ -280,8 +279,8 @@ for v in constantVars:
 verbose = True
 
 
-check_gddaccum_le_hui(dates_ds0, " dates_ds0: ")
-check_gddaccum_le_hui(dates_ds1, " dates_ds1: ")
+cc.check_v0_le_v1(dates_ds0, ["GDDACCUM_PERHARV", "HUI_PERHARV"], msg_txt=" dates_ds0: ")
+cc.check_v0_le_v1(dates_ds1, ["GDDACCUM_PERHARV", "HUI_PERHARV"], msg_txt=" dates_ds1: ")
 
 
 # Check that prescribed sowing dates were obeyed
@@ -296,13 +295,13 @@ if "time" in sdates_rx_ds.dims:
     
 
 if indirs[0]["used_rx_sdate"]:
-    check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds0, 0, "SDATES")
+    cc.check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds0, 0, "SDATES")
 if indirs[1]["used_rx_sdate"]:
-    check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds1, 1, "SDATES")
+    cc.check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds1, 1, "SDATES")
 if indirs[0]["used_rx_harvthresh"]:
-    check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds0, 0, "GDDHARV_PERHARV", gdd_min=gdd_min)
+    cc.check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds0, 0, "GDDHARV_PERHARV", gdd_min=gdd_min)
 if indirs[1]["used_rx_harvthresh"]:
-    check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds1, 1, "GDDHARV_PERHARV", gdd_min=gdd_min)
+    cc.check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds1, 1, "GDDHARV_PERHARV", gdd_min=gdd_min)
     
 
 # %% Make map of harvest reasons
@@ -368,13 +367,13 @@ for v, vegtype_str in enumerate(vegtype_list):
         reason_text = reason_list_text[f]
         
         ylabel = "CLM5-style" if f==0 else None
-        map0_yx = get_reason_freq_map(Ngs, thisCrop0_gridded, reason)
-        ax = make_axis(fig, ny, nx, f+1)
+        map0_yx = cc.get_reason_freq_map(Ngs, thisCrop0_gridded, reason)
+        ax = cc.make_axis(fig, ny, nx, f+1)
         im0 = make_map(ax, map0_yx, f"v0: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
         ylabel = "GGCMI-style" if f==0 else None
-        ax = make_axis(fig, ny, nx, f+nx+1)
-        map1_yx = get_reason_freq_map(Ngs, thisCrop1_gridded, reason)
+        ax = cc.make_axis(fig, ny, nx, f+nx+1)
+        map1_yx = cc.get_reason_freq_map(Ngs, thisCrop1_gridded, reason)
         im1 = make_map(ax, map1_yx, f"v1: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
     fig.suptitle(f"Harvest reason: {vegtype_str_title}")
@@ -520,8 +519,8 @@ for thisVar in varList:
         
         # If needed, only include seasons where crop reached maturity
         if onlyMature:
-            thisCrop0_gridded = mask_immature(dates_ds0, vegtype_int, thisCrop0_gridded)
-            thisCrop1_gridded = mask_immature(dates_ds1, vegtype_int, thisCrop1_gridded)
+            thisCrop0_gridded = cc.mask_immature(dates_ds0, vegtype_int, thisCrop0_gridded)
+            thisCrop1_gridded = cc.mask_immature(dates_ds1, vegtype_int, thisCrop1_gridded)
             
         # If needed, remove outliers
         if noOutliers:
@@ -602,15 +601,15 @@ for thisVar in varList:
                 raise RuntimeError(f"thisVar {thisVar} not recognized: Setting up third plot")
         
         ylabel = "CLM5-style"
-        ax = make_axis(fig, ny, nx, 1)
+        ax = cc.make_axis(fig, ny, nx, 1)
         im0 = make_map(ax, map0_yx, f"v0{subplot_title_suffixes[0]}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
         ylabel = "GGCMI-style"
-        ax = make_axis(fig, ny, nx, 2)
+        ax = cc.make_axis(fig, ny, nx, 2)
         im1 = make_map(ax, map1_yx, f"v1{subplot_title_suffixes[1]}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
         if nplots == 3:
-            ax = make_axis(fig, ny, nx, 3)
+            ax = cc.make_axis(fig, ny, nx, 3)
             if thisVar == "GSLEN":
                 tmp_title = f"GGCMI (max={max2})"
             elif thisVar in ["HUI_PERHARV", "GDDHARV_PERHARV", "SDATES"]:
@@ -894,7 +893,7 @@ for thisVar_orig in varList:
         
         # If needed, only include seasons where crop reached maturity
         if onlyMature:
-            thisCrop1_gridded = mask_immature(dates_ds1, vegtype_int, thisCrop1_gridded)
+            thisCrop1_gridded = cc.mask_immature(dates_ds1, vegtype_int, thisCrop1_gridded)
             
         # If needed, remove outliers
         if noOutliers:
@@ -936,19 +935,19 @@ for thisVar_orig in varList:
             max3 = int(np.ceil(np.nanmax(map3_yx)))
             vmax = max(max1, max2, max3, np.nanmax(ggcmiDA_mn.values))
         
-        ax = make_axis(fig, ny, nx, 1)
+        ax = cc.make_axis(fig, ny, nx, 1)
         im1 = make_map(ax, map1_yx, "CLM", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
         
         if not diffExpected:
-            ax = make_axis(fig, ny, nx, 2)
+            ax = cc.make_axis(fig, ny, nx, 2)
             im1 = make_map(ax, map2_yx, "CLM expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
             
-            ax = make_axis(fig, ny, nx, 3)
+            ax = cc.make_axis(fig, ny, nx, 3)
             im1 = make_map(ax, map3_yx, "GGCMI expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
         
         for g in np.arange(Nggcmi_models):
             ggcmi_yx = ggcmiDA_mn.isel(model=g, drop=True)
-            ax = make_axis(fig, ny, nx, 3+g+1)
+            ax = cc.make_axis(fig, ny, nx, 3+g+1)
             im1 = make_map(ax, ggcmi_yx, ggcmi_models[g], "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
             
         fig.suptitle(f"{title_prefix}: {vegtype_str_title}", y=0.95, fontsize=fontsize_titles*2.2)
