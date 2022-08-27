@@ -126,6 +126,50 @@ def check_and_trim_years(y1, yN, ds_in):
     return ds_in
 
 
+def check_constant_vars(this_ds, constantVars, ignore_nan, verbose=True, throw_error=True):
+    t1 = 0 # 0-indexed
+    any_bad = False
+    for v in constantVars:
+        ok = True
+
+        t1_yr = this_ds.gs.values[t1]
+        t1_vals = np.squeeze(this_ds[v].isel(gs=t1).values)
+
+        for t in np.arange(t1+1, this_ds.dims["gs"]):
+            t_yr = this_ds.gs.values[t]
+            t_vals = np.squeeze(this_ds[v].isel(gs=t).values)
+            ok_p = t1_vals == t_vals
+            
+            # If allowed, ignore where either t or t1 is NaN. Should only be used for runs where land use varies over time.
+            if ignore_nan:
+                ok_p = np.squeeze(np.bitwise_or(ok_p, np.isnan(t1_vals+t_vals)))
+            
+            if not np.all(ok_p):
+                any_bad = True
+                if ok:
+                    print(f"❌ CLM output {v} unexpectedly vary over time:")
+                ok = False
+                if verbose:
+                    for thisPatch in np.where(np.bitwise_not(ok_p))[0]:
+                        thisLon = this_ds.patches1d_lon.values[thisPatch]
+                        thisLat = this_ds.patches1d_lat.values[thisPatch]
+                        thisCrop = this_ds.patches1d_itype_veg_str.values[thisPatch]
+                        thisCrop_int = this_ds.patches1d_itype_veg.values[thisPatch]
+                        thisStr = f"   Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop} ({thisCrop_int})"
+                        if v == "SDATES":
+                            print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
+                        else:
+                            print(f"{thisStr}: {t1_yr} {v} {int(t1_vals[thisPatch])}, {t_yr} {v} {int(t_vals[thisPatch])}")
+                else:
+                    print(f"{v} timestep {t} does not match timestep {t1}")
+
+        if ok:
+            print(f"✅ CLM output {v} do not vary through {this_ds.dims['gs'] - t1} growing seasons of output.")
+
+    if any_bad and throw_error:
+        raise RuntimeError('Stopping due to failed check_constant_vars().')
+
+
 def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min=None):
     all_ok = 2
     diff_str_list = []

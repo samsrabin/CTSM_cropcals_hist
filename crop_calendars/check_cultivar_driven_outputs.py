@@ -238,40 +238,10 @@ dates_ds1["GSLEN"] = cc.get_gs_len_da(dates_ds1["HDATES"] - dates_ds1["SDATES"])
 
 # Check that some things are constant across years for ds1
 
-constantVars = ["SDATES", "GDDHARV_PERHARV"]
+constantVars = ["SDATES", "GDDHARV"]
 verbose = True
 
-t1 = 0 # 0-indexed
-for v in constantVars:
-    ok = True
-
-    t1_yr = dates_ds1.gs.values[t1]
-    t1_vals = np.squeeze(dates_ds1[v].isel(gs=t1).values)
-
-    for t in np.arange(t1+1, dates_ds1.dims["gs"]):
-        t_yr = dates_ds1.gs.values[t]
-        t_vals = np.squeeze(dates_ds1[v].isel(gs=t).values)
-        ok_p = np.squeeze(t1_vals == t_vals)
-        if not np.all(ok_p):
-            if ok:
-                print(f"❌ dates_ds1: CLM output {v} unexpectedly vary over time:")
-            ok = False
-            if verbose:
-                for thisPatch in np.where(np.bitwise_not(ok_p))[0]:
-                    thisLon = dates_ds1.patches1d_lon.values[thisPatch]
-                    thisLat = dates_ds1.patches1d_lat.values[thisPatch]
-                    thisCrop = dates_ds1.patches1d_itype_veg_str.values[thisPatch]
-                    thisCrop_int = dates_ds1.patches1d_itype_veg.values[thisPatch]
-                    thisStr = f"   Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop} ({thisCrop_int})"
-                    if v == "SDATES":
-                        print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
-                    else:
-                        print(f"{thisStr}: {t1_yr} {v} {int(t1_vals[thisPatch])}, {t_yr} {v} {int(t_vals[thisPatch])}")
-            else:
-                print(f"{v} timestep {t} does not match timestep {t1}")
-
-    if ok:
-        print(f"✅ dates_ds1: CLM output {v} do not vary through {dates_ds1.dims['gs'] - t1} growing seasons of output.")
+cc.check_constant_vars(dates_ds1, constantVars)
 
 
 # For both datasets, check that GDDACCUM_PERHARV <= HUI_PERHARV
