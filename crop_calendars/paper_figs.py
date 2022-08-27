@@ -105,16 +105,16 @@ cases['cmip6'] = {'filepath': '/Users/Shared/CESM_work/CropEvalData_ssr/danica_t
                   'res': 'f09_g17'}
 # My run with normal CLM code + my outputs
 cases['ctsm5.1.dev092'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013/2022-08-08/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013.clm2.h1.1950-01-01-00000.nc',
-                    'constantVars': None,
-                    'res': 'f19_g17'}
+                           'constantVars': None,
+                           'res': 'f19_g17'}
 # My run with rx_crop_calendars2 code but CLM calendars
 cases['mycode_clmcals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1950-2013.clm/2022-08-09/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1950-2013.clm.clm2.h1.1950-01-01-00000.nc',
-                    'constantVars': None,
-                    'res': 'f19_g17'}
+                           'constantVars': None,
+                           'res': 'f19_g17'}
 # My run with rx_crop_calendars2 code and GGCMI calendars
 cases['mycode_ggcmicals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddforced2/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddforced2.clm2.h1.1950-01-01-00000.nc',
-                    'constantVars': None,  # Would be SDATES, but land use changes over time
-                    'res': 'f19_g17'}
+                             'constantVars': None,  # Would be SDATES, but land use changes over time
+                             'res': 'f19_g17'}
 
 # Note that _PERHARV will be stripped off upon import
 myVars = ['GRAINC_TO_FOOD_PERHARV', 'GRAINC_TO_FOOD_ANN', 'SDATES', 'SDATES_PERHARV', 'SYEARS_PERHARV', 'HDATES', 'HYEARS', 'GDDHARV_PERHARV', 'GDDACCUM_PERHARV', 'HUI_PERHARV', 'SOWING_REASON_PERHARV', 'HARVEST_REASON_PERHARV']
