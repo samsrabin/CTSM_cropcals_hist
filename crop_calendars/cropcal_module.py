@@ -129,6 +129,8 @@ def check_and_trim_years(y1, yN, ds_in):
 def check_constant_vars(this_ds, constantVars, ignore_nan, verbose=True, throw_error=True):
     t1 = 0 # 0-indexed
     any_bad = False
+    if not isinstance(constantVars, list):
+        constantVars = [constantVars]
     for v in constantVars:
         ok = True
         
