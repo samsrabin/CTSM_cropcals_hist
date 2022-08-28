@@ -15,6 +15,8 @@ sys.path.append(my_ctsm_python_gallery)
 import utils
 
 outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures/"
+if not os.path.exists(outDir_figs):
+   os.mkdir(outDir_figs)
 
 import numpy as np
 from scipy import stats, signal
