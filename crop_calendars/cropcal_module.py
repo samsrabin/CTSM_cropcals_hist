@@ -129,7 +129,7 @@ def check_and_trim_years(y1, yN, ds_in):
 def check_constant_vars(this_ds, constantVars, ignore_nan, constantGSs=None, verbose=True, throw_error=True):
     
     if not constantVars:
-        return
+        return None
     
     if constantGSs:
         gs0 = this_ds.gs.values[0]
@@ -160,6 +160,7 @@ def check_constant_vars(this_ds, constantVars, ignore_nan, constantGSs=None, ver
         this_da = this_ds[v]
         ra_sp = np.moveaxis(this_da.copy().values, i_time_coord, 0)
         incl_patches = []
+        bad_patches = np.array([])
         strList = []
 
         for t1 in np.arange(this_ds.dims[time_coord]-1):
@@ -193,17 +194,20 @@ def check_constant_vars(this_ds, constantVars, ignore_nan, constantGSs=None, ver
                     if ok:
                         print(f"{emojus} CLM output {v} unexpectedly vary over time:")
                     ok = False
+                    bad_patches_thisT = list(np.where(np.bitwise_not(ok_p))[0])
+                    bad_patches = np.concatenate((bad_patches, np.array(thesePatches)[bad_patches_thisT]))
                     if verbose:
-                        for thisPatch in np.where(np.bitwise_not(ok_p))[0]:
-                            thisLon = this_ds.patches1d_lon.values[thisPatch]
-                            thisLat = this_ds.patches1d_lat.values[thisPatch]
-                            thisCrop = this_ds.patches1d_itype_veg_str.values[thisPatch]
-                            thisCrop_int = this_ds.patches1d_itype_veg.values[thisPatch]
+                        for p in bad_patches_thisT:
+                            thisPatch = thesePatches[p]
+                            thisLon = this_ds.patches1d_lon.values[p]
+                            thisLat = this_ds.patches1d_lat.values[p]
+                            thisCrop = this_ds.patches1d_itype_veg_str.values[p]
+                            thisCrop_int = this_ds.patches1d_itype_veg.values[p]
                             thisStr = f"   Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop} ({thisCrop_int})"
                             if v == "SDATES":
-                                strList.append(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
+                                strList.append(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[p])}, {t_yr} jday {int(t_vals[p])}")
                             else:
-                                strList.append(f"{thisStr}: {t1_yr} {v} {int(t1_vals[thisPatch])}, {t_yr} {v} {int(t_vals[thisPatch])}")
+                                strList.append(f"{thisStr}: {t1_yr} {v} {int(t1_vals[p])}, {t_yr} {v} {int(t_vals[p])}")
                     else:
                         print(f"{v} timestep {t} does not match timestep {t1}")
         if verbose:
@@ -230,6 +234,9 @@ def check_constant_vars(this_ds, constantVars, ignore_nan, constantGSs=None, ver
 
     if any_bad and throw_error:
         raise RuntimeError('Stopping due to failed check_constant_vars().')
+    
+    bad_patches = np.unique(bad_patches)
+    return [int(p) for p in bad_patches]
 
 
 def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min=None):
