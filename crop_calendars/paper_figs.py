@@ -774,6 +774,10 @@ top_yN = 2009
 overwrite = True
 portrait = False
 
+which_to_plot = "Yield"
+# which_to_plot = "Detrended yield"
+# which_to_plot = "Yield anomaly"
+
 if portrait:
    ny = 4
    nx = 3
@@ -816,7 +820,8 @@ for c, thisCrop in enumerate(fao_crops):
    topN = topN_list[c]
    
    suptitle = f"{thisCrop}, FAOSTAT vs CLM ({top_y1}-{top_yN})"
-   fig_outfile = outDir_figs + "Yield anom scatter top 10 " + suptitle + ".pdf"
+   file_prefix = which_to_plot.replace('aly','')
+   fig_outfile = outDir_figs + f"{file_prefix} scatter top 10 " + suptitle + ".pdf"
    if os.path.exists(fig_outfile) and not overwrite:
       print(f'   Skipping {thisCrop_out} (file exists).')
       continue
@@ -964,12 +969,21 @@ for c, thisCrop in enumerate(fao_crops):
          topN_ya_ds[v] = xr.DataArray(data = np.transpose(tmp_ya_Cy),
                                       coords = topN_ds[v].coords,
                                       attrs = topN_ds[v].attrs)
-      topN_ya_ds[v].attrs['units'] = 'anomalies (unitless)'
+      
+      if which_to_plot == "Yield anomaly":
+         topN_ya_ds[v].attrs['units'] = 'anomalies (unitless)'
+      elif which_to_plot not in ["Detrended yield", "Yield"]:
+         raise RuntimeError(f"Which units should be used for '{which_to_plot}'?")
          
 
-   # plot_ds = topN_ds
-   # plot_ds = topN_dt_ds
-   plot_ds = topN_ya_ds
+   if which_to_plot == "Yield":
+      plot_ds = topN_ds
+   elif which_to_plot == "Detrended yield":
+      plot_ds = topN_dt_ds
+   elif which_to_plot == "Yield anomaly":
+      plot_ds = topN_ya_ds
+   else:
+      raise RuntimeError(f"Which dataset should be used for '{which_to_plot}'?")
 
    f, axes = plt.subplots(ny, nx, figsize=figsize)
    axes = axes.flatten()
@@ -990,7 +1004,7 @@ for c, thisCrop in enumerate(fao_crops):
       
       for case in caselist:
          lr = stats.linregress(x = plot_ds['Yield (FAOSTAT)'].sel(Country=country),
-                              y = plot_ds['Yield'].sel(Country=country, Case=case))
+                               y = plot_ds['Yield'].sel(Country=country, Case=case))
          if case == "mycode_clmcals":
             t = country + ": " + "{r1:.3g} $\\rightarrow$ "
             r2_change_text += t.format(r1=lr.rvalue**2)
@@ -1021,7 +1035,7 @@ for c, thisCrop in enumerate(fao_crops):
    # Add row labels
    leftmost = np.arange(0, nx*ny, nx)
    for i, a in enumerate(leftmost):
-      axes[a].set_ylabel("Yield anomaly (CLM)", fontsize=12, fontweight='bold')
+      axes[a].set_ylabel(f"{which_to_plot} (CLM)", fontsize=12, fontweight='bold')
       axes[a].yaxis.set_label_coords(-0.15, 0.5)
 
    # Add column labels
@@ -1032,7 +1046,7 @@ for c, thisCrop in enumerate(fao_crops):
       x = np.mean(ax.get_xlim())
       y = ax.get_ylim()[0] - 0.2*np.diff(ax.get_ylim()) # 20% below the bottom edge
       ax.text(x=x, y=y,
-              s="Yield anomaly (FAOSTAT)",
+              s=f"{which_to_plot} (FAOSTAT)",
               fontsize=12,
               ha='center',
               fontweight='bold')
