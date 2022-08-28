@@ -772,6 +772,18 @@ print('Done making maps.')
 top_y1 = 1992 # Pre-1992, you start getting USSR, which isn't in map
 top_yN = 2009
 overwrite = True
+portrait = False
+
+if portrait:
+   ny = 4
+   nx = 3
+   figsize = (10, 16)
+   suptitle_ypos = 0.91
+else:
+   ny = 3
+   nx = 4
+   figsize = (16, 13)
+   suptitle_ypos = 0.92
 
 topYears = np.arange(top_y1, top_yN+1)
 NtopYears = len(topYears)
@@ -959,10 +971,6 @@ for c, thisCrop in enumerate(fao_crops):
    # plot_ds = topN_dt_ds
    plot_ds = topN_ya_ds
 
-   ny = 4
-   nx = 3
-
-   figsize = (10, 16)
    f, axes = plt.subplots(ny, nx, figsize=figsize)
    axes = axes.flatten()
 
@@ -1017,7 +1025,7 @@ for c, thisCrop in enumerate(fao_crops):
       axes[a].yaxis.set_label_coords(-0.15, 0.5)
 
    # Add column labels
-   bottommost = np.arange(Ntop)[-3:]
+   bottommost = np.arange(Ntop)[-nx:]
    bottommost_cols = bottommost % nx
    for i, a in enumerate(bottommost):
       ax = axes[a]
@@ -1031,7 +1039,6 @@ for c, thisCrop in enumerate(fao_crops):
 
    # Add figure title
    suptitle_xpos = 0.5
-   suptitle_ypos = 0.91
    f.suptitle(suptitle,
               x = suptitle_xpos,
               y = suptitle_ypos,
