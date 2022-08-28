@@ -964,7 +964,7 @@ for c, thisCrop in enumerate(fao_crops):
    f, axes = plt.subplots(ny, nx, figsize=figsize)
    axes = axes.flatten()
 
-   # This one will have hollow circles
+   # mycode_clmcals will have hollow circles if ctsm5.1.dev092 is included
    i_h = caselist.index('mycode_clmcals')
 
    # Text describing R2 changes for each country
@@ -986,10 +986,11 @@ for c, thisCrop in enumerate(fao_crops):
             r2_change_text += t.format(r1=lr.rvalue**2)
          elif case == "mycode_ggcmicals":
             r2_change_text += "{r2:.3g}\n".format(r2=lr.rvalue**2)
-      # Set this one to have hollow circles
-      color = sc[i_h].get_facecolor()
-      sc[i_h].set_facecolor('none')
-      sc[i_h].set_edgecolor(color)
+      # Set mycode_clmcals to have hollow circles if ctsm5.1.dev092 is included
+      if "ctsm5.1.dev092" in caselist:
+         color = sc[i_h].get_facecolor()
+         sc[i_h].set_facecolor('none')
+         sc[i_h].set_edgecolor(color)
       
       xlims = list(ax.get_xlim())
       ylims = list(ax.get_ylim())
