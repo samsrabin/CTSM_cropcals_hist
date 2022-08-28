@@ -146,7 +146,10 @@ for i, (casename, case) in enumerate(cases.items()):
    else:
       this_ds = cc.import_output(case['filepath'], myVars=myVars,
                                  y1=y1, yN=yN, verbose=verbose_import)
-      cc.check_constant_vars(this_ds, case['constantVars'], ignore_nan=True, constantGSs=case['constantGSs'], verbose=True, throw_error=False)
+      
+      bad_patches = cc.check_constant_vars(this_ds, case['constantVars'], ignore_nan=True, constantGSs=case['constantGSs'], verbose=True, throw_error=False)
+      # for p in bad_patches:
+      #    cc.print_gs_table(this_ds.isel(patch=p))
    
    case["ds"] = this_ds
 
