@@ -1067,6 +1067,14 @@ for c, thisCrop in enumerate(fao_crops):
       ax.set_xlim(newlims)
       ax.set_ylim(newlims)
       ax.set_aspect('equal')
+   
+   # Add 1:1 lines
+   for ax in axes:
+      xlims = list(ax.get_xlim())
+      ylims = list(ax.get_ylim())
+      p1 = min(xlims[0], ylims[0])
+      p2 = min(xlims[1], ylims[1])
+      ax.plot([p1, p2], [p1, p2], 'k--', lw=0.5, alpha=0.5)
       
    # Add "title" to text
    r2_change_text = r"$\bf{R^2\/changes}\/CLM \rightarrow GGCMI}$" + "\n" + r2_change_text
