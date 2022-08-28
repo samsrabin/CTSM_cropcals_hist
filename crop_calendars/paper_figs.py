@@ -739,6 +739,8 @@ countries = xr.open_dataset('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalen
 
 # Nearest-neighbor remap countries to LU resolutions
 for resname, res in reses.items():
+   if 'dsg' not in res:
+      continue
    res['dsg']['countries'] = utils.lon_idl2pm(countries).interp_like(res['dsg']['AREA'], method='nearest')['gadm0']
    
 countries_key = pd.read_csv('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_brendan/Nation_ID.csv',
