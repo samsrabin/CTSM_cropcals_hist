@@ -332,14 +332,19 @@ fao_all_ctry = pd.read_csv("/Users/sam/Documents/git_repos/CTSM_cropcals_hist/cr
 fao_all_ctry = cc.fao_data_preproc(fao_all_ctry)
 
 # Replace some countries' names in key to match FAO data
-countries_key = countries_key.replace({'China': 'China, mainland',   # Because it also has Taiwan
-                                       'Turkey': 'Türkiye',
+countries_key = countries_key.replace({'Turkey': 'Türkiye',
                                        'Vietnam': 'Viet Nam'})
 # Replace some countries' names in FAO data to match key (to keep them short for figs)
 fao_all_ctry = fao_all_ctry.replace({'Bolivia (Plurinational State of)': 'Bolivia',
                                      'Russian Federation': 'Russia',
-                                     'Syrian Arab Republic': 'Syria',
-                                     'United States of America': 'United States'})
+                                     'Syrian Arab Republic': 'Syria'})
+# Rename some countries to keep them short for figs
+countries_key = countries_key.replace({'China': 'China, mld.',   # Because it also has Taiwan
+                                       'United States': 'USA',
+                                       'South Africa': 'S. Africa'})
+fao_all_ctry = fao_all_ctry.replace({'China, mainland': 'China, mld.',
+                                     'United States of America': 'USA',
+                                     'South Africa': 'S. Africa'})
 
 # Make sure every country in map is in key
 for i, x in enumerate(np.unique(countries.gadm0.values)):
@@ -807,7 +812,8 @@ for c, thisCrop in enumerate(fao_crops):
       continue
    
    # Get yield datasets
-   topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats)         
+   topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats)
+   Ntop_global = Ntop + 1
    
    if which_to_plot == "Yield":
       plot_ds = topN_ds
@@ -824,10 +830,11 @@ for c, thisCrop in enumerate(fao_crops):
    # mycode_clmcals will have hollow circles if ctsm5.1.dev092 is included
    i_h = caselist.index('mycode_clmcals')
 
-   # Text describing R2 changes for each country
-   r2_change_text = ""
-
    for c, country in enumerate(plot_ds.Country.values):
+      
+      # Text describing R-squared changes for each country
+      r2_change_text = ""
+      
       ax = axes[c]
       sc = xr.plot.scatter(plot_ds.sel(Country=country),
                            x='Yield (FAOSTAT)',
@@ -839,10 +846,17 @@ for c, thisCrop in enumerate(fao_crops):
          lr = stats.linregress(x = plot_ds['Yield (FAOSTAT)'].sel(Country=country),
                                y = plot_ds['Yield'].sel(Country=country, Case=case))
          if case == "mycode_clmcals":
-            t = country + ": " + "{r1:.3g} $\\rightarrow$ "
+            t = "{r1:.3g} $\\rightarrow$ "
             r2_change_text += t.format(r1=lr.rvalue**2)
          elif case == "mycode_ggcmicals":
-            r2_change_text += "{r2:.3g}\n".format(r2=lr.rvalue**2)
+            r2_change_text += "{r2:.3g}".format(r2=lr.rvalue**2)
+            
+      # Set title
+      country_bf = ''
+      for w in country.split(' '):
+         country_bf += r'$\bf{' + w + r'}$' + ' '
+      ax.set_title(country_bf + f'($R^2$ {r2_change_text})')
+      
       # Set mycode_clmcals to have hollow circles if ctsm5.1.dev092 is included
       if "ctsm5.1.dev092" in caselist:
          color = sc[i_h].get_facecolor()
@@ -858,8 +872,8 @@ for c, thisCrop in enumerate(fao_crops):
       ax.get_legend().remove()
       ax.set_xlabel(None)
       ax.set_ylabel(None)
-      if c == Ntop-1:
-         ax.legend(bbox_to_anchor=(3,0.5), loc='center')
+      if c == Ntop_global-1:
+         ax.legend(bbox_to_anchor=(1.5,0.5), loc='center')
 
    # Delete unused axes, if any
    for a in np.arange(c+1, ny*nx):
@@ -872,7 +886,7 @@ for c, thisCrop in enumerate(fao_crops):
       axes[a].yaxis.set_label_coords(-0.15, 0.5)
 
    # Add column labels
-   bottommost = np.arange(Ntop)[-nx:]
+   bottommost = np.arange(Ntop_global)[-nx:]
    bottommost_cols = bottommost % nx
    for i, a in enumerate(bottommost):
       ax = axes[a]
@@ -908,15 +922,6 @@ for c, thisCrop in enumerate(fao_crops):
       p1 = min(xlims[0], ylims[0])
       p2 = min(xlims[1], ylims[1])
       ax.plot([p1, p2], [p1, p2], 'k--', lw=0.5, alpha=0.5)
-      
-   # Add "title" to text
-   r2_change_text = r"$\bf{R^2\/changes}\/CLM \rightarrow GGCMI}$" + "\n" + r2_change_text
-   # Add text to plot
-   ax = axes[Ntop-1]
-   x = ax.get_xlim()[1] + 0.2*np.diff(ax.get_xlim()) # 20% past the right edge
-   y = ax.get_ylim()[1]
-   ax.text(x, y, r2_change_text[:-1], va='top');
-   tmp = ax.get_children()[4]
    
    f.savefig(fig_outfile,
              bbox_inches='tight', facecolor='white')
