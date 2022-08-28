@@ -149,6 +149,7 @@ def check_constant_vars(this_ds, constantVars, ignore_nan, verbose=True, throw_e
         this_da = this_ds[v]
         ra_sp = np.moveaxis(this_da.copy().values, i_time_coord, 0)
         incl_patches = []
+        strList = []
 
         for t1 in np.arange(this_ds.dims[time_coord]-1):
             
@@ -189,11 +190,14 @@ def check_constant_vars(this_ds, constantVars, ignore_nan, verbose=True, throw_e
                             thisCrop_int = this_ds.patches1d_itype_veg.values[thisPatch]
                             thisStr = f"   Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop} ({thisCrop_int})"
                             if v == "SDATES":
-                                print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
+                                strList.append(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
                             else:
-                                print(f"{thisStr}: {t1_yr} {v} {int(t1_vals[thisPatch])}, {t_yr} {v} {int(t_vals[thisPatch])}")
+                                strList.append(f"{thisStr}: {t1_yr} {v} {int(t1_vals[thisPatch])}, {t_yr} {v} {int(t_vals[thisPatch])}")
                     else:
                         print(f"{v} timestep {t} does not match timestep {t1}")
+        if verbose:
+            strList.sort()
+            print('\n'.join(strList))
 
         # Make sure every patch was checked once (or is all-NaN except possibly final season)
         incl_patches = np.sort(incl_patches)
