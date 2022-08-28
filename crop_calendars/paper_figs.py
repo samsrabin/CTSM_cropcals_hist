@@ -166,14 +166,13 @@ reses["f19_g17"] = {"lu_path": "/Users/Shared/CESM_work/CropEvalData_ssr/landuse
 # Import land use to reses dicts
 for i, (resname, res) in enumerate(reses.items()):
    
-   print(f"Importing {resname}...")
-   
    # Find a matching case
    for (_, case) in cases.items():
       if case["res"] == resname:
          break
    if case["res"] != resname:
-      raise RuntimeError(f"No case found with res {resname}")
+      continue
+   print(f"Importing {resname}...")
    
    res['dsg'] = cc.open_lu_ds(res['lu_path'], y1, yN, case['ds'])
    res['dsg'] = res['dsg'].assign_coords({"time": [cftime.DatetimeNoLeap(y, 1, 1, 0, 0, 0, 0, has_year_zero=True) for y in res['dsg'].time.values]})
