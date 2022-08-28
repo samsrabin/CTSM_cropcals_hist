@@ -126,7 +126,18 @@ def check_and_trim_years(y1, yN, ds_in):
     return ds_in
 
 
-def check_constant_vars(this_ds, constantVars, ignore_nan, verbose=True, throw_error=True):
+def check_constant_vars(this_ds, constantVars, ignore_nan, constantGSs=None, verbose=True, throw_error=True):
+    
+    if not constantVars:
+        return
+    
+    if constantGSs:
+        gs0 = this_ds.gs.values[0]
+        gsN = this_ds.gs.values[-1]
+        if constantGSs.start > gs0 or constantGSs.stop < gsN:
+            print(f'❗ Only checking constantVars over {constantGSs.start}-{constantGSs.stop} (run includes {gs0}-{gsN})')
+        this_ds = this_ds.sel(gs=constantGSs)
+    
     any_bad = False
     if throw_error:
         emojus = '❌'
@@ -808,7 +819,7 @@ def import_rx_dates(var_prefix, date_inFile, dates_ds):
     return ds
 
 
-def import_output(filename, myVars, y1=None, yN=None, constantVars=None, constantGSs=None, myVegtypes=utils.define_mgdcrop_list(), 
+def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mgdcrop_list(), 
                   sdates_rx_ds=None, gdds_rx_ds=None, verbose=False):
    
    # Minimum harvest threshold allowed in PlantCrop()
@@ -935,19 +946,7 @@ def import_output(filename, myVars, y1=None, yN=None, constantVars=None, constan
    
    # Convert time axis to integer year
    this_ds_gs = this_ds_gs.assign_coords({"time": [t.year for t in this_ds.time_bounds.values[:,0]]})
-   
-   # Check that some things are constant across years
-   if constantVars:
-       throw_error = False
-       if constantGSs:
-           gs0 = this_ds_gs.gs.values[0]
-           gsN = this_ds_gs.gs.values[-1]
-           if constantGSs.start > gs0 or constantGSs.stop < gsN:
-               print(f'❗ Only checking constantVars over {constantGSs.start}-{constantGSs.stop} (run includes {gs0}-{gsN})')
-           check_constant_vars(this_ds_gs.sel(gs=constantGSs), constantVars, ignore_nan=True, throw_error=throw_error)
-       else:
-           check_constant_vars(this_ds_gs, constantVars, ignore_nan=True, throw_error=throw_error)
-   
+      
    return this_ds_gs
 
 

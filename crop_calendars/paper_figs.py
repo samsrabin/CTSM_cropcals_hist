@@ -145,8 +145,8 @@ for i, (casename, case) in enumerate(cases.items()):
 
    else:
       this_ds = cc.import_output(case['filepath'], myVars=myVars,
-                                 constantVars=case['constantVars'], constantGSs=case['constantGSs'],
                                  y1=y1, yN=yN, verbose=verbose_import)
+      cc.check_constant_vars(this_ds, case['constantVars'], ignore_nan=True, constantGSs=case['constantGSs'], verbose=True, throw_error=False)
    
    case["ds"] = this_ds
 
