@@ -359,6 +359,7 @@ def finishup_allcrops_plot(c, ny, nx, axes_this, f_this, suptitle, outDir_figs):
 
    f_this.savefig(outDir_figs + suptitle + " by crop.pdf",
                   bbox_inches='tight')
+   plt.close(f_this)
 
 for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
    ax_area = axes_area[c]
