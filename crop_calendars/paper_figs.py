@@ -313,6 +313,40 @@ for v in earthstats['f19_g17']:
 print("Done importing FAO EarthStat.")
 
 
+# %% Import country map and key
+
+# Half-degree countries from Brendan
+countries = xr.open_dataset('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_brendan/gadm0.mask.nc4')
+
+# Nearest-neighbor remap countries to LU resolutions
+for resname, res in reses.items():
+   if 'dsg' not in res:
+      continue
+   res['dsg']['countries'] = utils.lon_idl2pm(countries).interp_like(res['dsg']['AREA'], method='nearest')['gadm0']
+   
+countries_key = pd.read_csv('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_brendan/Nation_ID.csv',
+                               header=None,
+                               names=['num', 'name'])
+
+fao_all_ctry = pd.read_csv("/Users/sam/Documents/git_repos/CTSM_cropcals_hist/crop_calendar_MATLAB/FAOSTAT_data_en_8-21-2022_byCountry.csv")
+fao_all_ctry = cc.fao_data_preproc(fao_all_ctry)
+
+# Replace some countries' names in key to match FAO data
+countries_key = countries_key.replace({'China': 'China, mainland',   # Because it also has Taiwan
+                                       'Turkey': 'Türkiye',
+                                       'Vietnam': 'Viet Nam'})
+# Replace some countries' names in FAO data to match key (to keep them short for figs)
+fao_all_ctry = fao_all_ctry.replace({'Bolivia (Plurinational State of)': 'Bolivia',
+                                     'Russian Federation': 'Russia',
+                                     'Syrian Arab Republic': 'Syria',
+                                     'United States of America': 'United States'})
+
+# Make sure every country in map is in key
+for i, x in enumerate(np.unique(countries.gadm0.values)):
+   if not np.isnan(x) and not np.any(countries_key.num.values == x):
+      print(f'❗ {x} not found in key')
+
+
 # %% Compare area, production, and yield of individual crops
 
 # Set up figure
@@ -730,40 +764,6 @@ for (this_var, var_info) in varList.items():
       plt.close()
    
 print('Done making maps.')
-
-
-# %% Import country map and key
-
-# Half-degree countries from Brendan
-countries = xr.open_dataset('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_brendan/gadm0.mask.nc4')
-
-# Nearest-neighbor remap countries to LU resolutions
-for resname, res in reses.items():
-   if 'dsg' not in res:
-      continue
-   res['dsg']['countries'] = utils.lon_idl2pm(countries).interp_like(res['dsg']['AREA'], method='nearest')['gadm0']
-   
-countries_key = pd.read_csv('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_brendan/Nation_ID.csv',
-                               header=None,
-                               names=['num', 'name'])
-
-fao_all_ctry = pd.read_csv("/Users/sam/Documents/git_repos/CTSM_cropcals_hist/crop_calendar_MATLAB/FAOSTAT_data_en_8-21-2022_byCountry.csv")
-fao_all_ctry = cc.fao_data_preproc(fao_all_ctry)
-
-# Replace some countries' names in key to match FAO data
-countries_key = countries_key.replace({'China': 'China, mainland',   # Because it also has Taiwan
-                                       'Turkey': 'Türkiye',
-                                       'Vietnam': 'Viet Nam'})
-# Replace some countries' names in FAO data to match key (to keep them short for figs)
-fao_all_ctry = fao_all_ctry.replace({'Bolivia (Plurinational State of)': 'Bolivia',
-                                     'Russian Federation': 'Russia',
-                                     'Syrian Arab Republic': 'Syria',
-                                     'United States of America': 'United States'})
-
-# Make sure every country in map is in key
-for i, x in enumerate(np.unique(countries.gadm0.values)):
-   if not np.isnan(x) and not np.any(countries_key.num.values == x):
-      print(f'❗ {x} not found in key')
 
 
 # %% Make scatter plots, FAOSTAT vs. CLM, of top 10 countries for each crop
