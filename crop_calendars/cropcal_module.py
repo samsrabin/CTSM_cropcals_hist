@@ -127,7 +127,6 @@ def check_and_trim_years(y1, yN, ds_in):
 
 
 def check_constant_vars(this_ds, constantVars, ignore_nan, verbose=True, throw_error=True):
-    t1 = 0 # 0-indexed
     any_bad = False
     if throw_error:
         emojus = '❌'
@@ -135,6 +134,7 @@ def check_constant_vars(this_ds, constantVars, ignore_nan, verbose=True, throw_e
         emojus = '❗'
     if not isinstance(constantVars, list):
         constantVars = [constantVars]
+    
     for v in constantVars:
         ok = True
         
@@ -144,40 +144,74 @@ def check_constant_vars(this_ds, constantVars, ignore_nan, verbose=True, throw_e
             time_coord = "time"
         else:
             raise RuntimeError(f"Which of these is the time coordinate? {this_ds[v].dims}")
+        i_time_coord = this_ds[v].dims.index(time_coord)
+        
+        this_da = this_ds[v]
+        ra_sp = np.moveaxis(this_da.copy().values, i_time_coord, 0)
+        incl_patches = []
 
-        t1_yr = this_ds[time_coord].values[t1]
-        t1_vals = np.squeeze(this_ds[v].isel({time_coord: t1}).values)
-
-        for t in np.arange(t1+1, this_ds.dims[time_coord]):
-            t_yr = this_ds[time_coord].values[t]
-            t_vals = np.squeeze(this_ds[v].isel({time_coord: t}).values)
-            ok_p = t1_vals == t_vals
+        for t1 in np.arange(this_ds.dims[time_coord]-1):
             
-            # If allowed, ignore where either t or t1 is NaN. Should only be used for runs where land use varies over time.
-            if ignore_nan:
-                ok_p = np.squeeze(np.bitwise_or(ok_p, np.isnan(t1_vals+t_vals)))
+            condn = ~np.isnan(ra_sp[t1,...])
+            if t1 > 0:
+                condn = np.bitwise_and(condn,
+                                       np.all(np.isnan(ra_sp[:t1,...]), axis=0)
+                                       )
+            thesePatches = np.where(condn)[0]
+            if thesePatches.size == 0:
+                continue
+            thesePatches = list(np.where(condn)[0])
+            incl_patches += thesePatches
+            # print(f't1 {t1}: {thesePatches}')
             
-            if not np.all(ok_p):
-                any_bad = True
-                if ok:
-                    print(f"{emojus} CLM output {v} unexpectedly vary over time:")
-                ok = False
-                if verbose:
-                    for thisPatch in np.where(np.bitwise_not(ok_p))[0]:
-                        thisLon = this_ds.patches1d_lon.values[thisPatch]
-                        thisLat = this_ds.patches1d_lat.values[thisPatch]
-                        thisCrop = this_ds.patches1d_itype_veg_str.values[thisPatch]
-                        thisCrop_int = this_ds.patches1d_itype_veg.values[thisPatch]
-                        thisStr = f"   Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop} ({thisCrop_int})"
-                        if v == "SDATES":
-                            print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
-                        else:
-                            print(f"{thisStr}: {t1_yr} {v} {int(t1_vals[thisPatch])}, {t_yr} {v} {int(t_vals[thisPatch])}")
-                else:
-                    print(f"{v} timestep {t} does not match timestep {t1}")
+            t1_yr = this_ds[time_coord].values[t1]
+            t1_vals = np.squeeze(this_da.isel({time_coord: t1, 'patch': thesePatches}).values)
 
+            for t in np.arange(t1+1, this_ds.dims[time_coord]):
+                t_yr = this_ds[time_coord].values[t]
+                t_vals = np.squeeze(this_da.isel({time_coord: t, 'patch': thesePatches}).values)
+                ok_p = t1_vals == t_vals
+                
+                # If allowed, ignore where either t or t1 is NaN. Should only be used for runs where land use varies over time.
+                if ignore_nan:
+                    ok_p = np.squeeze(np.bitwise_or(ok_p, np.isnan(t1_vals+t_vals)))
+                
+                if not np.all(ok_p):
+                    any_bad = True
+                    if ok:
+                        print(f"{emojus} CLM output {v} unexpectedly vary over time:")
+                    ok = False
+                    if verbose:
+                        for thisPatch in np.where(np.bitwise_not(ok_p))[0]:
+                            thisLon = this_ds.patches1d_lon.values[thisPatch]
+                            thisLat = this_ds.patches1d_lat.values[thisPatch]
+                            thisCrop = this_ds.patches1d_itype_veg_str.values[thisPatch]
+                            thisCrop_int = this_ds.patches1d_itype_veg.values[thisPatch]
+                            thisStr = f"   Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop} ({thisCrop_int})"
+                            if v == "SDATES":
+                                print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
+                            else:
+                                print(f"{thisStr}: {t1_yr} {v} {int(t1_vals[thisPatch])}, {t_yr} {v} {int(t_vals[thisPatch])}")
+                    else:
+                        print(f"{v} timestep {t} does not match timestep {t1}")
+
+        # Make sure every patch was checked once (or is all-NaN except possibly final season)
+        incl_patches = np.sort(incl_patches)
+        if not np.array_equal(incl_patches, np.unique(incl_patches)):
+            raise RuntimeError('Patch(es) checked more than once!')
+        incl_patches = list(incl_patches)
+        incl_patches += list(np.where(np.all(np.isnan(ra_sp[:-1,]), axis=0))[0])
+        incl_patches = np.sort(incl_patches)
+        if not np.array_equal(incl_patches, np.unique(incl_patches)):
+            raise RuntimeError('Patch(es) checked but also all-NaN??')
+        if not np.array_equal(incl_patches, np.arange(this_ds.dims['patch'])):
+            for p in np.arange(this_ds.dims['patch']):
+                if p not in incl_patches:
+                    break
+            raise RuntimeError(f'Not all patches checked! E.g., {p}: {this_da.isel(patch=p).values}')
+        
         if ok:
-            print(f"✅ CLM output {v} do not vary through {this_ds.dims[time_coord] - t1} growing seasons of output.")
+            print(f"✅ CLM output {v} do not vary through {this_ds.dims[time_coord]} growing seasons of output.")
 
     if any_bad and throw_error:
         raise RuntimeError('Stopping due to failed check_constant_vars().')
