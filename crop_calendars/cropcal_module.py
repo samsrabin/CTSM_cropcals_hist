@@ -9,6 +9,7 @@ import cartopy.crs as ccrs
 from scipy import stats, signal
 import warnings
 import cftime
+import pandas as pd
 
 
 def adjust_grainC(da_in, patches1d_itype_veg_str):
@@ -980,6 +981,21 @@ def open_lu_ds(filename, y1, yN, existing_ds):
    ds = ds.swap_dims({"lsmlon": "lon",
                            "lsmlat": "lat"})
    return ds
+
+
+def print_gs_table(ds):
+    if "patch" in ds.dims:
+        raise RuntimeError('Input Dataset must have no patch dimension')
+    data = {}
+    for v in ['gs', 'SDATES', 'GDDHARV', 'HDATES', 'HARVEST_REASON']:
+        if ds[v].dims != ("gs",):
+            raise RuntimeError(f'{v} dims must be (\'gs\'), not {ds[v].dims}')
+        data[v] = ds[v].values
+    print(f'Lon {ds.patches1d_lon.values} lat {ds.patches1d_lat.values}, {ds.patches1d_itype_veg_str.values}')
+    maxrows = pd.get_option('display.max_rows')
+    pd.set_option('display.max_rows', None)
+    print(pd.DataFrame(data = data))
+    pd.set_option('display.max_rows', maxrows)
 
 
 def print_onepatch_wrongNgs(p, this_ds_orig, sdates_ymp, hdates_ymp, sdates_pym, hdates_pym, sdates_pym2, hdates_pym2, sdates_pym3, hdates_pym3, sdates_pg, hdates_pg, sdates_pg2, hdates_pg2):
