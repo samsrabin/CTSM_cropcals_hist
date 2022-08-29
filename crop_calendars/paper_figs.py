@@ -928,3 +928,125 @@ for c, thisCrop in enumerate(fao_crops):
    plt.close()
    
    
+# %% Make line plots, FAOSTAT vs. CLM, of top 10 countries for each crop
+
+Ntop = 10
+# top_y1 = 1961 # First year of FAO data
+top_y1 = 1992 # Pre-1992, you start getting USSR, which isn't in map
+top_yN = 2009
+overwrite = True
+portrait = False
+
+# which_to_plot = "Yield"
+# which_to_plot = "Detrended yield"
+which_to_plot = "Yield anomaly"
+
+if portrait:
+   ny = 4
+   nx = 3
+   figsize = (10, 18)
+   suptitle_ypos = 0.91
+else:
+   ny = 3
+   nx = 4
+   figsize = (18, 14)
+   suptitle_ypos = 0.93
+
+topYears = np.arange(top_y1, top_yN+1)
+NtopYears = len(topYears)
+
+legend_members = caselist + ['FAOSTAT']
+
+fao_crops = np.unique(fao_all_ctry.Crop.values)
+for c, thisCrop in enumerate(fao_crops):
+      
+   thisCrop_clm = cc.cropnames_fao2clm(thisCrop)
+   
+   suptitle = f"{thisCrop}, FAOSTAT vs CLM ({top_y1}-{top_yN})"
+   file_prefix = which_to_plot.replace('aly','')
+   fig_outfile = outDir_figs + f"{file_prefix} timeseries top 10 " + suptitle + ".pdf"
+   if os.path.exists(fig_outfile) and not overwrite:
+      print(f'   Skipping {thisCrop_out} (file exists).')
+      continue
+   
+   # Get yield datasets
+   topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats)
+   Ntop_global = Ntop + 1
+   
+   if which_to_plot == "Yield":
+      plot_ds = topN_ds
+   elif which_to_plot == "Detrended yield":
+      plot_ds = topN_dt_ds
+   elif which_to_plot == "Yield anomaly":
+      plot_ds = topN_ya_ds
+   else:
+      raise RuntimeError(f"Which dataset should be used for '{which_to_plot}'?")
+
+   f, axes = plt.subplots(ny, nx, figsize=figsize)
+   axes = axes.flatten()
+
+   # mycode_clmcals will have hollow circles if ctsm5.1.dev092 is included
+   i_h = caselist.index('mycode_clmcals')
+
+   for c, country in enumerate(plot_ds.Country.values):
+      
+      # Text describing R-squared changes for each country
+      r2_change_text = ""
+            
+      ax = axes[c]
+      xr.plot.line(plot_ds['Yield'].sel(Country=country),
+                   hue='Case',
+                   ax=ax)
+      xr.plot.line(plot_ds['Yield (FAOSTAT)'].sel(Country=country),
+                   'k--', ax=ax)
+      
+      for case in caselist:
+         lr = stats.linregress(x = plot_ds['Yield (FAOSTAT)'].sel(Country=country),
+                               y = plot_ds['Yield'].sel(Country=country, Case=case))
+         if case == "mycode_clmcals":
+            t = "{r1:.3g} $\\rightarrow$ "
+            r2_change_text += t.format(r1=lr.rvalue**2)
+         elif case == "mycode_ggcmicals":
+            r2_change_text += "{r2:.3g}".format(r2=lr.rvalue**2)
+            
+      # Set title
+      country_bf = ''
+      for w in country.split(' '):
+         country_bf += r'$\bf{' + w + r'}$' + ' '
+      ax.set_title(country_bf + f'($R^2$ {r2_change_text})')
+      
+      # Set mycode_clmcals to be dashed line if ctsm5.1.dev092 is included
+      if "ctsm5.1.dev092" in caselist:
+         print('Set mycode_clmcals to be dashed line if ctsm5.1.dev092 is included')
+         # color = sc[i_h].get_facecolor()
+         # sc[i_h].set_facecolor('none')
+         # sc[i_h].set_edgecolor(color)
+      
+      # ax.set_aspect('equal')
+      ax.get_legend().remove()
+      ax.set_xlabel(None)
+      ax.set_ylabel(None)
+      if c == Ntop_global-1:
+         ax.legend(legend_members, bbox_to_anchor=(1.5,0.5), loc='center')
+   
+   # Delete unused axes, if any
+   for a in np.arange(c+1, ny*nx):
+      f.delaxes(axes[a])
+      
+   # Add row labels
+   leftmost = np.arange(0, nx*ny, nx)
+   for i, a in enumerate(leftmost):
+      axes[a].set_ylabel(f"{which_to_plot} (CLM)", fontsize=12, fontweight='bold')
+      axes[a].yaxis.set_label_coords(-0.15, 0.5)
+
+   # Add figure title
+   suptitle_xpos = 0.5
+   f.suptitle(suptitle,
+              x = suptitle_xpos,
+              y = suptitle_ypos,
+              fontsize = 18,
+              fontweight='bold')
+   
+   f.savefig(fig_outfile,
+             bbox_inches='tight', facecolor='white')
+   plt.close()
