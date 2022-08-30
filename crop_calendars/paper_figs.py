@@ -1,5 +1,7 @@
 # %% Setup
 
+all_cases = False
+
 # Import shared functions
 import os
 import sys
@@ -14,7 +16,10 @@ my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myf
 sys.path.append(my_ctsm_python_gallery)
 import utils
 
-outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures/"
+if all_cases:
+   outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures/"
+else:
+   outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures_main2/"
 if not os.path.exists(outDir_figs):
    os.mkdir(outDir_figs)
 
@@ -101,16 +106,17 @@ Nyears = len(yearList)
 
 # Define cases
 cases = {}
-# A run that someone else did
-cases['cmip6'] = {'filepath': '/Users/Shared/CESM_work/CropEvalData_ssr/danica_timeseries-cmip6_i.e21.IHIST.f09_g17/month_1/ssr_trimmed_annual.nc',
-                  'constantVars': None,
-                  'constantGSs': None,
-                  'res': 'f09_g17'}
-# My run with normal CLM code + my outputs
-cases['ctsm5.1.dev092'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013/2022-08-08/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013.clm2.h1.1950-01-01-00000.nc',
-                           'constantVars': None,
-                           'constantGSs': None,
-                           'res': 'f19_g17'}
+if all_cases:
+   # A run that someone else did
+   cases['cmip6'] = {'filepath': '/Users/Shared/CESM_work/CropEvalData_ssr/danica_timeseries-cmip6_i.e21.IHIST.f09_g17/month_1/ssr_trimmed_annual.nc',
+                     'constantVars': None,
+                     'constantGSs': None,
+                     'res': 'f09_g17'}
+   # My run with normal CLM code + my outputs
+   cases['ctsm5.1.dev092'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013/2022-08-08/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013.clm2.h1.1950-01-01-00000.nc',
+                              'constantVars': None,
+                              'constantGSs': None,
+                              'res': 'f19_g17'}
 # My run with rx_crop_calendars2 code but CLM calendars
 cases['mycode_clmcals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1950-2013.clm/2022-08-09/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1950-2013.clm.clm2.h1.1950-01-01-00000.nc',
                            'constantVars': None,
