@@ -55,12 +55,7 @@ hdate_inFile = "/glade/u/home/samrabin/crop_dates/hdates_ggcmi_crop_calendar_pha
 
 # Directory to save output netCDF
 import os
-if hostname == "Sams-2021-MacBook-Pro.local":
-    outdir = "/Users/Shared/CESM_work/crop_dates/"
-else:
-    outdir = "/glade/u/home/samrabin/crop_dates/"
-if not os.path.exists(outdir):
-    os.makedirs(outdir)
+outdir = indir
 if save_figs:
     outdir_figs = indir + "figs/"
     if not os.path.exists(outdir_figs):
