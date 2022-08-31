@@ -57,7 +57,7 @@ hdate_inFile = "/glade/u/home/samrabin/crop_dates/hdates_ggcmi_crop_calendar_pha
 import os
 outdir = indir
 if save_figs:
-    outdir_figs = indir + "figs/"
+    outdir_figs = os.path.join(indir, "figs")
     if not os.path.exists(outdir_figs):
         os.makedirs(outdir_figs)
 
@@ -89,8 +89,8 @@ print(f"Importing netCDF time steps {y1_import_str} through {yN_import_str} (yea
 import importlib
 importlib.reload(gddfn)
 
-pickle_file = indir + f'/{y1}-{yN}.pickle'
-h1_ds_file = indir + f'/{y1}-{yN}.h1_ds.nc'
+pickle_file = os.path.join(indir, f'{y1}-{yN}.pickle')
+h1_ds_file = os.path.join(indir, f'{y1}-{yN}.h1_ds.nc')
 if os.path.exists(pickle_file):
     with open(pickle_file, 'rb') as f:
         y1, yN, pickle_year, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = pickle.load(f)
@@ -202,8 +202,8 @@ print("Saving...")
 
 # Get output file path
 datestr = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-outfile = outdir + "gdds_" + datestr + ".nc"
-outfile_fill0 = outdir + "gdds_fill0_" + datestr + ".nc"
+outfile = os.path.join(outdir, "gdds_" + datestr + ".nc")
+outfile_fill0 = os.path.join(outdir, "gdds_fill0_" + datestr + ".nc")
 
 def save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx):
     # Set up output file from template (i.e., prescribed sowing dates).
@@ -421,7 +421,7 @@ def make_figures(thisDir=None, gdd_maps_ds=None, gddharv_maps_ds=None, outdir_fi
         plt.xlabel("|latitude| zone", fontsize=fontsize_axislabels)
         plt.ylabel("Growing degree-days", fontsize=fontsize_axislabels)
         plt.title(f"Zonal changes: {vegtype_str}", fontsize=fontsize_titles)
-        outfile = f"{outdir_figs}/{thisVar}_{vegtype_str}_gs{y1}-{yN}.png"
+        outfile = os.path.join(outdir_figs, f"{thisVar}_{vegtype_str}_gs{y1}-{yN}.png")
         plt.savefig(outfile, dpi=300, transparent=False, facecolor='white',
                     bbox_inches='tight')
         plt.close()
