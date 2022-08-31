@@ -632,13 +632,19 @@ def detrend(ps_in):
    return ps_out
 
 
-def equalize_colorbars(ims):
+def equalize_colorbars(ims, center0=False):
    vmin = np.inf
    vmax = -np.inf
    nims = len(ims)
    for im in ims:
       vmin = min(vmin, im.get_clim()[0])
       vmax = max(vmax, im.get_clim()[1])
+   
+   if center0:
+       v = np.max(np.abs([vmin, vmax]))
+       vmin = -v
+       vmax = v
+   
    for i in np.arange(nims):
       ims[i].set_clim(vmin, vmax)
 

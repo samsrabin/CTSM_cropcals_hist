@@ -126,7 +126,10 @@ cases['mycode_clmcals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cr
 cases['mycode_ggcmicals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddforced2/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddforced2.clm2.h1.1950-01-01-00000.nc',
                              'constantVars': ["SDATES", "GDDHARV"],
                              'constantGSs': slice(1980,2009),
-                             'res': 'f19_g17'}
+                             'res': 'f19_g17',
+                             'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
+                             'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
+                             'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/gdds_20220820_163845.nc"}
 
 # Note that _PERHARV will be stripped off upon import
 myVars = ['GRAINC_TO_FOOD_PERHARV', 'GRAINC_TO_FOOD_ANN', 'SDATES', 'SDATES_PERHARV', 'SYEARS_PERHARV', 'HDATES', 'HYEARS', 'GDDHARV_PERHARV', 'GDDACCUM_PERHARV', 'HUI_PERHARV', 'SOWING_REASON_PERHARV', 'HARVEST_REASON_PERHARV']
@@ -160,6 +163,19 @@ for i, (casename, case) in enumerate(cases.items()):
       #    cc.print_gs_table(this_ds.isel(patch=p))
    
    case["ds"] = this_ds
+
+# Get growing season set info   
+gs_values = this_ds.gs.values
+Ngs = len(gs_values)
+
+# Get list of simulated vegetation types
+clm_sim_veg_types = []
+for casename, case in cases.items():
+   case_ds = case['ds']
+   ever_active = np.where(np.any(case_ds['SDATES'] > 0, axis=1))[0]
+   ivt_str_ever_active = np.unique(case_ds.isel(patch=ever_active)['patches1d_itype_veg_str'].values)
+   clm_sim_veg_types += list(ivt_str_ever_active)
+clm_sim_veg_types = np.unique(clm_sim_veg_types)
 
 
 # %% Import LU data
@@ -220,6 +236,44 @@ for i, (casename, case) in enumerate(cases.items()):
    
 
 print("Done.")
+
+
+# %% Import GGCMI sowing and harvest dates
+for i, (casename, case) in enumerate(cases.items()):
+   
+   if 'rx_sdates_file' in case:
+      if 'rx_hdates_file' not in case:
+         raise RuntimeError(f'{casename} had prescribed sdates but not hdates?')
+      elif 'rx_gdds_file' not in case:
+         raise RuntimeError(f'{casename} had prescribed s/hdates but not GDDs?')
+      case['rx_sdates_ds'] = cc.import_rx_dates("sdate", case['rx_sdates_file'], case['ds'])
+      case['rx_hdates_ds'] = cc.import_rx_dates("hdate", case['rx_hdates_file'], case['ds'])
+      case['rx_gdds_ds'] = cc.import_rx_dates("gdd", case['rx_gdds_file'], case['ds'])
+      
+      # Equalize lons/lats
+      lonlat_tol = 1e-4
+      for v in ['rx_sdates_ds', 'rx_hdates_ds', 'rx_gdds_ds']:
+         for l in ['lon', 'lat']:
+            max_diff_orig = np.max(np.abs(case[v][l].values - case['ds'][l].values))
+            if max_diff_orig > lonlat_tol:
+               raise RuntimeError(f'{v} {l} values differ too much from {casename} ({max_diff_orig} > {lonlat_tol})')
+            elif max_diff_orig > 0:
+               case[v] = case[v].assign_coords({l: case['ds'][l].values})
+               max_diff = np.max(np.abs(case[v][l].values - case['ds'][l].values))
+               print(f'{v} {l} max_diff {max_diff_orig} → {max_diff}')
+            else:
+               print(f'{v} {l} max_diff {max_diff_orig}')
+      
+      case['rx_gslen_ds'] = case['rx_hdates_ds'].copy()
+      for v in case['rx_gslen_ds']:
+         if v == "time_bounds":
+            continue
+         case['rx_gslen_ds'][v] = cc.get_gs_len_da(case['rx_hdates_ds'][v] - case['rx_sdates_ds'][v])
+      
+   elif 'rx_hdates_file' in case:
+      raise RuntimeError(f'{casename} had prescribed hdates but not sdates?')
+   elif 'rx_gdds_file' in case:
+      raise RuntimeError(f'{casename} had prescribed GDDs but not s/hdates?')
 
 
 # %% Get FAO data from CSV
@@ -1056,3 +1110,373 @@ for c, thisCrop in enumerate(fao_crops):
    f.savefig(fig_outfile,
              bbox_inches='tight', facecolor='white')
    plt.close()
+   
+   
+# %% Compare mean growing season length to GGCMI models
+
+# varList = ["GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.noOutliers", "GSLEN.onlyMature.useMedian"]
+# varList = ["GSLEN"]
+# varList = ["GSLEN.onlyMature"]
+# varList = ["GSLEN.onlyMature.diffExpected"]
+# varList = ["GSLEN.onlyMature.diffExpected.noOutliers"]
+varList = ["GSLEN.onlyMature.diffExpected.useMedian"]
+# varList = ["GSLEN", "GSLEN.onlyMature"]
+# varList = ["GSLEN.onlyMature.noOutliers"]
+# varList = ["GSLEN.onlyMature.useMedian"]
+
+ggcmi_out_topdir = "/Users/Shared/GGCMI/AgMIP.output"
+ggcmi_cropcal_dir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar"
+
+importlib.reload(cc)
+
+verbose = False
+
+ggcmi_models_orig = ["ACEA", "CROVER", "CYGMA1p74", "DSSAT-Pythia", "EPIC-IIASA", "ISAM", "LDNDC", "LPJ-GUESS", "LPJmL", "pDSSAT", "PEPIC", "PROMET", "SIMPLACE-LINTUL5"]
+Nggcmi_models_orig = len(ggcmi_models_orig)
+
+fontsize = {}
+fontsize['titles'] = 14
+fontsize['axislabels'] = 12
+fontsize['ticklabels'] = 8
+fontsize['suptitle'] = 16
+# bin_width = 30
+bin_width = None
+
+def get_new_filename(pattern):
+   thisFile = glob.glob(pattern)
+   if len(thisFile) > 1:
+      raise RuntimeError(f"Expected at most 1 match of {pattern}; found {len(thisFile)}")
+   return thisFile
+
+def trim_years(y1, yN, Ngs, ds_in):
+   time_units = ds_in.time.attrs["units"]
+   match = re.search("growing seasons since \d+-01-01, 00:00:00", time_units)
+   if not match:
+      raise RuntimeError(f"Can't process time axis '{time_units}'")
+   sinceyear = int(re.search("since \d+", match.group()).group().replace("since ", ""))
+   thisDS_years = ds_in.time.values + sinceyear - 1
+   ds_in = ds_in.isel(time=np.nonzero(np.bitwise_and(thisDS_years>=y1, thisDS_years <= yN))[0])
+   if ds_in.dims["time"] != Ngs:
+      tmp = ds_in.dims["time"]
+      raise RuntimeError(f"Expected {Ngs} matching growing seasons in GGCMI dataset; found {tmp}")
+   return ds_in
+
+ggcmiDS_started = False
+
+for thisVar_orig in varList:
+   thisVar = thisVar_orig
+   
+   # Processing options
+   title_prefix = ""
+   filename_prefix = ""
+   onlyMature = "onlyMature" in thisVar
+   if onlyMature:
+      thisVar = thisVar.replace(".onlyMature", "")
+      title_prefix = title_prefix + " (if mat.)"
+      filename_prefix = filename_prefix + "_ifmature"
+   noOutliers = "noOutliers" in thisVar
+   if noOutliers:
+      thisVar = thisVar.replace(".noOutliers", "")
+      title_prefix = title_prefix + " (no outl.)"
+      filename_prefix = filename_prefix + "_nooutliers"
+   useMedian = "useMedian" in thisVar
+   if useMedian:
+      thisVar = thisVar.replace(".useMedian", "")
+      title_prefix = title_prefix + " (median)"
+      filename_prefix = filename_prefix + "_median"
+   diffExpected = "diffExpected" in thisVar
+   if diffExpected:
+      thisVar = thisVar.replace(".diffExpected", "")
+      filename_prefix = filename_prefix + "_diffExpected"
+
+   ny = 4
+   nx = 5
+   if Nggcmi_models_orig + len(cases) + 2 > ny*nx:
+      raise RuntimeError(f"2 + {Nggcmi_models_orig} GGCMI models + CLM cases ({len(cases)}) > ny*nx ({ny*nx})")
+   vmin = 0.0
+   title_prefix = "Seas. length" + title_prefix
+   filename_prefix = "seas_length_compGGCMI" + filename_prefix
+   if diffExpected:
+      units = "Season length minus expected"
+      cmap = plt.cm.RdBu
+   else:
+      units = "Days"
+      cmap = plt.cm.viridis
+   vmin = None
+   
+   figsize = (16, 8)
+   cbar_adj_bottom = 0.15
+   cbar_ax_rect = [0.15, 0.05, 0.7, 0.025]
+   if nx != 4 or ny != 4:
+      print(f"Since (nx,ny) = ({nx},{ny}), you may need to rework some parameters")
+
+   for v, vegtype_str in enumerate(clm_sim_veg_types):
+      
+      if "corn" in vegtype_str:
+         vegtype_str_ggcmi = "mai"
+      elif "rice" in vegtype_str:
+         vegtype_str_ggcmi = "ri1" # Ignoring ri2, which isn't simulated in CLM yet
+      elif "soybean" in vegtype_str:
+         vegtype_str_ggcmi = "soy"
+      elif "spring_wheat" in vegtype_str:
+         vegtype_str_ggcmi = "swh"
+      # elif "winter_wheat" in vegtype_str:
+      #    vegtype_str_ggcmi = "wwh"
+      else:
+         print(f"{thisVar}: Skipping {vegtype_str}.")
+         continue
+      print(f"{thisVar}: {vegtype_str}...")
+      if "irrigated" in vegtype_str:
+         irrtype_str_ggcmi = "firr"
+      else:
+         irrtype_str_ggcmi = "noirr"
+      ncvar = f"matyday-{vegtype_str_ggcmi}-{irrtype_str_ggcmi}"
+      vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+      
+      # Get variations on vegtype string
+      vegtype_str_paramfile = cc.get_vegtype_str_paramfile(vegtype_str)
+      vegtype_str_title = cc.get_vegtype_str_for_title(vegtype_str)
+      vegtype_str_figfile = cc.get_vegtype_str_figfile(vegtype_str)
+      
+      # Import GGCMI outputs
+      ggcmi_models_bool = np.full((Nggcmi_models_orig,), False)
+      for g, thisModel in enumerate(ggcmi_models_orig):
+         
+         # Only need to import each variable once
+         if ggcmiDS_started and ncvar in ggcmiDS:
+               did_read = False
+               break
+         did_read = True
+         
+         # Open file
+         pattern = os.path.join(ggcmi_out_topdir, thisModel, "phase3a", "gswp3-w5e5", "obsclim", vegtype_str_ggcmi, f"*{ncvar}*")
+         thisFile = glob.glob(pattern)
+         if not thisFile:
+               if verbose:
+                  print(f"{ncvar}: Skipping {thisModel}")
+               continue
+         elif len(thisFile) != 1:
+               raise RuntimeError(f"Expected 1 match of {pattern}; found {len(thisFile)}")
+         thisDS = xr.open_dataset(thisFile[0], decode_times=False)
+         ggcmi_models_bool[g] = True
+         
+         # Set up GGCMI Dataset
+         if not ggcmiDS_started:
+               ggcmiDS = xr.Dataset(coords={"gs": gs_values,
+                                            "lat": thisDS.lat,
+                                            "lon": thisDS.lon,
+                                            "model": ggcmi_models_orig,
+                                            "cft": clm_sim_veg_types})
+               ggcmiDS_started = True
+         
+         # Set up DataArray for this crop-irr
+         if g==0:
+            matyday_da = xr.DataArray(data=np.full((Ngs,
+                                                   thisDS.dims["lat"],
+                                                   thisDS.dims["lon"],
+                                                   Nggcmi_models_orig
+                                                   ),
+                                                   fill_value=np.nan),
+                                      coords=[ggcmiDS.coords[x] for x in ["gs","lat","lon","model"]])
+         
+         # Get just the seasons you need
+         thisDS = trim_years(y1, yN, Ngs, thisDS)
+         thisDA = thisDS[ncvar]
+         
+         # Pre-filtering
+         thisMax = np.nanmax(thisDA.values)
+         if thisMax > 10**19:
+            if verbose:
+               print(f"Warning: {ncvar}: {thisModel}: Max {thisMax} (before filtering); setting values >1e19 to NaN")
+            thisDA.values[np.where(thisDA.values > 10**19)] = np.nan
+         thisMax = np.nanmax(thisDA.values)
+         highMax = thisMax > 366
+         if highMax and verbose:
+            print(f"Warning: {ncvar}: {thisModel}: Max {thisMax} (before filtering)")
+         
+         # Figure out which seasons to include
+         if highMax:
+            filterVar = "maturityindex"
+            thisFile = get_new_filename(pattern.replace("matyday", filterVar))
+            filter_str = None
+            if thisFile:
+               filterDS = xr.open_dataset(thisFile[0], decode_times=False)
+               filterDS = trim_years(y1, yN, Ngs, filterDS)
+               filter_str = f"(after filtering by {filterVar} == 1)"
+               thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] == 1)
+            else:
+               filterVar = "maturitystatus"
+               thisFile = get_new_filename(pattern.replace("matyday", filterVar))
+               if thisFile:
+                  filterDS = xr.open_dataset(thisFile[0], decode_times=False)
+                  filterDS = trim_years(y1, yN, Ngs, filterDS)
+                  filter_str = f"(after filtering by {filterVar} >= 1)"
+                  thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] >= 1)
+               else:
+                  filterVar = "yield"
+                  thisFile = get_new_filename(pattern.replace("matyday", filterVar))
+                  if thisFile:
+                     filterDS = xr.open_dataset(thisFile[0], decode_times=False)
+                     filterDS = trim_years(y1, yN, Ngs, filterDS)
+                     filter_str = f"(after filtering by {filterVar} > 0)"
+                     thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] > 0)
+            if not filter_str:
+               filter_str = "(after no filtering)"
+            thisMax = np.nanmax(thisDA.values)
+            if thisMax > 366:
+               if verbose:
+                  print(f"Warning: {ncvar}: {thisModel}: Max {thisMax} {filter_str}; setting values > 364 to NaN")
+               thisDA.values[np.where(thisDA.values > 364)] = np.nan
+                  
+         # Only include cell-seasons with positive yield
+         filterVar = "yield"
+         thisFile = get_new_filename(pattern.replace("matyday", filterVar))
+         if thisFile:
+            filterDS = xr.open_dataset(thisFile[0], decode_times=False)
+            filterDS = trim_years(y1, yN, Ngs, filterDS)
+            thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] > 0)
+               
+         # Don't include cell-years with growing season length < 50 (how Jonas does his: https://ebi-forecast.igb.illinois.edu/ggcmi/issues/421#note-5)
+         this_matyday_array = thisDA.values
+         this_matyday_array[np.where(this_matyday_array < 50)] = np.nan
+         
+         # Rework time axis
+         thisMin = np.nanmin(this_matyday_array)
+         if thisMin < 0:
+            if verbose:
+               print(f"{thisModel}: {ncvar}: Setting negative matyday values (min = {thisMin}) to NaN")
+            this_matyday_array[np.where(this_matyday_array < 0)] = np.nan
+         matyday_da[:,:,:,g] = this_matyday_array
+      
+      if did_read:
+         ggcmiDS[ncvar] = matyday_da
+         ggcmiDS[f"{ncvar}-inclmodels"] = matyday_da = xr.DataArray( \
+            data=ggcmi_models_bool,
+            coords={"model": ggcmiDS.coords["model"]})
+      ggcmiDA = ggcmiDS[ncvar].copy()
+      
+      # If needed, remove outliers
+      if noOutliers:
+         ggcmiDA = cc.remove_outliers(ggcmiDA)
+         
+      # Get summary statistic
+      if useMedian:
+         ggcmiDA_mn = ggcmiDA.median(axis=0)
+      else:
+         ggcmiDA_mn = np.mean(ggcmiDA, axis=0)
+      
+      # If you want to remove models that didn't actually simulate this crop-irr, do that here.
+      # For now, it just uses the entire list.
+      Nggcmi_models = Nggcmi_models_orig
+      ggcmi_models = ggcmi_models_orig
+      
+      # Get GGCMI expected
+      if irrtype_str_ggcmi=="noirr":
+         tmp_rfir_token = "rf"
+      else:
+         tmp_rfir_token = "ir"
+      thisFile = os.path.join(ggcmi_cropcal_dir, f"{vegtype_str_ggcmi}_{tmp_rfir_token}_ggcmi_crop_calendar_phase3_v1.01.nc4")
+      ggcmiExpDS = xr.open_dataset(thisFile)
+      ggcmiExp_gslen_yx = ggcmiExpDS["growing_season_length"] / np.timedelta64(1, 'D')
+      
+      # Get maps from CLM sims
+      gslen_ds = xr.Dataset()
+      clmExp_gslen_ds = xr.Dataset()
+      for casename, case in cases.items():
+         case_ds = case['ds']
+         
+         thisCrop1_gridded = utils.grid_one_variable(case_ds, thisVar, vegtype=vegtype_int).squeeze(drop=True)
+         
+         # If needed, only include seasons where crop reached maturity
+         if onlyMature:
+            thisCrop1_gridded = cc.mask_immature(case_ds, vegtype_int, thisCrop1_gridded)
+               
+         # If needed, remove outliers
+         if noOutliers:
+            thisCrop1_gridded = cc.remove_outliers(thisCrop1_gridded)
+               
+         # Get summary statistic
+         if useMedian:
+            gslen_yx = thisCrop1_gridded.median(axis=0)
+         else:
+            gslen_yx = np.mean(thisCrop1_gridded, axis=0)
+         
+         # Save Dataset
+         gslen_ds[casename] = gslen_yx
+         
+         # Save prescribed crops
+         if 'rx_gslen_ds' in case:
+            if len(clmExp_gslen_ds.dims) > 0:
+               raise RuntimeError('Need to amend figure code to allow for multiple prescribed GS lengths')
+            clmExp_gslen_yx = case['rx_gslen_ds'][f"gs1_{vegtype_int}"].isel(time=0, drop=True)
+            clmExp_gslen_yx = clmExp_gslen_yx.where(np.bitwise_not(np.isnan(gslen_yx)))
+            clmExp_gslen_ds['map2'] = clmExp_gslen_yx
+      
+      
+      # Set up figure
+      importlib.reload(cc)
+      fig = plt.figure(figsize=figsize)
+      subplot_title_suffixes = ["", ""]
+      ims = []
+      
+      # Plot CLM cases
+      for i, (casename, case) in enumerate(cases.items()):
+         gslen_yx = gslen_ds[casename]
+         
+         if diffExpected:
+            map1_yx = gslen_yx - clmExp_gslen_ds['map2']
+         else:
+            map1_yx = gslen_yx
+                  
+         ax = cc.make_axis(fig, ny, nx, i+1)
+         im = make_map(ax, map1_yx, fontsize, this_title=casename, lonlat_bin_width=bin_width, cmap=cmap)
+         ims.append(im[0])
+      
+      if not diffExpected:
+         ax = cc.make_axis(fig, ny, nx, i+2)
+         im = make_map(ax, clmExp_gslen_yx, fontsize, this_title="CLM expected", lonlat_bin_width=bin_width, cmap=cmap)
+         ims.append(im[0])
+         
+         ax = cc.make_axis(fig, ny, nx, i+3)
+         im = make_map(ax, clmExp_gslen_yx, fontsize, this_title="GGCMI expected", lonlat_bin_width=bin_width, cmap=cmap)
+         ims.append(im[0])
+      
+      # Plot GGCMI outputs
+      if diffExpected:
+         ggcmiDA_mn_plot = ggcmiDA_mn - ggcmiExp_gslen_yx
+      else:
+         ggcmiDA_mn_plot = ggcmiDA_mn
+      for g in np.arange(Nggcmi_models):
+         ggcmi_yx = ggcmiDA_mn_plot.isel(model=g, drop=True)
+         if verbose: print(f'{ggcmi_models[g]} map ranges {np.nanmin(ggcmi_yx.values)} to {np.nanmax(ggcmi_yx.values)}')
+         ax = cc.make_axis(fig, ny, nx, 3+g+len(caselist))
+         if not np.any(~np.isnan(ggcmi_yx.values)):
+            ax.set_title(ggcmi_models[g], fontsize=fontsize['titles'])
+            continue
+         im = make_map(ax, ggcmi_yx, fontsize, this_title=ggcmi_models[g], lonlat_bin_width=bin_width, cmap=cmap)
+         ims.append(im[0])
+      
+      cc.equalize_colorbars(ims, center0=diffExpected)
+      
+      fig.suptitle(f"{title_prefix}: {vegtype_str_title}", y=0.95, fontsize=fontsize['titles']*2.2)
+      fig.subplots_adjust(bottom=cbar_adj_bottom)
+      
+      cbar_ax = fig.add_axes(cbar_ax_rect)
+      cbar = fig.colorbar(ims[0], cax=cbar_ax, orientation="horizontal")
+      cbar_ax.tick_params(labelsize=fontsize['ticklabels']*2)
+      
+      plt.xlabel(units, fontsize=fontsize['titles']*2)
+      
+      plt.subplots_adjust(wspace=0, hspace=0.3)
+      
+      # weinrueruebr
+      # plt.show()
+      # break
+      
+      # Save
+      outfile = os.path.join(outDir_figs, f"{filename_prefix}_{vegtype_str_figfile}.png")
+      plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+               bbox_inches='tight')
+      plt.close()
+
+# %%
