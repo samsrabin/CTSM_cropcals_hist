@@ -987,6 +987,53 @@ def get_ts_prod_clm_yc_da(yield_gd, lu_ds, yearList, cropList_combined_clm):
    return ts_prod_clm_yc_da
 
 
+def get_vegtype_str_figfile(vegtype_str_in):
+    vegtype_str_out = vegtype_str_in
+    if "soybean" in vegtype_str_in and "tropical" not in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("soybean", "temperate_soybean")
+    for t in ["winter", "spring", "temperate", "tropical"]:
+        if t in vegtype_str_out:
+            vegtype_str_out = vegtype_str_out.replace(f"{t}_", "") + f"_{t}"
+    if "irrigated" in vegtype_str_out:
+        vegtype_str_out = vegtype_str_out.replace("irrigated_", "") + "_ir"
+    else:
+        vegtype_str_out = vegtype_str_out + "_rf"
+    return vegtype_str_out
+
+
+# Get vegtype str for figure titles
+def get_vegtype_str_for_title(vegtype_str_in):
+    vegtype_str_out = vegtype_str_in
+    if "irrigated" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("irrigated_", "") + " (ir)"
+    else:
+        vegtype_str_out = vegtype_str_out + " (rf)"
+    if "temperate" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("temperate_", "temp. ")
+    if "tropical" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("tropical_", "trop. ")
+    elif "soybean" in vegtype_str_in:
+        vegtype_str_out = "temp. " + vegtype_str_out
+    if "soybean" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("soybean", "soy")
+    if "spring" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("spring_", "spr. ")
+    if "winter" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("winter_", "win.")
+    return vegtype_str_out
+
+
+def get_vegtype_str_paramfile(vegtype_str_in):
+    # Get vegtype str used in parameter file
+    if vegtype_str_in == "soybean":
+        vegtype_str_out = "temperate_soybean"
+    elif vegtype_str_in == "irrigated_soybean":
+        vegtype_str_out = "irrigated_temperate_soybean"
+    else:
+        vegtype_str_out = vegtype_str_in
+    return vegtype_str_out
+
+
 # E.g. import_rx_dates("sdate", sdates_rx_file, dates_ds0_orig)
 def import_rx_dates(var_prefix, date_inFile, dates_ds):
     # Get run info:
@@ -1151,8 +1198,13 @@ def make_axis(fig, ny, nx, n):
 
 
 def mask_immature(this_ds, this_vegtype, gridded_da):
-    reason_gridded = utils.grid_one_variable(this_ds, "HARVEST_REASON_PERHARV", \
-                vegtype=this_vegtype).squeeze(drop=True)
+    if "HARVEST_REASON_PERHARV" in this_ds:
+        thisVar = "HARVEST_REASON_PERHARV"
+    elif "HARVEST_REASON" in this_ds:
+        thisVar = "HARVEST_REASON"
+    else:
+        raise RuntimeError('Neither HARVEST_REASON nor HARVEST_REASON_PERHARV found in this_ds.')
+    reason_gridded = utils.grid_one_variable(this_ds, thisVar, vegtype=this_vegtype).squeeze(drop=True)
     gridded_da = gridded_da.where(reason_gridded == 1)
     return gridded_da
 
@@ -1274,6 +1326,18 @@ def print_onepatch_wrongNgs(p, this_ds_orig, sdates_ymp, hdates_ymp, sdates_pym,
         print_nopandas(sdates_pg2[p,:], hdates_pg2[p,:], 'After "Ignore any harvests that were planted in the final year, because some cells will have incomplete growing seasons for the final year"')
     
     print("\n\n")
+
+
+def remove_outliers(gridded_da):
+    gs_axis = gridded_da.dims.index("gs")
+    pctle25 = np.nanpercentile(gridded_da, q=25, axis=gs_axis)
+    pctle75 = np.nanpercentile(gridded_da, q=75, axis=gs_axis)
+    iqr = pctle75 - pctle25
+    outlier_thresh_lo = pctle25 - iqr
+    outlier_thresh_up = pctle75 - iqr
+    not_outlier = np.bitwise_and(gridded_da > outlier_thresh_lo, gridded_da < outlier_thresh_up)
+    gridded_da = gridded_da.where(not_outlier)
+    return gridded_da
 
 
 def round_lonlats_to_match_da(ds_a, varname_a, tolerance, ds_b=None, varname_b=None):
