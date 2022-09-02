@@ -153,9 +153,7 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
     print(f'netCDF year {thisYear}...')
     
     # Get h2 file (list)
-    if indir[-1] != os.path.sep:
-        indir = indir + os.path.sep
-    h2_pattern = indir + "*h2.*"
+    h2_pattern = os.path.join(indir, "*h2.*")
     h2_filelist = glob.glob(h2_pattern)
     if not h2_filelist:
         raise RuntimeError(f"No files found matching pattern: {h2_pattern}")
@@ -302,12 +300,14 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
     myVars = [clm_gdd_var]
     if save_figs and not gddharv_in_h3:
         myVars.append("GDDHARV")
-    h1_ds = utils.import_ds(glob.glob(indir + f"*h1.{thisYear-1}-01-01*"), myVars=myVars, myVegtypes=utils.define_mgdcrop_list(), myVars_missing_ok=['GDDHARV'])
+    pattern = os.path.join(indir, f"*h1.{thisYear-1}-01-01*")
+    h1_ds = utils.import_ds(glob.glob(pattern), myVars=myVars, myVegtypes=utils.define_mgdcrop_list(), myVars_missing_ok=['GDDHARV'])
     if save_figs and 'GDDHARV' not in h1_ds:
         if not gddharv_in_h3:
             print('Trying to get GDDHARV from h3 file(s) instead.')
         try:
-            h3_ds = utils.import_ds(glob.glob(indir + f"*h3.{thisYear-1}-01-01*"), myVars=['GDDHARV'], myVegtypes=utils.define_mgdcrop_list())
+            pattern = os.path.join(indir, f"*h3.{thisYear-1}-01-01*")
+            h3_ds = utils.import_ds(glob.glob(pattern), myVars=['GDDHARV'], myVegtypes=utils.define_mgdcrop_list())
             h1_ds['GDDHARV'] = h3_ds['GDDHARV']
             if not gddharv_in_h3:
                 print('Success! Will look in h3 files from now on.')

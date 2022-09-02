@@ -42,8 +42,9 @@ else:
 # indir = "/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220601.03.ba902039"
 # indir = "/glade/scratch/samrabin/archive/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1950-2013.ggcmi2/lnd/hist"
 # indir = "/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1950-2013.ggcmi2"
-indir = "/glade/scratch/samrabin/archive/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddgen/lnd/hist"
+#indir = "/glade/scratch/samrabin/archive/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddgen/lnd/hist"
 # indir = "/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddgen"
+indir = "/glade/scratch/samrabin/archive/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen2/lnd/hist"
 
 # sdate_inFile = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
 # hdate_inFile = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.20220602_230029.nc"
