@@ -127,7 +127,14 @@ def check_and_trim_years(y1, yN, ds_in):
     return ds_in
 
 
-def check_constant_vars(this_ds, constantVars, ignore_nan, constantGSs=None, verbose=True, throw_error=True):
+def check_constant_vars(this_ds, case, ignore_nan, constantGSs=None, verbose=True, throw_error=True):
+    
+    if isinstance(case, str):
+        constantVars = case
+    elif isinstance(case, dict):
+        constantVars = case['constantVars']
+    else:
+        raise TypeError(f'case must be str or dict, not {type(case)}')
     
     if not constantVars:
         return None
@@ -140,6 +147,7 @@ def check_constant_vars(this_ds, constantVars, ignore_nan, constantGSs=None, ver
         this_ds = this_ds.sel(gs=constantGSs)
     
     any_bad = False
+    any_bad_before_checking_rx = False
     if throw_error:
         emojus = '❌'
     else:
@@ -163,6 +171,12 @@ def check_constant_vars(this_ds, constantVars, ignore_nan, constantGSs=None, ver
         incl_patches = []
         bad_patches = np.array([])
         strList = []
+        
+        # Read prescription file, if needed
+        rx_ds = None
+        if isinstance(case, dict):
+            if v == "GDDHARV" and 'rx_gdds_file' in case:
+                rx_ds = import_rx_dates("gdd", case['rx_gdds_file'], this_ds).squeeze()
 
         for t1 in np.arange(this_ds.dims[time_coord]-1):
             
@@ -191,28 +205,54 @@ def check_constant_vars(this_ds, constantVars, ignore_nan, constantGSs=None, ver
                     ok_p = np.squeeze(np.bitwise_or(ok_p, np.isnan(t1_vals+t_vals)))
                 
                 if not np.all(ok_p):
-                    any_bad = True
-                    if ok:
-                        print(f"{emojus} CLM output {v} unexpectedly vary over time:")
-                    ok = False
+                    any_bad_before_checking_rx = True
                     bad_patches_thisT = list(np.where(np.bitwise_not(ok_p))[0])
                     bad_patches = np.concatenate((bad_patches, np.array(thesePatches)[bad_patches_thisT]))
-                    if verbose:
-                        for p in bad_patches_thisT:
-                            thisPatch = thesePatches[p]
-                            thisLon = this_ds.patches1d_lon.values[p]
-                            thisLat = this_ds.patches1d_lat.values[p]
-                            thisCrop = this_ds.patches1d_itype_veg_str.values[p]
-                            thisCrop_int = this_ds.patches1d_itype_veg.values[p]
+                    if rx_ds:
+                        found_in_rx = np.array([False for x in bad_patches])
+                    for i, p in enumerate(bad_patches_thisT):
+                        thisPatch = thesePatches[p]
+                        thisLon = this_ds.patches1d_lon.values[p]
+                        thisLat = this_ds.patches1d_lat.values[p]
+                        thisCrop = this_ds.patches1d_itype_veg_str.values[p]
+                        thisCrop_int = this_ds.patches1d_itype_veg.values[p]
+                        
+                        # If prescribed input had missing value (-1), it's fine for it to vary.
+                        if rx_ds:
+                            rx_var = f'gs1_{thisCrop_int}'
+                            if thisLon in rx_ds.lon.values and thisLat in rx_ds.lat.values:
+                                rx = rx_ds[rx_var].sel(lon=thisLon, lat=thisLat).values
+                                Nunique = len(np.unique(rx))
+                                if (Nunique == 1):
+                                    found_in_rx[i] = True
+                                    if rx == -1:
+                                        continue
+                                elif Nunique > 1:
+                                    raise RuntimeError(f'How does lon {thisLon} lat {thisLat} {thisCrop} have time-varying {v}?')
+                        
+                        # Print info (or save to print later)
+                        any_bad = True
+                        if verbose:
                             thisStr = f"   Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop} ({thisCrop_int})"
+                            if rx_ds and not found_in_rx[i]:
+                                thisStr = thisStr.replace('(lon', '* (lon')
                             if v == "SDATES":
                                 strList.append(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[p])}, {t_yr} jday {int(t_vals[p])}")
                             else:
                                 strList.append(f"{thisStr}: {t1_yr} {v} {int(t1_vals[p])}, {t_yr} {v} {int(t_vals[p])}")
-                    else:
-                        print(f"{v} timestep {t} does not match timestep {t1}")
-        if verbose:
+                        else:
+                            if ok:
+                                print(f"{emojus} CLM output {v} unexpectedly vary over time:")
+                                ok = False
+                            print(f"{v} timestep {t} does not match timestep {t1}")
+                            break
+        if verbose and any_bad:
+            print(f"{emojus} CLM output {v} unexpectedly vary over time:")
             strList.sort()
+            if rx_ds and np.any(~found_in_rx):
+                strList = ['*: Not found in prescribed input file (maybe minor lon/lat mismatch)'] + strList
+            elif not rx_ds:
+                strList = ['(No rx file checked)'] + strList
             print('\n'.join(strList))
 
         # Make sure every patch was checked once (or is all-NaN except possibly final season)
@@ -230,8 +270,11 @@ def check_constant_vars(this_ds, constantVars, ignore_nan, constantGSs=None, ver
                     break
             raise RuntimeError(f'Not all patches checked! E.g., {p}: {this_da.isel(patch=p).values}')
         
-        if ok:
-            print(f"✅ CLM output {v} do not vary through {this_ds.dims[time_coord]} growing seasons of output.")
+        if not any_bad:
+            if any_bad_before_checking_rx:
+                print(f"✅ CLM output {v} do not vary through {this_ds.dims[time_coord]} growing seasons of output (except for patch(es) with missing rx).")
+            else:
+                print(f"✅ CLM output {v} do not vary through {this_ds.dims[time_coord]} growing seasons of output.")
 
     if any_bad and throw_error:
         raise RuntimeError('Stopping due to failed check_constant_vars().')
