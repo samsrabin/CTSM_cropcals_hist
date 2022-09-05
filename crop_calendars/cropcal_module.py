@@ -130,6 +130,8 @@ def check_and_trim_years(y1, yN, ds_in):
 def check_constant_vars(this_ds, case, ignore_nan, constantGSs=None, verbose=True, throw_error=True):
     
     if isinstance(case, str):
+        constantVars = [case]
+    elif isinstance(case, list):
         constantVars = case
     elif isinstance(case, dict):
         constantVars = case['constantVars']
