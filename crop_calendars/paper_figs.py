@@ -113,19 +113,20 @@ if all_cases:
                      'constantGSs': None,
                      'res': 'f09_g17'}
    # My run with normal CLM code + my outputs
-   cases['ctsm5.1.dev092'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1901-2014/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1901-2014.clm2.h1.1901-01-01-00000.nc',
+   cases['ctsm5.1.dev092'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1958-2014/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1958-2014.clm2.h1.1958-01-01-00000.nc',
                               'constantVars': None,
                               'constantGSs': None,
                               'res': 'f19_g17'}
-# # My run with rx_crop_calendars2 code but CLM calendars
-# cases['mycode_clmcals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1958-2014/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1958-2014.clm2.h1.1958-01-01-00000.nc',
-#                            'constantVars': None,
-#                            'constantGSs': None,
-#                            'res': 'f19_g17'}
+# My run with rx_crop_calendars2 code but CLM calendars
+cases['mycode_clmcals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1958-2014/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1958-2014.clm2.h1.1958-01-01-00000.nc',
+                           'constantVars': None,
+                           'constantGSs': None,
+                           'res': 'f19_g17'}
 # My run with rx_crop_calendars2 code and GGCMI calendars
 cases['mycode_ggcmicals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced.clm2.h1.1958-01-01-00000.nc',
+                           #   'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced.clm2.h1.1958-01-01-00000.nc',
                              'constantVars': ["SDATES", "GDDHARV"],
-                             'constantGSs': None, # 'None' means all should be constant #slice(1980,2009),
+                             'constantGSs': None, # 'None' with constantVars specified means all should be constant
                              'res': 'f19_g17',
                              'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
                              'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
@@ -554,8 +555,8 @@ finishup_allcrops_plot(c, ny, nx, axes_yield_dt, f_yield_dt, "Global crop yield 
 # %% Make maps of individual crops (rainfed, irrigated)
 
 # Define reference case, if you want to plot differences
-# ref_casename = None
-ref_casename = 'mycode_clmcals'
+ref_casename = None
+# ref_casename = 'mycode_clmcals'
 
 overwrite = True
 
