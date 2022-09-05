@@ -49,7 +49,7 @@ indirs.append(dict(path="/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.
                    used_clm_mxmat = True,
                    used_rx_sdate = False,
                    used_rx_harvthresh = False))
-indirs.append(dict(path="/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddforced2/",
+indirs.append(dict(path="/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/",
                    used_clm_mxmat = False,
                    used_rx_sdate = True,
                    used_rx_harvthresh = True))
@@ -279,6 +279,8 @@ elif nx != 2:
     print(f"Since nx = {nx}, you may need to rework some parameters")
 
 for v, vegtype_str in enumerate(vegtype_list):
+    if 'winter' in vegtype_str or 'miscanthus' in vegtype_str:
+        continue
     print(f"{thisVar}: {vegtype_str}...")
     vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
     
@@ -332,7 +334,7 @@ for v, vegtype_str in enumerate(vegtype_list):
 
 # %% Make map of means 
 
-varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "HUI_PERHARV.onlyMature", "GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.useMedian", "SDATES", "HDATES.onlyMature"]
+varList = ["GSLEN.onlyMature.useMedian", "GDDHARV_PERHARV", "HUI_PERHARV", "HUI_PERHARV.onlyMature", "GSLEN", "GSLEN.onlyMature", "SDATES", "HDATES.onlyMature"]
 # varList = ["GDDHARV_PERHARV"]
 # varList = ["HUI_PERHARV"]
 # varList = ["GSLEN"]
