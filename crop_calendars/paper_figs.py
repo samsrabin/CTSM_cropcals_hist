@@ -1129,6 +1129,8 @@ ggcmi_cropcal_dir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calenda
 
 importlib.reload(cc)
 
+y1_ggcmi = 1980
+yN_ggcmi = 2009
 verbose = False
 
 ggcmi_models_orig = ["ACEA", "CROVER", "CYGMA1p74", "DSSAT-Pythia", "EPIC-IIASA", "ISAM", "LDNDC", "LPJ-GUESS", "LPJmL", "pDSSAT", "PEPIC", "PROMET", "SIMPLACE-LINTUL5"]
@@ -1148,7 +1150,8 @@ def get_new_filename(pattern):
       raise RuntimeError(f"Expected at most 1 match of {pattern}; found {len(thisFile)}")
    return thisFile
 
-def trim_years(y1, yN, Ngs, ds_in):
+def trim_years_ggcmi(y1, yN, ds_in):
+   Ngs = yN - y1 + 1
    time_units = ds_in.time.attrs["units"]
    match = re.search("growing seasons since \d+-01-01, 00:00:00", time_units)
    if not match:
@@ -1162,6 +1165,9 @@ def trim_years(y1, yN, Ngs, ds_in):
    return ds_in
 
 ggcmiDS_started = False
+
+Ngs_ggcmi = yN_ggcmi - y1_ggcmi + 1
+gs_ggcmi = np.arange(y1_ggcmi, yN_ggcmi + 1)
 
 for thisVar_orig in varList:
    thisVar = thisVar_orig
@@ -1271,16 +1277,16 @@ for thisVar_orig in varList:
          
          # Set up DataArray for this crop-irr
          if g==0:
-            matyday_da = xr.DataArray(data=np.full((Ngs,
+            matyday_da = xr.DataArray(data=np.full((Ngs_ggcmi,
                                                    thisDS.dims["lat"],
                                                    thisDS.dims["lon"],
                                                    Nggcmi_models_orig
                                                    ),
                                                    fill_value=np.nan),
-                                      coords=[ggcmiDS.coords[x] for x in ["gs","lat","lon","model"]])
+                                      coords=[(gs_ggcmi)] + [ggcmiDS.coords[x] for x in ["lat", "lon", "model"]])
          
          # Get just the seasons you need
-         thisDS = trim_years(y1, yN, Ngs, thisDS)
+         thisDS = trim_years_ggcmi(y1_ggcmi, yN_ggcmi, thisDS)
          thisDA = thisDS[ncvar]
          
          # Pre-filtering
@@ -1301,7 +1307,7 @@ for thisVar_orig in varList:
             filter_str = None
             if thisFile:
                filterDS = xr.open_dataset(thisFile[0], decode_times=False)
-               filterDS = trim_years(y1, yN, Ngs, filterDS)
+               filterDS = trim_years_ggcmi(y1_ggcmi, yN_ggcmi, filterDS)
                filter_str = f"(after filtering by {filterVar} == 1)"
                thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] == 1)
             else:
@@ -1309,7 +1315,7 @@ for thisVar_orig in varList:
                thisFile = get_new_filename(pattern.replace("matyday", filterVar))
                if thisFile:
                   filterDS = xr.open_dataset(thisFile[0], decode_times=False)
-                  filterDS = trim_years(y1, yN, Ngs, filterDS)
+                  filterDS = trim_years_ggcmi(y1_ggcmi, yN_ggcmi, filterDS)
                   filter_str = f"(after filtering by {filterVar} >= 1)"
                   thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] >= 1)
                else:
@@ -1317,7 +1323,7 @@ for thisVar_orig in varList:
                   thisFile = get_new_filename(pattern.replace("matyday", filterVar))
                   if thisFile:
                      filterDS = xr.open_dataset(thisFile[0], decode_times=False)
-                     filterDS = trim_years(y1, yN, Ngs, filterDS)
+                     filterDS = trim_years_ggcmi(y1_ggcmi, yN_ggcmi, filterDS)
                      filter_str = f"(after filtering by {filterVar} > 0)"
                      thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] > 0)
             if not filter_str:
@@ -1333,7 +1339,7 @@ for thisVar_orig in varList:
          thisFile = get_new_filename(pattern.replace("matyday", filterVar))
          if thisFile:
             filterDS = xr.open_dataset(thisFile[0], decode_times=False)
-            filterDS = trim_years(y1, yN, Ngs, filterDS)
+            filterDS = trim_years_ggcmi(y1_ggcmi, yN_ggcmi, filterDS)
             thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] > 0)
                
          # Don't include cell-years with growing season length < 50 (how Jonas does his: https://ebi-forecast.igb.illinois.edu/ggcmi/issues/421#note-5)
@@ -1458,7 +1464,8 @@ for thisVar_orig in varList:
       
       cc.equalize_colorbars(ims, center0=diffExpected)
       
-      fig.suptitle(f"{title_prefix}: {vegtype_str_title}", y=0.95, fontsize=fontsize['titles']*2.2)
+      suptitle = f"{title_prefix}: {vegtype_str_title} ({y1_ggcmi}-{yN_ggcmi})"
+      fig.suptitle(suptitle, y=0.95, fontsize=fontsize['titles']*2.2)
       fig.subplots_adjust(bottom=cbar_adj_bottom)
       
       cbar_ax = fig.add_axes(cbar_ax_rect)
