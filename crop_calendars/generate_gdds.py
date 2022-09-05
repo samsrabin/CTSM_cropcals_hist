@@ -248,8 +248,8 @@ if save_figs:
     gdd_maps_ds = add_attrs_to_map_ds(gdd_maps_ds, plot_vegtypes_str, dummy_fill, outdir_figs, y1, yN)
     gddharv_maps_ds = add_attrs_to_map_ds(gddharv_maps_ds, plot_vegtypes_str, dummy_fill, outdir_figs, y1, yN)
     
-    gdd_maps_ds.to_netcdf(outdir_figs + "gdd_maps.nc")
-    gddharv_maps_ds.to_netcdf(outdir_figs + "gddharv_maps.nc")
+    gdd_maps_ds.to_netcdf(os.path.join(outdir_figs, "gdd_maps.nc"))
+    gddharv_maps_ds.to_netcdf(os.path.join(outdir_figs, "gddharv_maps.nc"))
 
 
 # %% Save before/after map and boxplot figures
