@@ -173,6 +173,8 @@ Ngs = len(gs_values)
 clm_sim_veg_types = []
 for casename, case in cases.items():
    case_ds = case['ds']
+   if "SDATES" not in case_ds:
+      continue
    ever_active = np.where(np.any(case_ds['SDATES'] > 0, axis=1))[0]
    ivt_str_ever_active = np.unique(case_ds.isel(patch=ever_active)['patches1d_itype_veg_str'].values)
    clm_sim_veg_types += list(ivt_str_ever_active)
