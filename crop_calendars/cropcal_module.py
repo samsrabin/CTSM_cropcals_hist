@@ -238,10 +238,18 @@ def check_constant_vars(this_ds, case, ignore_nan, constantGSs=None, verbose=Tru
                             thisStr = f"   Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop} ({thisCrop_int})"
                             if rx_ds and not found_in_rx[i]:
                                 thisStr = thisStr.replace('(lon', '* (lon')
-                            if v == "SDATES":
-                                strList.append(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[p])}, {t_yr} jday {int(t_vals[p])}")
+                            if not np.isnan(t1_vals[p]):
+                                t1_val_print = int(t1_vals[p])
                             else:
-                                strList.append(f"{thisStr}: {t1_yr} {v} {int(t1_vals[p])}, {t_yr} {v} {int(t_vals[p])}")
+                                t1_val_print = 'NaN'
+                            if not np.isnan(t_vals[p]):
+                                t_val_print = int(t_vals[p])
+                            else:
+                                t_val_print = 'NaN'
+                            if v == "SDATES":
+                                strList.append(f"{thisStr}: Sowing {t1_yr} jday {t1_val_print}, {t_yr} jday {t_val_print}")
+                            else:
+                                strList.append(f"{thisStr}: {t1_yr} {v} {t1_val_print}, {t_yr} {v} {t_val_print}")
                         else:
                             if ok:
                                 print(f"{emojus} CLM output {v} unexpectedly vary over time:")
