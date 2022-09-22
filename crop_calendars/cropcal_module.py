@@ -298,7 +298,10 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
     diff_str_list = []
     gdd_tolerance = 0
     for vegtype_str in vegtype_list:
-        ds_thisVeg = dates_ds.isel(patch=np.where(dates_ds.patches1d_itype_veg_str == vegtype_str)[0])
+        thisVeg_patches = np.where(dates_ds.patches1d_itype_veg_str == vegtype_str)[0]
+        if thisVeg_patches.size == 0:
+            continue
+        ds_thisVeg = dates_ds.isel(patch=thisVeg_patches)
         patch_inds_lon_thisVeg = ds_thisVeg.patches1d_ixy.values.astype(int) - 1
         patch_inds_lat_thisVeg = ds_thisVeg.patches1d_jxy.values.astype(int) - 1
         patch_lons_thisVeg = ds_thisVeg.patches1d_lon
