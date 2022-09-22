@@ -48,11 +48,13 @@ indirs = list()
 indirs.append(dict(path="/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1958-2014/",
                    used_clm_mxmat = True,
                    used_rx_sdate = False,
-                   used_rx_harvthresh = False))
+                   used_rx_harvthresh = False,
+                   landuse_varies = True))
 indirs.append(dict(path="/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/",
                    used_clm_mxmat = False,
                    used_rx_sdate = True,
-                   used_rx_harvthresh = True))
+                   used_rx_harvthresh = True,
+                   landuse_varies = True))
 
 ggcmi_out_topdir = "/Users/Shared/GGCMI/AgMIP.output"
 ggcmi_cropcal_dir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar"
@@ -201,7 +203,7 @@ verbose = True
 
 importlib.reload(cc)
 cc.check_constant_vars(dates_ds1, constantVars,
-                       indirs[1]['path'] == "/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1976-2013_gddforced2/")
+                       ignore_nan=indirs[1]['landuse_varies'])
 
 
 # %% For both datasets, check that GDDACCUM_PERHARV <= HUI_PERHARV
