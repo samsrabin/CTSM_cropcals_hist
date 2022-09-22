@@ -307,6 +307,7 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         rx_da = rx_ds[f"gs1_{vegtype_int}"]
         rx_array = rx_da.values[patch_inds_lat_thisVeg,patch_inds_lon_thisVeg]
+        rx_array = np.expand_dims(rx_array, axis=1)
         sim_array = ds_thisVeg[output_var].values
         sim_array_dims = ds_thisVeg[output_var].dims
         
@@ -326,10 +327,10 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
                     (ds_thisVeg["HARVEST_REASON_PERHARV"].values==5))
     
             if np.any(np.abs(diff_array[abs(diff_array) > 0]) > 0):
-                min_diff, minLon, minLat, minGS = get_extreme_info(diff_array, np.min, sim_array_dims, dates_ds.gs, patch_lons_thisVeg, patch_lats_thisVeg)
-                max_diff, maxLon, maxLat, maxGS = get_extreme_info(diff_array, np.max, sim_array_dims, dates_ds.gs, patch_lons_thisVeg, patch_lats_thisVeg)
+                min_diff, minLon, minLat, minGS, minRx = get_extreme_info(diff_array, rx_array, np.nanmin, sim_array_dims, dates_ds.gs, patch_lons_thisVeg, patch_lats_thisVeg)
+                max_diff, maxLon, maxLat, maxGS, maxRx = get_extreme_info(diff_array, rx_array, np.nanmax, sim_array_dims, dates_ds.gs, patch_lons_thisVeg, patch_lats_thisVeg)
                 
-                diffs_eg_txt = f"{vegtype_str} ({vegtype_int}): diffs range {min_diff} (lon {minLon}, lat {minLat}, year {minGS}) to {max_diff} (lon {maxLon}, lat {maxLat}, gs {maxGS})"
+                diffs_eg_txt = f"{vegtype_str} ({vegtype_int}): diffs range {min_diff} (lon {minLon}, lat {minLat}, gs {minGS}, rx ~{minRx}) to {max_diff} (lon {maxLon}, lat {maxLat}, gs {maxGS}, rx ~{maxRx})"
                 if output_var=="GDDHARV_PERHARV" and np.max(abs(diff_array)) <= gdd_tolerance:
                     all_ok = 1
                     diff_str_list.append(f"   {diffs_eg_txt}")
@@ -809,11 +810,9 @@ def get_extreme_info(diff_array, rx_array, mxn, dims, gs, patches1d_lon, patches
     thisGS = gs.values[s]
     
     # Get the prescribed value for this patch-gs
-    rx_array = rx_array.sel(lon=thisLon, lat=thisLat)
-    if "gs" in rx_array.dims:
-        rx_array
+    thisRx = rx_array[p][0]
     
-    return round(themxn, 3), round(thisLon, 3), round(thisLat,3), thisGS
+    return round(themxn, 3), round(thisLon, 3), round(thisLat,3), thisGS, round(thisRx)
 
 
 # Get growing season lengths from a DataArray of hdate-sdate
