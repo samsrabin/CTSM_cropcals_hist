@@ -208,14 +208,12 @@ cc.check_constant_vars(dates_ds1, constantVars,
 
 # %% For both datasets, check that GDDACCUM_PERHARV <= HUI_PERHARV
 
-verbose = True
+cc.check_v0_le_v1(dates_ds0, ["GDDACCUM", "HUI"], msg_txt=" dates_ds0: ", both_nan_ok=indirs[0]['landuse_varies'])
+cc.check_v0_le_v1(dates_ds1, ["GDDACCUM", "HUI"], msg_txt=" dates_ds1: ", both_nan_ok=indirs[0]['landuse_varies'])
 
 
-cc.check_v0_le_v1(dates_ds0, ["GDDACCUM_PERHARV", "HUI_PERHARV"], msg_txt=" dates_ds0: ")
-cc.check_v0_le_v1(dates_ds1, ["GDDACCUM_PERHARV", "HUI_PERHARV"], msg_txt=" dates_ds1: ")
 
-
-# Check that prescribed sowing dates were obeyed
+# %% Check that prescribed sowing dates were obeyed
 
 if "time" in sdates_rx_ds.dims:
     if sdates_rx_ds.dims["time"] > 1:
@@ -231,9 +229,9 @@ if indirs[0]["used_rx_sdate"]:
 if indirs[1]["used_rx_sdate"]:
     cc.check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds1, 1, "SDATES")
 if indirs[0]["used_rx_harvthresh"]:
-    cc.check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds0, 0, "GDDHARV_PERHARV", gdd_min=gdd_min)
+    cc.check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds0, 0, "GDDHARV", gdd_min=gdd_min)
 if indirs[1]["used_rx_harvthresh"]:
-    cc.check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds1, 1, "GDDHARV_PERHARV", gdd_min=gdd_min)
+    cc.check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds1, 1, "GDDHARV", gdd_min=gdd_min)
     
 
 # %% Make map of harvest reasons
