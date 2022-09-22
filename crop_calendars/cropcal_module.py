@@ -342,13 +342,13 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
                     break
     
     if all_ok == 2:
-        print(f"✅ dates_ds{which_ds}: Prescribed {output_var} always obeyed")
+        print(f"✅ {which_ds}: Prescribed {output_var} always obeyed")
     elif all_ok == 1:
-        # print(f"🟨 dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable:")
+        # print(f"🟨 {which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable:")
         # for x in diff_str_list: print(x)
-        print(f"🟨 dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable (diffs <= {gdd_tolerance})")
+        print(f"🟨 {which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable (diffs <= {gdd_tolerance})")
     else:
-        print(f"❌ dates_ds{which_ds}: Prescribed {output_var} *not* always obeyed. E.g., {diffs_eg_txt}")
+        print(f"❌ {which_ds}: Prescribed {output_var} *not* always obeyed. E.g., {diffs_eg_txt}")
 
 
  # Make sure that, e.g., GDDACCUM_PERHARV is always <= HUI_PERHARV
@@ -1242,9 +1242,9 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
       
    # Check that prescribed calendars were obeyed
    if sdates_rx_ds:
-      check_rx_obeyed(vegtype_list, sdates_rx_ds, this_ds, 0, "SDATES")
+      check_rx_obeyed(vegtype_list, sdates_rx_ds, this_ds, "this_ds", "SDATES")
    if gdds_rx_ds:
-      check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, 0, "SDATES", "GDDHARV", gdd_min=gdd_min)
+      check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, "this_ds", "SDATES", "GDDHARV", gdd_min=gdd_min)
    
    # Convert time axis to integer year
    this_ds_gs = this_ds_gs.assign_coords({"time": [t.year for t in this_ds.time_bounds.values[:,0]]})

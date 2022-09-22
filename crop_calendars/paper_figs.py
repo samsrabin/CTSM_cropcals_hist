@@ -242,6 +242,9 @@ print("Done.")
 
 
 # %% Import GGCMI sowing and harvest dates
+# Minimum harvest threshold allowed in PlantCrop()
+gdd_min = 50
+
 for i, (casename, case) in enumerate(cases.items()):
    
    if 'rx_sdates_file' in case:
@@ -272,6 +275,10 @@ for i, (casename, case) in enumerate(cases.items()):
          if v == "time_bounds":
             continue
          case['rx_gslen_ds'][v] = cc.get_gs_len_da(case['rx_hdates_ds'][v] - case['rx_sdates_ds'][v])
+         
+      # Check
+      cc.check_rx_obeyed(case['ds'].vegtype_str.values, case['rx_sdates_ds'].isel(time=0), case['ds'], casename, "SDATES")
+      cc.check_rx_obeyed(case['ds'].vegtype_str.values, case['rx_gdds_ds'].isel(time=0), case['ds'], casename, "GDDHARV", gdd_min=gdd_min)
       
    elif 'rx_hdates_file' in case:
       raise RuntimeError(f'{casename} had prescribed hdates but not sdates?')

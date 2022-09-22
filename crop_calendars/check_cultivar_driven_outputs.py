@@ -225,13 +225,13 @@ if "time" in sdates_rx_ds.dims:
     
 
 if indirs[0]["used_rx_sdate"]:
-    cc.check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds0, 0, "SDATES")
+    cc.check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds0, "dates_ds0", "SDATES")
 if indirs[1]["used_rx_sdate"]:
-    cc.check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds1, 1, "SDATES")
+    cc.check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds1, "dates_ds1", "SDATES")
 if indirs[0]["used_rx_harvthresh"]:
-    cc.check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds0, 0, "GDDHARV", gdd_min=gdd_min)
+    cc.check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds0, "dates_ds0", "GDDHARV", gdd_min=gdd_min)
 if indirs[1]["used_rx_harvthresh"]:
-    cc.check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds1, 1, "GDDHARV", gdd_min=gdd_min)
+    cc.check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds1, "dates_ds1", "GDDHARV", gdd_min=gdd_min)
     
 
 # %% Make map of harvest reasons
