@@ -202,8 +202,8 @@ constantVars = ["SDATES", "GDDHARV"]
 verbose = True
 
 importlib.reload(cc)
-cc.check_constant_vars(dates_ds1, constantVars,
-                       ignore_nan=indirs[1]['landuse_varies'])
+bad_patches = cc.check_constant_vars(dates_ds1, constantVars,
+                                     ignore_nan=indirs[1]['landuse_varies'])
 
 
 # %% For both datasets, check that GDDACCUM_PERHARV <= HUI_PERHARV
