@@ -23,10 +23,11 @@ my_clm_subver = "c211112"
 # hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
 # gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220331_144207.nc"
 # hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.20220602_230029.nc"
-gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220602_231239.nc"
+# gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220602_231239.nc"
 sdates_rx_file = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
 hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
-gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220820_163845.nc"
+# gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220820_163845.nc"
+gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen2/gdds_20220902_114645.nc"
 
 # Directory where model output file(s) can be found (figure files will be saved in subdir here)
 indirs = list()
