@@ -17,6 +17,7 @@ import warnings
 import os
 import glob
 import cftime
+import datetime as dt
 
 
 def check_sdates(dates_ds, sdates_rx, verbose=False):
@@ -383,6 +384,8 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
         sortorder = np.argsort(patches)
         i_patches = list(np.array(i_patches)[np.array(sortorder)])
         # Select using the indexing tuple
+        print(dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        print(f'({len(i_times)}, {len(i_patches)})')
         gddaccum_atharv_p = thisCrop_gddaccum_da.values[(i_times, i_patches)]
         if save_figs: gddharv_atharv_p = thisCrop_gddharv_da.values[(i_times, i_patches)]
         if np.any(np.isnan(gddaccum_atharv_p)):
