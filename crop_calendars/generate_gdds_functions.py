@@ -378,11 +378,12 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
             patches += list(thisCrop_gddaccum_da.patch.values[here])
             i_patches += list(here)
             i_times += list(np.full((len(here),), int(hdate-1)))
-        # Sort patches back to correct order
+        # Sort back to correct order
         if not np.all(thisCrop_gddaccum_da.patch.values[:-1] <= thisCrop_gddaccum_da.patch.values[1:]):
             raise RuntimeError("This code depends on DataArray patch list being sorted.")
         sortorder = np.argsort(patches)
         i_patches = list(np.array(i_patches)[np.array(sortorder)])
+        i_times = list(np.array(i_times)[np.array(sortorder)])
         # Select using the indexing tuple
         print(dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         print(f'({len(i_times)}, {len(i_patches)})')
