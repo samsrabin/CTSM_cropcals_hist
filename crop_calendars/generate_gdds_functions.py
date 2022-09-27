@@ -152,6 +152,7 @@ def yp_list_to_ds(yp_list, daily_ds, incl_vegtypes_str, dates_rx, longname_prefi
 
 def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str_in, h1_ds_file):
     print(f'netCDF year {thisYear}...')
+    print(dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     
     # Get h2 file (list)
     h2_pattern = os.path.join(indir, "*h2.*")
@@ -385,8 +386,6 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
         i_patches = list(np.array(i_patches)[np.array(sortorder)])
         i_times = list(np.array(i_times)[np.array(sortorder)])
         # Select using the indexing tuple
-        print(dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        print(f'({len(i_times)}, {len(i_patches)})')
         gddaccum_atharv_p = thisCrop_gddaccum_da.values[(i_times, i_patches)]
         if save_figs: gddharv_atharv_p = thisCrop_gddharv_da.values[(i_times, i_patches)]
         if np.any(np.isnan(gddaccum_atharv_p)):
