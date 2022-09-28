@@ -76,7 +76,7 @@ def main(argv):
         sys.exit(2)
     elif y1 == None or yN == None:
         print(help_string)
-        print("You must provide both -y1/--first-year and -yN/--last-year")
+        print("You must provide both -1/--first-year and -N/--last-year")
         sys.exit(2)
 
     # Parse remaining info
