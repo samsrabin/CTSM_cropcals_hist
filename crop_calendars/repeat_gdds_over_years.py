@@ -21,7 +21,7 @@ import datetime as dt
 
 def main(argv):
 
-    help_string = "repeat_gdds_over_years.py -i <input-file> -1 <first-year> -N <last-year> OPTIONAL: [(-d <output-dir> OR -o <output-file>)]"
+    help_string = "repeat_gdds_over_years.py -i <input-file> -1 <first-year> -N <last-year> OPTIONAL: [(-d <output-dir> OR -o <output-file>) (--overwrite OR --no-overwrite)]"
 
     # Get arguments
     y1 = None
@@ -53,8 +53,16 @@ def main(argv):
         elif opt in ("-N", "-n", "--last-year"):
             yN = int(arg)
         elif opt == "--overwrite":
+            if overwrite != 0:
+                print(help_string)
+                print("Do not specify both --overwrite and --no-overwrite")
+                sys.exit(1)
             overwrite = 1
         elif opt == "--no-overwrite":
+            if overwrite != 0:
+                print(help_string)
+                print("Do not specify both --overwrite and --no-overwrite")
+                sys.exit(1)
             overwrite = -1
 
     # Check arguments
