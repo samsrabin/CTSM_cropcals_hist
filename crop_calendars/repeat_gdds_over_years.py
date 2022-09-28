@@ -31,7 +31,7 @@ def main(argv):
     outdir = None
     overwrite = 0
     try:
-        opts, args = getopt.getopt(argv, "hi:o:1:N:n:d", ["input-file", "output-file", "first-year", "last-year", "output-dir", "overwrite", "no-overwrite"])
+        opts, args = getopt.getopt(argv, "h:i:o:1:N:n:d:", ["input-file", "output-file", "first-year", "last-year", "output-dir", "overwrite", "no-overwrite"])
     except getopt.GetoptError:
         print(help_string)
         print("Error parsing arguments. Probably an incorrect option specified?")
