@@ -12,6 +12,9 @@ out_attrs = {
     "comment": "Day of year is 1-indexed (i.e., Jan. 1 = 1). Filled using cdo -remapnn,$original -setmisstonn"
 }
 
+# Your path to ctsm_py directory (i.e., where utils.py lives)
+my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
+
 
 # %% Imports
 
@@ -22,15 +25,32 @@ import shutil
 import os
 import time
 import datetime as dt
+import cftime
+
+import sys
+sys.path.append(my_ctsm_python_gallery)
+import utils
 
 
 # %% Setup
 
-# Files/directories to use
-templatefile = "/Users/Shared/CESM_runs/f10_f10_mg37/2021-11-23/f10_f10_mg37.clm2.h3.2000-01-01-00000.nc"
-indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar-nninterp-f10_f10_mg37/"
-file_specifier = "_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37" # In name of input and output files
+# Where to save output files
 outdir = "/Users/Shared/CESM_work/crop_dates/"
+
+# Files/directories to use for inputs
+### f10_f10_mg37
+# templatefile = "/Users/Shared/CESM_runs/f10_f10_mg37/2021-11-23/f10_f10_mg37.clm2.h3.2000-01-01-00000.nc"
+# indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar-nninterp-f10_f10_mg37/"
+# file_specifier = "_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37" # In name of input and output files
+### half degree
+# templatefile = "/Users/Shared/CESM_runs/halfdeg_test/2022-04-22/halfdeg_test.clm2.h1.1850-01-01-00000.nc"
+# indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar/"
+# file_specifier = "_ggcmi_crop_calendar_phase3_v1.01" # In name of input and output files
+### f19_g17 ("2-degree", actually 2.5° lon x 1.875° lat; i.e., 144x96)
+templatefile = "/Users/Shared/CESM_runs/spinup_ctsm5.1.dev092_I1850Clm50BgcCrop_f19-g17_pt2/lnd/hist/spinup_ctsm5.1.dev092_I1850Clm50BgcCrop_f19-g17_pt2.clm2.h0.1801-12.nc"
+indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar-nninterp-f19_g17/"
+file_specifier = "_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17" # In name of input and output files
+
 
 # Add current date/time to output attributes
 out_attrs["created"] = dt.datetime.now().replace(microsecond=0).astimezone().isoformat()
@@ -121,7 +141,7 @@ def set_var_dict(name_ggcmi, outfile):
 
 variable_dict = {
     "sdate": set_var_dict("planting_day", ""),
-    # "hdate": set_var_dict("maturity_day", "")
+    "hdate": set_var_dict("maturity_day", "")
 }
 
 def slice_yr(y):
@@ -131,22 +151,45 @@ def slice_yr(y):
         return str(y)
 
 # Open and time-slice template dataset
-template_ds = xr.open_dataset(templatefile, decode_times=True)
-template_ds = template_ds.sel(time=slice(slice_yr(y1), slice_yr(yN)))
+template_ds = xr.open_dataset(templatefile, decode_times=True).sel(time=slice(slice_yr(y1), slice_yr(yN)))
+# template_ds = template_ds.sel(time=slice(slice_yr(y1), slice_yr(yN)))
+if np.size(template_ds.time) == 0:
+    print(f"Time slice {y1}-{yN} not found in template dataset. Faking.")
+    if y1 != yN:
+        raise RuntimeError("Not sure how to fake time axis when y1 != yN")
+    template_ds = xr.open_dataset(templatefile, decode_times=True)
+    template_ds = template_ds.isel(time=slice(0,1)) # Get the first timestep. Just using .values[0] causes trouble.
+    val0 = template_ds.time.values[0]
+    if not isinstance(template_ds.time.values[0], cftime.datetime):
+        raise TypeError(f"Template file time axis is type {type(template_ds.time.values[0])}, which isn't a cftime.datetime subclass; not sure that next line (assigning fake value) will work.")
+    template_ds.time.values[0] = type(val0)(y1, 1, 1, 0, 0, 0, 0, has_year_zero=val0.has_year_zero)
+    template_ds.time_bounds.values[0] = np.array([template_ds.time.values[0,], template_ds.time.values[0]])
+    if "mcdate" in template_ds:
+        template_ds.mcdate.values = np.array([20000101,]).astype(type(template_ds.mcdate.values[0]))
+    if "mcsec" in template_ds:
+        template_ds.mcsec.values = np.array([0,]).astype(type(template_ds.mcsec.values[0]))
+    if "mdcur" in template_ds:
+        template_ds.mdcur.values = np.array([0,]).astype(type(template_ds.mdcur.values[0]))
+    if "mscur" in template_ds:
+        template_ds.mscur.values = np.array([0,]).astype(type(template_ds.mscur.values[0]))
+    if "nstep" in template_ds:
+        template_ds.nstep.values = np.array([0,]).astype(type(template_ds.nstep.values[0]))
 y1 = template_ds.time.values[0].year
 yN = template_ds.time.values[-1].year
 template_ds.attrs = out_attrs
 
-#  Remove variable(s) we don't need
-for v in ["hdm", "HDATES", "SDATE1", "SDATES"]:
-    if v in template_ds:
+#  Remove variable(s) we don't need (hdm, or any all-uppercase variables)
+for v in template_ds:
+    if v == "hdm" or v.upper()==v:
         template_ds = template_ds.drop(v)
 
 # Create output files
 for v in variable_dict:
-    outfile = "%s%ss%s.%d-%d.nc" % (outdir, v, file_specifier, y1, yN)
+    outfile = "%s%ss%s.%d-%d.%s.nc" % (outdir, v, file_specifier, y1, yN, dt.datetime.now().strftime("%Y%m%d_%H%M%S"))
     variable_dict[v]["outfile"] = outfile
-    template_ds.to_netcdf(path=outfile)
+    variable_dict[v]["outfile_fill1"] = outfile.replace(".nc", ".fill1.nc")
+    template_ds.to_netcdf(path=variable_dict[v]["outfile"])
+    template_ds.to_netcdf(path=variable_dict[v]["outfile_fill1"])
 
 template_ds.close()
 
@@ -190,6 +233,8 @@ for thiscrop_clm in crop_dict:
         cropcal_ds = xr.open_dataset(file_ggcmi)
         # Flip latitude to match destination
         cropcal_ds = cropcal_ds.reindex(lat=cropcal_ds.lat[::-1])
+        # Rearrange longitude to match destination (does nothing if not needed)
+        cropcal_ds = utils.lon_idl2pm(cropcal_ds, fail_silently=True)
     
     for thisvar_clm in variable_dict:
         # Get GGCMI netCDF info
@@ -203,9 +248,14 @@ for thiscrop_clm in crop_dict:
         if not os.path.exists(file_clm):
             raise Exception("Output file not found: " + file_clm)
         file_clm_tmp = file_clm + ".tmp"
+        file_clm_fill1 = variable_dict[thisvar_clm]["outfile_fill1"]
+        if not os.path.exists(file_clm_fill1):
+            raise Exception("Output file not found: " + file_clm_fill1)
+        file_clm_fill1_tmp = file_clm_fill1 + ".tmp"
         
         # "Read" the file (doesn't actually bring anything into memory yet)
         out_ds = xr.open_dataset(file_clm)
+        out_fill1_ds = xr.open_dataset(file_clm_fill1)
         
         # Strip dataset to just this variable
         droplist = []
@@ -214,24 +264,33 @@ for thiscrop_clm in crop_dict:
                 droplist.append(i)
         thisvar_ds = cropcal_ds.drop(droplist)
         thisvar_ds = thisvar_ds.load()
+        thisvar_fill1_ds = thisvar_ds.copy()
 
         # Convert to integer
         new_fillvalue = -1
         dummyvalue = -1
         thisvar_ds.variables[varname_ggcmi].encoding["_FillValue"] \
             = new_fillvalue
+        thisvar_fill1_ds.variables[varname_ggcmi].encoding["_FillValue"] \
+            = new_fillvalue
         if thiscrop_ggcmi == None:
             thisvar_ds.variables[varname_ggcmi].values.fill(dummyvalue)
+            thisvar_fill1_ds.variables[varname_ggcmi].values.fill(1)
         else:
             thisvar_ds.variables[varname_ggcmi].values[np.isnan(thisvar_ds.variables[varname_ggcmi].values)] \
                 = new_fillvalue
             thisvar_ds.variables[varname_ggcmi].values \
                 = thisvar_ds.variables[varname_ggcmi].values.astype("int16")
+            thisvar_fill1_ds.variables[varname_ggcmi].values[np.isnan(thisvar_fill1_ds.variables[varname_ggcmi].values)] \
+                = 1
+            thisvar_fill1_ds.variables[varname_ggcmi].values \
+                = thisvar_fill1_ds.variables[varname_ggcmi].values.astype("int16")
         
         # Add time dimension (https://stackoverflow.com/a/62862440)
         # (Repeats original map for every timestep)
         # Probably not necessary to use this method, since I only end up extracting thisvar_ds.values anyway---I could probably use some numpy method instead.
         thisvar_ds = thisvar_ds.expand_dims(time = template_ds.time)
+        thisvar_fill1_ds = thisvar_fill1_ds.expand_dims(time = template_ds.time)
         # "True" here shows that the time dimension was created by just repeating the one map.
         # tmp = thisvar_ds[varname_ggcmi]
         # np.all((np.diff(tmp.values, axis=0) == 0.0) | np.isnan(np.diff(tmp.values, axis=0)))
@@ -239,20 +298,31 @@ for thiscrop_clm in crop_dict:
         # Add variable to output dataset
         out_ds[varname_clm]=(thisvar_ds[varname_ggcmi].dims,
                              thisvar_ds[varname_ggcmi].values)
+        out_fill1_ds[varname_clm]=(thisvar_fill1_ds[varname_ggcmi].dims,
+                             thisvar_fill1_ds[varname_ggcmi].values)
 
         # Edit/add variable attributes etc.
         longname = thisvar_ds[varname_ggcmi].attrs["long_name"]
         longname = longname.replace("rainfed", thiscrop_clm).replace("irrigated", thiscrop_clm)
-        out_ds[varname_clm].attrs["long_name"] = longname
-        if thiscrop_ggcmi == None:
-            out_ds[varname_clm].attrs["crop_name_clm"] = "none"
-            out_ds[varname_clm].attrs["crop_name_ggcmi"] = "none"
-        else:
-            out_ds[varname_clm].attrs["crop_name_clm"] = thiscrop_clm
-            out_ds[varname_clm].attrs["crop_name_ggcmi"] = thiscrop_ggcmi
-        out_ds[varname_clm].attrs["short_name_ggcmi"] = varname_ggcmi
-        out_ds[varname_clm].attrs["units"] = "day of year"
-        out_ds[varname_clm].encoding["_FillValue"] = new_fillvalue
+        def set_var_attrs(out_ds, varname_clm, longname, thiscrop_clm, thiscrop_ggcmi, varname_ggcmi, new_fillvalue):
+            out_ds[varname_clm].attrs["long_name"] = longname
+            if thiscrop_ggcmi == None:
+                out_ds[varname_clm].attrs["crop_name_clm"] = "none"
+                out_ds[varname_clm].attrs["crop_name_ggcmi"] = "none"
+            else:
+                out_ds[varname_clm].attrs["crop_name_clm"] = thiscrop_clm
+                out_ds[varname_clm].attrs["crop_name_ggcmi"] = thiscrop_ggcmi
+            out_ds[varname_clm].attrs["short_name_ggcmi"] = varname_ggcmi
+            out_ds[varname_clm].attrs["units"] = "day of year"
+            out_ds[varname_clm].encoding["_FillValue"] = new_fillvalue
+            # scale_factor and add_offset are required by I/O library for short data
+            # From https://www.unidata.ucar.edu/software/netcdf/workshops/2010/bestpractices/Packing.html:
+            #    unpacked_value = packed_value * scale_factor + add_offset
+            out_ds[varname_clm].attrs["scale_factor"] = np.int16(1)
+            out_ds[varname_clm].attrs["add_offset"] = np.int16(0)
+            return out_ds
+        out_ds = set_var_attrs(out_ds, varname_clm, longname, thiscrop_clm, thiscrop_ggcmi, varname_ggcmi, new_fillvalue)
+        out_fill1_ds = set_var_attrs(out_fill1_ds, varname_clm, longname, thiscrop_clm, thiscrop_ggcmi, varname_ggcmi, new_fillvalue)
 
         # Save
         if verbose:
@@ -260,12 +330,16 @@ for thiscrop_clm in crop_dict:
         # start = time.time()
         # Can't overwrite file_clm while you have it open (as out_ds), so first copy it to a temporary file...
         shutil.copyfile(file_clm, file_clm_tmp)
+        shutil.copyfile(file_clm_fill1, file_clm_fill1_tmp)
         # ... then save out_ds to the temporary file...
         out_ds.to_netcdf(file_clm_tmp, format="NETCDF3_CLASSIC")
+        out_fill1_ds.to_netcdf(file_clm_fill1_tmp, format="NETCDF3_CLASSIC")
         # ... then close out_ds...
         out_ds.close()
+        out_fill1_ds.close()
         # ... and finally replace the original file with the new temporary file (deleting the temporary file in the process)
         os.replace(file_clm_tmp, file_clm)
+        os.replace(file_clm_fill1_tmp, file_clm_fill1)
         # end = time.time()
         # print(end - start)
         ### NOTE: This method gets slower and slower as the file gets bigger! (The entire process, but also the out_ds.to_netcdf() step.) Is there a better way?
