@@ -17,6 +17,7 @@ import xarray as xr
 import cftime
 import getopt
 import os
+import datetime as dt
 
 def main(argv):
 
@@ -102,6 +103,13 @@ def main(argv):
     
     # Repeat for each year in specified list
     ds_out = utils.tile_over_time(ds_in, years=yearList)
+
+    # Add attributes
+    orig_keys = [x for x in ds_out.attrs.keys()]
+    for a in orig_keys:
+        ds_out.attrs['original_' + a] = ds_out.attrs.pop(a)
+    ds_out.attrs['history'] = "repeat_gdds_over_years.py " + " ".join(argv)
+    ds_out.attrs["created"] = dt.datetime.now().replace(microsecond=0).astimezone().isoformat()
     
     # Save
     ds_out.to_netcdf(outfile, mode='w', format='NETCDF3_CLASSIC')
