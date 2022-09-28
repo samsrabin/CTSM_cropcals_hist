@@ -35,6 +35,7 @@ import warnings
 import cartopy.crs as ccrs
 import datetime as dt
 import pickle
+import datetime as dt
 import argparse
 
 # Figure settings
@@ -106,11 +107,14 @@ def main(argv):
     for k, v in sorted(vars(args).items()):
         print(f"{k}: {v}")
     save_figs = not args.dont_save_figs
-        
+
     # Directories to save output files and figures
     outdir = os.path.join(args.run_dir, "generate_gdds")
     if not unlimited_season_length:
         outdir += ".mxmat"
+    outdir += "." + dt.datetime.now().strftime('%Y-%m-%d-%H%M%S')
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
     outdir_figs = os.path.join(outdir, "figs")
     
     
