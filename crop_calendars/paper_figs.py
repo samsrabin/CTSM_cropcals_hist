@@ -1,5 +1,7 @@
 # %% Setup
 
+all_cases = False
+
 # Import shared functions
 import os
 import sys
@@ -7,16 +9,22 @@ import inspect
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
-from cropcal_module import *
+import cropcal_module as cc
 
 # Import general CTSM Python utilities
+my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
 sys.path.append(my_ctsm_python_gallery)
 import utils
 
-outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures/"
+if all_cases:
+   outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures/"
+else:
+   outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures_main2/"
+if not os.path.exists(outDir_figs):
+   os.mkdir(outDir_figs)
 
 import numpy as np
-from scipy import stats
+from scipy import stats, signal
 import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -26,7 +34,6 @@ from matplotlib import cm
 import datetime as dt
 import re
 import importlib
-from cropcal_module import *
 import pandas as pd
 import cftime
 
@@ -39,305 +46,6 @@ warnings.filterwarnings("ignore", message="This figure includes Axes that are no
 
 
 # %% Define functions
-
-def adjust_grainC(da_in, patches1d_itype_veg_str):
-   # Parameters from Danica's 2020 paper
-   fyield = 0.85 # 85% harvest efficiency (Kucharik & Brye, 2003)
-   cgrain = 0.45 # 45% of dry biomass is C (Monfreda et al., 2008)
-   
-   # Dry matter fraction from Wirsenius (2000) Table A1.II except as noted
-   drymatter_fractions = {
-      'corn': 0.88,
-      'cotton': 0.912, # Table A1.III, "Seed cotton", incl. lint, seed, and "other (ginning waste)"
-      'miscanthus': 0.0,  # Not included in Wirsenius, but also not simulated, so I don't care
-      'rice': 0.87,
-      'soybean': 0.91,
-      'sugarcane': 1-0.745, # Irvine, Cane Sugar Handbook, 10th ed., 1977, P. 16. (see sugarcane.py)
-      'wheat': 0.88,
-   }
-   
-   # Convert patches1d_itype_veg_str to needed format
-   if isinstance(patches1d_itype_veg_str, xr.DataArray):
-      patches1d_itype_veg_str = patches1d_itype_veg_str.values
-   if not isinstance(patches1d_itype_veg_str[0], str):
-      patches1d_itype_veg_int = patches1d_itype_veg_str
-      patches1d_itype_veg_str = [utils.ivt_int2str(x) for x in patches1d_itype_veg_int]
-   
-   # Create new array with patch as the first dimension. This allows us to use Ellipsis when filling.
-   patch_dim = da_in.dims.index('patch')
-   wet_tp = np.full(da_in.shape, np.nan)
-   wet_tp = np.moveaxis(wet_tp, patch_dim, 0)
-   
-   # Fill new array, increasing to include water weight
-   drymatter_cropList = []
-   da_in.load()
-   for thisCrop, dm_frac in drymatter_fractions.items():
-      drymatter_cropList.append(thisCrop)
-      i_thisCrop = [i for i,x in enumerate(patches1d_itype_veg_str) if thisCrop in x]
-      
-      tmp = da_in.isel(patch=i_thisCrop).values
-      if dm_frac != None:
-         tmp /= dm_frac
-      elif np.any(tmp > 0):
-         raise RuntimeError(f"You need to get a real dry-matter fraction for {thisCrop}")
-      
-      # For sugarcane, also account for the fact that sugar is only 43% of dry matter
-      if thisCrop == "sugarcane":
-         tmp /= 1 - 0.43
-      
-      wet_tp[i_thisCrop, ...] = np.moveaxis(tmp, patch_dim, 0)
-   
-   # Move patch dimension (now in 0th position) back to where it should be.
-   wet_tp = np.moveaxis(wet_tp, 0, patch_dim)
-   
-   # Make sure NaN mask is unchanged
-   if not np.array_equal(np.isnan(wet_tp), np.isnan(da_in.values)):
-      missing_croptypes = [x for x in np.unique(patches1d_itype_veg_str) if x not in drymatter_cropList]
-      raise RuntimeError(f'Failed to completely fill wet_tp. Missing crop types: {missing_croptypes}')
-
-   # Save to output DataArray
-   da_out = xr.DataArray(data = wet_tp * fyield / cgrain,
-                         coords = da_in.coords,
-                         attrs = da_in.attrs)
-   return da_out
-
-
-# Rounding errors can result in differences of up to lon/lat_tolerance. Tolerate those by replacing the value in the gridded dataset.
-def adjust_gridded_lonlats(patches1d_lonlat, patches1d_ij, lu_dsg_lonlat_da, this_tolerance, i_or_j_str):
-      missing_lonlats = np.unique(patches1d_lonlat.values[np.isnan(patches1d_ij)])
-      new_gridded_lonlats = lu_dsg_lonlat_da.values
-      for m in missing_lonlats:
-         # Find closest value in gridded lonlat
-         min_diff = np.inf
-         for i, n in enumerate(np.sort(lu_dsg_lonlat_da)):
-            this_diff = n - m
-            if np.abs(this_diff) < min_diff:
-               min_diff = np.abs(this_diff)
-               closest_i = i
-               closest_n = n
-            if this_diff > 0:
-               break
-         if min_diff > this_tolerance:
-            raise ValueError(f"NaN in patches1d_{i_or_j_str}xy; closest value is {min_diff}° off.")
-         print(f"Replacing {m} with {closest_n}")
-         new_gridded_lonlats[closest_i] = closest_n
-         patches1d_ij[patches1d_lonlat.values == m] = closest_i + 1
-      lu_dsg_lonlat_da = xr.DataArray(data = new_gridded_lonlats,
-                                      coords = {"lat": new_gridded_lonlats})
-      return lu_dsg_lonlat_da, patches1d_ij
-
-
-def equalize_colorbars(ims):
-   vmin = np.inf
-   vmax = -np.inf
-   nims = len(ims)
-   for im in ims:
-      vmin = min(vmin, im.get_clim()[0])
-      vmax = max(vmax, im.get_clim()[1])
-   for i in np.arange(nims):
-      ims[i].set_clim(vmin, vmax)
-
-
-def get_ts_prod_clm_yc_da(yield_gd, lu_ds, yearList, cropList_combined_clm):
-
-   # Convert km2 to m2
-   allCropArea = lu_ds.AREA*1e6 * lu_ds.LANDFRAC_PFT * lu_ds.PCT_CROP/100
-
-   # Combined rainfed+irrigated
-   
-   cftList_str_clm = [] # Will fill during loop below
-   cftList_int_clm = [] # Will fill during loop below
-   ts_prod_clm_yc = np.full((Nyears, len(cropList_combined_clm)), 0.0)
-   for c, thisCrop in enumerate(cropList_combined_clm[:-1]):
-      # print(f"{thisCrop}")
-      for pft_str in yield_gd.ivt_str.values:
-         if thisCrop.lower() not in pft_str:
-            continue
-         pft_int = utils.ivt_str2int(pft_str)
-         cftList_str_clm.append(pft_str)
-         cftList_int_clm.append(pft_int)
-         # print(f"{pft_str}: {pft_int}")
-         map_yield_thisCrop_clm = yield_gd.sel(ivt_str=pft_str)
-         map_area_thisCrop_clm = allCropArea * lu_ds.PCT_CFT.sel(cft=pft_int)/100
-         map_prod_thisCrop_clm = map_yield_thisCrop_clm * map_area_thisCrop_clm
-         map_prod_thisCrop_clm = map_prod_thisCrop_clm * 1e-12
-         if map_prod_thisCrop_clm.shape != map_yield_thisCrop_clm.shape:
-            raise RuntimeError(f"Error getting production map {map_yield_thisCrop_clm.dims}: expected shape {map_yield_thisCrop_clm.shape} but got {map_prod_thisCrop_clm.shape}")
-         ts_prod_thisCrop_clm = map_prod_thisCrop_clm.sum(dim=["lon","lat"])
-         ts_prod_clm_yc[:,c] += ts_prod_thisCrop_clm.values
-         # Total
-         ts_prod_clm_yc[:,-1] += ts_prod_thisCrop_clm.values
-         
-   ts_prod_clm_yc_da = xr.DataArray(ts_prod_clm_yc,
-                                    coords={"Year": yearList,
-                                          "Crop": cropList_combined_clm})
-   return ts_prod_clm_yc_da
-
-
-def import_output(filename, myVars, y1=None, yN=None, constantVars=None, myVegtypes=utils.define_mgdcrop_list(), 
-                  sdates_rx_ds=None, gdds_rx_ds=None, verbose=False):
-   
-   # Minimum harvest threshold allowed in PlantCrop()
-   gdd_min = 50
-   
-   # Import
-   this_ds = utils.import_ds(filename,
-                             myVars=myVars,
-                             myVegtypes=myVegtypes)
-   
-   # Trim to years of interest (do not include extra year needed for finishing last growing season)
-   if y1 and yN:
-      this_ds = check_and_trim_years(y1, yN, this_ds)
-   else: # Assume including all growing seasons except last complete one are "of interest"
-      y1 = this_ds.time.values[0].year
-      yN = this_ds.time.values[-1].year - 2
-      this_ds = check_and_trim_years(y1, yN, this_ds)
-      
-   # What vegetation types are included?
-   vegtype_list = [x for x in this_ds.vegtype_str.values if x in this_ds.patches1d_itype_veg_str.values]
-   
-   # Check for consistency among sowing/harvest date/year info
-   date_vars = ["SDATES_PERHARV", "SYEARS_PERHARV", "HDATES", "HYEARS"]
-   all_nan = np.full(this_ds[date_vars[0]].shape, True)
-   all_nonpos = np.full(this_ds[date_vars[0]].shape, True)
-   all_pos = np.full(this_ds[date_vars[0]].shape, True)
-   for v in date_vars:
-      all_nan = all_nan & np.isnan(this_ds[v].values)
-      all_nonpos = all_nonpos & (this_ds[v].values <= 0)
-      all_pos = all_pos & (this_ds[v].values > 0)
-   if np.any(np.bitwise_not(all_nan | all_nonpos | all_pos)):
-      raise RuntimeError("Inconsistent missing/present values on mxharvests axis")
-   
-   # When doing transient runs, it's somehow possible for crops in newly-active patches to be *already alive*. They even have a sowing date (idop)! This will of course not show up in SDATES, but it does show up in SDATES_PERHARV. 
-   # I could put the SDATES_PERHARV dates into where they "should" be, but instead I'm just going to invalidate those "seasons."
-   #
-   # In all but the last calendar year, which patches had no sowing?
-   no_sowing_yp = np.all(np.isnan(this_ds.SDATES.values[:-1,:,:]), axis=1)
-   # In all but the first calendar year, which harvests' jdays are < their sowings' jdays? (Indicates sowing the previous calendar year.)
-   hsdate1_gt_hdate1_yp = this_ds.SDATES_PERHARV.values[1:,0,:] > this_ds.HDATES.values[1:,0,:]
-   # Where both, we have the problem.
-   falsely_alive_yp = no_sowing_yp & hsdate1_gt_hdate1_yp
-   if np.any(falsely_alive_yp):
-      print(f"Warning: {np.sum(falsely_alive_yp)} patch-seasons being ignored: Seemingly sown the year before harvest, but no sowings occurred that year.")
-      falsely_alive_yp = np.concatenate((np.full((1, this_ds.dims["patch"]), False),
-                                       falsely_alive_yp),
-                                       axis=0)
-      falsely_alive_y1p = np.expand_dims(falsely_alive_yp, axis=1)
-      dummy_false_y1p = np.expand_dims(np.full_like(falsely_alive_yp, False), axis=1)
-      falsely_alive_yhp = np.concatenate((falsely_alive_y1p, dummy_false_y1p), axis=1)
-      for v in this_ds.data_vars:
-         if this_ds[v].dims != ("time", "mxharvests", "patch"):
-            continue
-         this_ds[v] = this_ds[v].where(~falsely_alive_yhp)
-         
-   def check_no_negative(this_ds_in, varList_no_negative, which_file, verbose=False):
-      tiny_negOK = 1e-12
-      this_ds = this_ds_in.copy()
-      for v in this_ds:
-         if not any(x in v for x in varList_no_negative):
-            continue
-         the_min = np.nanmin(this_ds[v].values)
-         if the_min < 0:
-            if np.abs(the_min) <= tiny_negOK:
-               if verbose: print(f"Tiny negative value(s) in {v} (abs <= {tiny_negOK}) being set to 0 ({which_file})")
-            else:
-               print(f"WARNING: Unexpected negative value(s) in {v}; minimum {the_min} ({which_file})")
-            values = this_ds[v].copy().values
-            values[np.where((values < 0) & (values >= -tiny_negOK))] = 0
-            this_ds[v] = xr.DataArray(values,
-                                      coords = this_ds[v].coords,
-                                      dims = this_ds[v].dims,
-                                      attrs = this_ds[v].attrs)
-
-         elif verbose:
-            print(f"No negative value(s) in {v}; min {the_min} ({which_file})")
-      return this_ds
-            
-   def check_no_zeros(this_ds, varList_no_zero, which_file):
-      for v in this_ds:
-         if not any(x in v for x in varList_no_zero):
-            continue
-         if np.any(this_ds[v].values == 0):
-            print(f"WARNING: Unexpected zero(s) in {v} ({which_file})")
-         elif verbose:
-            print(f"No zero value(s) in {v} ({which_file})")
-         
-   # Check for no zero values where there shouldn't be
-   varList_no_zero = ["DATE", "YEAR"]
-   check_no_zeros(this_ds, varList_no_zero, "original file")
-   
-   # Check that some things are constant across years
-   if constantVars:
-      t1 = 0 # 0-indexed
-      for v in constantVars:
-         ok = True
-
-         t1_yr = this_ds.gs.values[t1]
-         t1_vals = np.squeeze(this_ds[v].isel(gs=t1).values)
-
-         for t in np.arange(t1+1, this_ds.dims["gs"]):
-            t_yr = this_ds.gs.values[t]
-            t_vals = np.squeeze(this_ds[v].isel(gs=t).values)
-            ok_p = np.squeeze(t1_vals == t_vals)
-            if not np.all(ok_p):
-                  if ok:
-                     print(f"❌ CLM output {v} unexpectedly vary over time:")
-                  ok = False
-                  if verbose:
-                     for thisPatch in np.where(np.bitwise_not(ok_p))[0]:
-                        thisLon = this_ds.patches1d_lon.values[thisPatch]
-                        thisLat = this_ds.patches1d_lat.values[thisPatch]
-                        thisCrop = this_ds.patches1d_itype_veg_str.values[thisPatch]
-                        thisCrop_int = this_ds.patches1d_itype_veg.values[thisPatch]
-                        thisStr = f"   Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop} ({thisCrop_int})"
-                        if v == "SDATES":
-                              print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
-                        else:
-                              print(f"{thisStr}: {t1_yr} {v} {int(t1_vals[thisPatch])}, {t_yr} {v} {int(t_vals[thisPatch])}")
-                  else:
-                     print(f"{v} timestep {t} does not match timestep {t1}")
-
-         if ok:
-            print(f"✅ CLM output {v} do not vary through {this_ds.dims['gs'] - t1} growing seasons of output.")
-   
-   # Convert time*mxharvests axes to growingseason axis
-   this_ds_gs = convert_axis_time2gs(this_ds, verbose=verbose, incl_orig=False)
-   
-   # Get growing season length
-   this_ds["GSLEN_PERHARV"] = get_gs_len_da(this_ds["HDATES"] - this_ds["SDATES_PERHARV"])
-   this_ds_gs["GSLEN"] = get_gs_len_da(this_ds_gs["HDATES"] - this_ds_gs["SDATES"])
-   
-   # Get *biomass* *actually harvested*
-   this_ds["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
-   this_ds["GRAINC_TO_FOOD_PERHARV"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_PERHARV"], this_ds.patches1d_itype_veg_str)
-   this_ds_gs["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
-   this_ds_gs["GRAIN_HARV_TOFOOD"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD"], this_ds.patches1d_itype_veg_str)
-   
-   # Avoid tiny negative values
-   varList_no_negative = ["GRAIN", "REASON", "GDD", "HUI", "YEAR", "DATE", "GSLEN"]
-   this_ds_gs = check_no_negative(this_ds_gs, varList_no_negative, "new file", verbose=verbose)
-   
-   # Check for no zero values where there shouldn't be
-   varList_no_zero = ["REASON", "DATE"]
-   check_no_zeros(this_ds_gs, varList_no_zero, "new file")
-   
-   # Check that e.g., GDDACCUM <= HUI
-   for vars in [["GDDACCUM", "HUI"],
-                ["SYEARS", "HYEARS"]]:
-      if all(v in this_ds_gs for v in vars):
-         check_v0_le_v1(this_ds_gs, vars, both_nan_ok=True, throw_error=True)
-      
-   # Check that prescribed calendars were obeyed
-   if sdates_rx_ds:
-      check_rx_obeyed(vegtype_list, sdates_rx_ds, this_ds, 0, "SDATES")
-   if gdds_rx_ds:
-      check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, 0, "SDATES", "GDDHARV", gdd_min=gdd_min)
-   
-   # Convert time axis to integer year
-   this_ds_gs = this_ds_gs.assign_coords({"time": [t.year for t in this_ds.time_bounds.values[:,0]]})
-   
-   return this_ds_gs
-
 
 def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False): 
    im = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
@@ -389,130 +97,6 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
       return im, None
 
 
-def open_lu_ds(filename, y1, yN, existing_ds):
-   # Open and trim to years of interest
-   ds = xr.open_dataset(filename).sel(time=slice(y1,yN))
-
-   # Assign actual lon/lat coordinates
-   ds = ds.assign_coords(lon=("lsmlon", existing_ds.lon.values),
-                              lat=("lsmlat", existing_ds.lat.values))
-   ds = ds.swap_dims({"lsmlon": "lon",
-                           "lsmlat": "lat"})
-   return ds   
-
-
-def round_lonlats_to_match_da(ds_a, varname_a, tolerance, ds_b=None, varname_b=None):
-   if (ds_b and varname_b) or (not ds_b and not varname_b):
-      raise RuntimeError(f"You must provide one of ds_b or varname_b")
-   elif ds_b:
-      da_a = ds_a[varname_a]
-      da_b = ds_b[varname_a]
-   elif varname_b:
-      da_a = ds_a[varname_a]
-      da_b = ds_a[varname_b]
-      
-   unique_vals_a = np.unique(da_a)
-   unique_vals_b = np.unique(da_b)
-   
-   # Depends on unique values being sorted ascending, which they should be from np.unique().
-   # If calling with one of these being unique values from a coordinate axis, having that be unique_vals_b should avoid large differences due to some coordinate values not being represented in data.
-   def get_diffs(unique_vals_a, unique_vals_b):
-      max_diff = 0
-      y0 = 0
-      diffs = []
-      for x in unique_vals_a:
-         min_diff_fromx = np.inf
-         for i,y in enumerate(unique_vals_b[y0:]):
-            y_minus_x = y-x
-            min_diff_fromx = min(min_diff_fromx, np.abs(y_minus_x))
-            if y_minus_x >= 0:
-               break
-         max_diff = max(max_diff, min_diff_fromx)
-         if min_diff_fromx > 0:
-            diffs.append(min_diff_fromx)
-      return max_diff, diffs
-   
-   max_diff, diffs = get_diffs(unique_vals_a, unique_vals_b)
-   
-   if max_diff > tolerance:
-      new_tolerance = np.ceil(np.log10(max_diff))
-      if new_tolerance > 0:
-         print(len(unique_vals_a))
-         print(unique_vals_a)
-         print(len(unique_vals_b))
-         print(unique_vals_b)
-         print(diffs)
-         raise RuntimeError(f"Maximum disagreement in {varname_a} ({max_diff}) is intolerably large")
-      new_tolerance = 10**new_tolerance
-      if varname_b:
-         print(f"Maximum disagreement between {varname_a} and {varname_b} ({max_diff}) is larger than default tolerance of {tolerance}. Increasing tolerance to {new_tolerance}.")
-      else:
-         print(f"Maximum disagreement in {varname_a} ({max_diff}) is larger than default tolerance of {tolerance}. Increasing tolerance to {new_tolerance}.")
-      tolerance = new_tolerance
-   neglog_tolerance = int(-np.log10(tolerance))
-   
-   da_a = np.round(da_a, neglog_tolerance)
-   da_b = np.round(da_b, neglog_tolerance)
-   
-   def replace_vals(ds, new_da, varname):
-      if len(ds[varname]) != len(new_da):
-         raise RuntimeError(f"Not allowing you to change length of {varname} from {len(ds[varname])} to {len(new_da)}")
-      if varname in ds.coords:
-         ds = ds.assign_coords({varname: new_da.values})
-      elif varname in ds.data_vars:
-         ds[varname] = new_da
-      else:
-         raise TypeError(f"{varname} is not a coordinate or data variable; update round_lonlats_to_match_da()->replace_vals() to handle it")
-      return ds
-   
-   ds_a = replace_vals(ds_a, da_a, varname_a)
-   if ds_b:
-      ds_b = replace_vals(ds_b, da_b, varname_a)
-      return ds_a, ds_b, tolerance
-   else:
-      ds_a = replace_vals(ds_a, da_b, varname_b)
-      return ds_a, tolerance
-
-
-def round_lonlats_to_match_ds(ds_a, ds_b, which_coord, tolerance):
-   tolerance_orig = np.inf
-   i=0
-   max_Nloops = 10
-   while tolerance != tolerance_orig:
-      if i > max_Nloops:
-         raise RuntimeError(f"More than {max_Nloops} loops required in round_lonlats_to_match_ds()")
-      tolerance_orig = tolerance
-      patches_var = "patches1d_" + which_coord
-      if patches_var in ds_a and which_coord in ds_a:
-         ds_a, tolerance = round_lonlats_to_match_da(ds_a, patches_var, tolerance, varname_b=which_coord)
-      if patches_var in ds_b and which_coord in ds_b:
-         ds_b, tolerance = round_lonlats_to_match_da(ds_b, patches_var, tolerance, varname_b=which_coord)
-      if patches_var in ds_a and patches_var in ds_b:
-         ds_a, ds_b, tolerance = round_lonlats_to_match_da(ds_a, patches_var, tolerance, ds_b=ds_b)
-      if which_coord in ds_a and which_coord in ds_b:
-         ds_a, ds_b, tolerance = round_lonlats_to_match_da(ds_a, which_coord, tolerance, ds_b=ds_b)
-   return ds_a, ds_b, tolerance
-
-
-def time_units_and_trim(ds, y1, yN, dt_type):
-   
-   # Convert to dt_type
-   time0 = ds.time.values[0]
-   time0_type = type(time0)
-   if not isinstance(time0, cftime.datetime):
-      if not isinstance(time0, np.integer):
-         raise TypeError(f"Unsure how to convert time of type {time0_type} to cftime.datetime")
-      print(f"Converting integer time to {dt_type}, assuming values are years and each time step is Jan. 1.")
-      ds = ds.assign_coords({"time": [dt_type(x, 1, 1) for x in ds.time.values]})
-   elif not isinstance(time0, dt_type):
-      raise TypeError(f"Expected time axis to be type {dt_type} but got {time0_type}")
-   
-   # Trim
-   ds = ds.sel(time=slice(f"{y1}-01-01", f"{yN}-01-01"))
-      
-   return ds
-
-
 # %% Import model output
 
 y1 = 1961
@@ -522,18 +106,31 @@ Nyears = len(yearList)
 
 # Define cases
 cases = {}
-# A run that someone else did
-cases['cmip6'] = {'filepath': '/Users/Shared/CESM_work/CropEvalData_ssr/danica_timeseries-cmip6_i.e21.IHIST.f09_g17/month_1/ssr_trimmed_annual.nc',
-                  'constantVars': None,
-                  'res': 'f09_g17'}
-# My run with normal CLM code + my outputs
-cases['ctsm5.1.dev092'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013/2022-08-08/cropcals.f19-g17.sdates_perharv.IHistClm50BgcCrop.1950-2013.clm2.h1.1950-01-01-00000.nc',
-                    'constantVars': None,
-                    'res': 'f19_g17'}
+if all_cases:
+   # A run that someone else did
+   cases['cmip6'] = {'filepath': '/Users/Shared/CESM_work/CropEvalData_ssr/danica_timeseries-cmip6_i.e21.IHIST.f09_g17/month_1/ssr_trimmed_annual.nc',
+                     'constantVars': None,
+                     'constantGSs': None,
+                     'res': 'f09_g17'}
+   # My run with normal CLM code + my outputs
+   cases['ctsm5.1.dev092'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1958-2014/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1958-2014.clm2.h1.1958-01-01-00000.nc',
+                              'constantVars': None,
+                              'constantGSs': None,
+                              'res': 'f19_g17'}
 # My run with rx_crop_calendars2 code but CLM calendars
-cases['mycode_clmcals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1950-2013.clm/2022-08-09/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1950-2013.clm.clm2.h1.1950-01-01-00000.nc',
-                    'constantVars': None,
-                    'res': 'f19_g17'}
+cases['mycode_clmcals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1958-2014/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1958-2014.clm2.h1.1958-01-01-00000.nc',
+                           'constantVars': None,
+                           'constantGSs': None,
+                           'res': 'f19_g17'}
+# My run with rx_crop_calendars2 code and GGCMI calendars
+cases['mycode_ggcmicals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced.clm2.h1.1958-01-01-00000.nc',
+                           #   'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced.clm2.h1.1958-01-01-00000.nc',
+                             'constantVars': ["SDATES", "GDDHARV"],
+                             'constantGSs': None, # 'None' with constantVars specified means all should be constant
+                             'res': 'f19_g17',
+                             'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
+                             'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
+                             'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen2/gdds_20220902_114645.nc"}
 
 # Note that _PERHARV will be stripped off upon import
 myVars = ['GRAINC_TO_FOOD_PERHARV', 'GRAINC_TO_FOOD_ANN', 'SDATES', 'SDATES_PERHARV', 'SYEARS_PERHARV', 'HDATES', 'HYEARS', 'GDDHARV_PERHARV', 'GDDACCUM_PERHARV', 'HUI_PERHARV', 'SOWING_REASON_PERHARV', 'HARVEST_REASON_PERHARV']
@@ -548,7 +145,7 @@ for i, (casename, case) in enumerate(cases.items()):
       this_ds = xr.open_dataset(case['filepath'])
 
       # Convert gC/m2 to g/m2 actually harvested
-      this_ds["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds.GRAINC_TO_FOOD, this_ds.patches1d_itype_veg)
+      this_ds["GRAIN_HARV_TOFOOD_ANN"] = cc.adjust_grainC(this_ds.GRAINC_TO_FOOD, this_ds.patches1d_itype_veg)
 
       # Rework to match what we already have
       this_ds = this_ds.assign_coords({"ivt": np.arange(np.min(this_ds.patches1d_itype_veg.values),
@@ -559,12 +156,29 @@ for i, (casename, case) in enumerate(cases.items()):
                                             dims = {"ivt": this_ds.ivt})
 
    else:
-      this_ds = import_output(case['filepath'], myVars=myVars, constantVars=case['constantVars'], 
-                              y1=y1, yN=yN, verbose=verbose_import)
+      this_ds = cc.import_output(case['filepath'], myVars=myVars,
+                                 y1=y1, yN=yN, verbose=verbose_import)
+      
+      bad_patches = cc.check_constant_vars(this_ds, case, ignore_nan=True, constantGSs=case['constantGSs'], verbose=True, throw_error=False)
+      # for p in bad_patches:
+      #    cc.print_gs_table(this_ds.isel(patch=p))
    
    case["ds"] = this_ds
 
+# Get growing season set info   
+gs_values = this_ds.gs.values
+Ngs = len(gs_values)
 
+# Get list of simulated vegetation types
+clm_sim_veg_types = []
+for casename, case in cases.items():
+   case_ds = case['ds']
+   if "SDATES" not in case_ds:
+      continue
+   ever_active = np.where(np.any(case_ds['SDATES'] > 0, axis=1))[0]
+   ivt_str_ever_active = np.unique(case_ds.isel(patch=ever_active)['patches1d_itype_veg_str'].values)
+   clm_sim_veg_types += list(ivt_str_ever_active)
+clm_sim_veg_types = np.unique(clm_sim_veg_types)
 
 
 # %% Import LU data
@@ -579,16 +193,15 @@ reses["f19_g17"] = {"lu_path": "/Users/Shared/CESM_work/CropEvalData_ssr/landuse
 # Import land use to reses dicts
 for i, (resname, res) in enumerate(reses.items()):
    
-   print(f"Importing {resname}...")
-   
    # Find a matching case
    for (_, case) in cases.items():
       if case["res"] == resname:
          break
    if case["res"] != resname:
-      raise RuntimeError(f"No case found with res {resname}")
+      continue
+   print(f"Importing {resname}...")
    
-   res['dsg'] = open_lu_ds(res['lu_path'], y1, yN, case['ds'])
+   res['dsg'] = cc.open_lu_ds(res['lu_path'], y1, yN, case['ds'])
    res['dsg'] = res['dsg'].assign_coords({"time": [cftime.DatetimeNoLeap(y, 1, 1, 0, 0, 0, 0, has_year_zero=True) for y in res['dsg'].time.values]})
    
    res['dsg']['AREA_CFT'] = res['dsg'].AREA*1e6 * res['dsg'].LANDFRAC_PFT * res['dsg'].PCT_CROP/100 * res['dsg'].PCT_CFT/100
@@ -596,7 +209,7 @@ for i, (resname, res) in enumerate(reses.items()):
       
 print("Done importing land use.")
 
-# %%Harmonize LU and cases
+# Harmonize LU and cases
 print("Harmonizing LU data and case datasets:")
 for i, (casename, case) in enumerate(cases.items()):
    print(casename + "...")
@@ -612,12 +225,12 @@ for i, (casename, case) in enumerate(cases.items()):
    # Harmonize lon/lat (round to a high precision but one where float weirdness won't be an issue)
    initial_tolerance = 1e-6
    lu_dsg = reses[case['res']]['dsg'].copy()
-   case_ds, lu_dsg, lon_tolerance = round_lonlats_to_match_ds(case_ds, lu_dsg, "lon", initial_tolerance)
-   case_ds, lu_dsg, lat_tolerance = round_lonlats_to_match_ds(case_ds, lu_dsg, "lat", initial_tolerance)
+   case_ds, lu_dsg, lon_tolerance = cc.round_lonlats_to_match_ds(case_ds, lu_dsg, "lon", initial_tolerance)
+   case_ds, lu_dsg, lat_tolerance = cc.round_lonlats_to_match_ds(case_ds, lu_dsg, "lat", initial_tolerance)
       
    # Ensure that time axes are formatted the same
-   case_ds = time_units_and_trim(case_ds, y1, yN, cftime.DatetimeNoLeap)
-   lu_dsg = time_units_and_trim(lu_dsg, y1, yN, cftime.DatetimeNoLeap)
+   case_ds = cc.time_units_and_trim(case_ds, y1, yN, cftime.DatetimeNoLeap)
+   lu_dsg = cc.time_units_and_trim(lu_dsg, y1, yN, cftime.DatetimeNoLeap)
 
    # Save
    case['ds'] = case_ds
@@ -628,43 +241,58 @@ for i, (casename, case) in enumerate(cases.items()):
 print("Done.")
 
 
+# %% Import GGCMI sowing and harvest dates
+# Minimum harvest threshold allowed in PlantCrop()
+gdd_min = 50
+
+for i, (casename, case) in enumerate(cases.items()):
+   
+   if 'rx_sdates_file' in case:
+      if 'rx_hdates_file' not in case:
+         raise RuntimeError(f'{casename} had prescribed sdates but not hdates?')
+      elif 'rx_gdds_file' not in case:
+         raise RuntimeError(f'{casename} had prescribed s/hdates but not GDDs?')
+      case['rx_sdates_ds'] = cc.import_rx_dates("sdate", case['rx_sdates_file'], case['ds'])
+      case['rx_hdates_ds'] = cc.import_rx_dates("hdate", case['rx_hdates_file'], case['ds'])
+      case['rx_gdds_ds'] = cc.import_rx_dates("gdd", case['rx_gdds_file'], case['ds'])
+      
+      # Equalize lons/lats
+      lonlat_tol = 1e-4
+      for v in ['rx_sdates_ds', 'rx_hdates_ds', 'rx_gdds_ds']:
+         for l in ['lon', 'lat']:
+            max_diff_orig = np.max(np.abs(case[v][l].values - case['ds'][l].values))
+            if max_diff_orig > lonlat_tol:
+               raise RuntimeError(f'{v} {l} values differ too much from {casename} ({max_diff_orig} > {lonlat_tol})')
+            elif max_diff_orig > 0:
+               case[v] = case[v].assign_coords({l: case['ds'][l].values})
+               max_diff = np.max(np.abs(case[v][l].values - case['ds'][l].values))
+               print(f'{v} {l} max_diff {max_diff_orig} → {max_diff}')
+            else:
+               print(f'{v} {l} max_diff {max_diff_orig}')
+      
+      case['rx_gslen_ds'] = case['rx_hdates_ds'].copy()
+      for v in case['rx_gslen_ds']:
+         if v == "time_bounds":
+            continue
+         case['rx_gslen_ds'][v] = cc.get_gs_len_da(case['rx_hdates_ds'][v] - case['rx_sdates_ds'][v])
+         
+      # Check
+      cc.check_rx_obeyed(case['ds'].vegtype_str.values, case['rx_sdates_ds'].isel(time=0), case['ds'], casename, "SDATES")
+      cc.check_rx_obeyed(case['ds'].vegtype_str.values, case['rx_gdds_ds'].isel(time=0), case['ds'], casename, "GDDHARV", gdd_min=gdd_min)
+      
+   elif 'rx_hdates_file' in case:
+      raise RuntimeError(f'{casename} had prescribed hdates but not sdates?')
+   elif 'rx_gdds_file' in case:
+      raise RuntimeError(f'{casename} had prescribed GDDs but not s/hdates?')
+
+
 # %% Get FAO data from CSV
 
 fao_all = pd.read_csv("/Users/sam/Documents/git_repos/CTSM_cropcals_hist/crop_calendar_MATLAB/FAOSTAT_data_6-15-2022.csv")
-fao_all.rename(columns={"Item": "Crop"}, inplace=True, errors="raise") # Because I always confuse Item vs. Element
 
-def get_fao_data(fao_all, element):
-   fao_this = fao_all.copy().query(f"Element == '{element}'")
-
-   # Combine "Maize" and "Maize, green"
-   fao_this.Crop.replace("Maize.*", "Maize", regex=True, inplace=True)
-   fao_this = fao_this.groupby(by=["Crop","Year","Element","Area","Unit"], as_index=False).agg("sum")
-
-   # Pick one rice
-   rice_to_keep = "Rice, paddy"
-   rice_to_drop = "Rice, paddy (rice milled equivalent)"
-   drop_this = [x == rice_to_drop for x in fao_this.Crop]
-   fao_this = fao_this.drop(fao_this[drop_this].index)
-
-   # Convert t to Mt
-   if element == 'Production':
-      fao_this.Value *= 1e-6
-
-   # Pivot and add Total column
-   fao_this = fao_this.copy().pivot(index="Year", columns="Crop", values="Value")
-   fao_this['Total'] = fao_this.sum(numeric_only=True, axis=1)
-
-   # Remove unneeded years
-   fao_this = fao_this.filter(items=np.arange(y1,yN+1), axis=0)
-
-   # Make no-sugarcane version
-   fao_this_nosgc = fao_this.drop(columns = ["Sugar cane", "Total"])
-   fao_this_nosgc['Total'] = fao_this_nosgc.sum(numeric_only=True, axis=1)
-   
-   return fao_this, fao_this_nosgc
-
-fao_prod, fao_prod_nosgc = get_fao_data(fao_all, 'Production')
-fao_area, fao_area_nosgc = get_fao_data(fao_all, 'Area harvested')
+fao_all = cc.fao_data_preproc(fao_all)
+fao_prod, fao_prod_nosgc = cc.fao_data_get(fao_all, 'Production', y1, yN)
+fao_area, fao_area_nosgc = cc.fao_data_get(fao_all, 'Area harvested', y1, yN)
 
 
 # %% Get CLM crop production
@@ -681,7 +309,7 @@ for i, (casename, case) in enumerate(cases.items()):
                                       "lat": lu_dsg.lat})
    case['ds']['GRAIN_HARV_TOFOOD_ANN_GD'] = yield_gd
    
-   case['ds']['ts_prod_yc'] = get_ts_prod_clm_yc_da(yield_gd, lu_dsg, yearList, cropList_combined_clm)
+   case['ds']['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da(yield_gd, lu_dsg, yearList, cropList_combined_clm)
 print("Done gridding.")
 
 
@@ -755,6 +383,45 @@ for v in earthstats['f19_g17']:
 print("Done importing FAO EarthStat.")
 
 
+# %% Import country map and key
+
+# Half-degree countries from Brendan
+countries = xr.open_dataset('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_brendan/gadm0.mask.nc4')
+
+# Nearest-neighbor remap countries to LU resolutions
+for resname, res in reses.items():
+   if 'dsg' not in res:
+      continue
+   res['dsg']['countries'] = utils.lon_idl2pm(countries).interp_like(res['dsg']['AREA'], method='nearest')['gadm0']
+   
+countries_key = pd.read_csv('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_brendan/Nation_ID.csv',
+                               header=None,
+                               names=['num', 'name'])
+
+fao_all_ctry = pd.read_csv("/Users/sam/Documents/git_repos/CTSM_cropcals_hist/crop_calendar_MATLAB/FAOSTAT_data_en_8-21-2022_byCountry.csv")
+fao_all_ctry = cc.fao_data_preproc(fao_all_ctry)
+
+# Replace some countries' names in key to match FAO data
+countries_key = countries_key.replace({'Turkey': 'Türkiye',
+                                       'Vietnam': 'Viet Nam'})
+# Replace some countries' names in FAO data to match key (to keep them short for figs)
+fao_all_ctry = fao_all_ctry.replace({'Bolivia (Plurinational State of)': 'Bolivia',
+                                     'Russian Federation': 'Russia',
+                                     'Syrian Arab Republic': 'Syria'})
+# Rename some countries to keep them short for figs
+countries_key = countries_key.replace({'China': 'China, mld.',   # Because it also has Taiwan
+                                       'United States': 'USA',
+                                       'South Africa': 'S. Africa'})
+fao_all_ctry = fao_all_ctry.replace({'China, mainland': 'China, mld.',
+                                     'United States of America': 'USA',
+                                     'South Africa': 'S. Africa'})
+
+# Make sure every country in map is in key
+for i, x in enumerate(np.unique(countries.gadm0.values)):
+   if not np.isnan(x) and not np.any(countries_key.num.values == x):
+      print(f'❗ {x} not found in key')
+
+
 # %% Compare area, production, and yield of individual crops
 
 # Set up figure
@@ -768,6 +435,8 @@ f_prod, axes_prod = plt.subplots(ny, nx, figsize=figsize)
 axes_prod = axes_prod.flatten()
 f_yield, axes_yield = plt.subplots(ny, nx, figsize=figsize)
 axes_yield = axes_yield.flatten()
+f_yield_dt, axes_yield_dt = plt.subplots(ny, nx, figsize=figsize)
+axes_yield_dt = axes_yield_dt.flatten()
 
 fig_caselist = ["FAOSTAT"]
 this_earthstat_res = "f09_g17"
@@ -801,11 +470,13 @@ def finishup_allcrops_plot(c, ny, nx, axes_this, f_this, suptitle, outDir_figs):
 
    f_this.savefig(outDir_figs + suptitle + " by crop.pdf",
                   bbox_inches='tight')
+   plt.close(f_this)
 
 for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
    ax_area = axes_area[c]
    ax_prod = axes_prod[c]
    ax_yield = axes_yield[c]
+   ax_yield_dt = axes_yield_dt[c]
    
    # FAOSTAT
    if thisCrop_clm == "Total (no sgc)":
@@ -881,20 +552,22 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
    make_1crop_plot(ax_area, ydata_area, fig_caselist, thisCrop_clm, "Mha", y1, yN)
    make_1crop_plot(ax_prod, ydata_prod, fig_caselist, thisCrop_clm, "Mt", y1, yN)
    make_1crop_plot(ax_yield, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", y1, yN)
+   make_1crop_plot(ax_yield_dt, cc.detrend(ydata_yield), fig_caselist, thisCrop_clm, "t/ha", y1, yN)
    
 # Finish up and save
 finishup_allcrops_plot(c, ny, nx, axes_area, f_area, "Global crop area", outDir_figs)
 finishup_allcrops_plot(c, ny, nx, axes_prod, f_prod, "Global crop production", outDir_figs)
-finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outDir_figs)   
+finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outDir_figs)
+finishup_allcrops_plot(c, ny, nx, axes_yield_dt, f_yield_dt, "Global crop yield (detrended)", outDir_figs)
 
 
 # %% Make maps of individual crops (rainfed, irrigated)
 
 # Define reference case, if you want to plot differences
 ref_casename = None
-# ref_casename = 'ctsm5.1.dev092'
+# ref_casename = 'mycode_clmcals'
 
-overwrite = False
+overwrite = True
 
 varList = {
    'GDDHARV': {
@@ -996,6 +669,13 @@ for (this_var, var_info) in varList.items():
       cbar_pos = [0.2, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
       new_sp_bottom = 0.11 # default: 0.1
       new_sp_left = 0.125
+   elif ny == 4:
+      figsize = (22, 16)    # width, height
+      suptitle_xpos = 0.55
+      suptitle_ypos = 1
+      cbar_pos = [0.2, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
+      new_sp_bottom = 0.11 # default: 0.1
+      new_sp_left = 0.125
    else:
       raise ValueError(f"Set up for ny = {ny}")
 
@@ -1047,9 +727,12 @@ for (this_var, var_info) in varList.items():
          
          found_types = [x for x in this_ds.vegtype_str.values if thisCrop_main in x]
 
-         # Grid, if needed
+         # Grid the included vegetation types, if needed
          if "lon" not in this_map.dims:
             this_map = utils.grid_one_variable(this_ds, this_var, vegtype=found_types)
+         # If not, select the included vegetation types
+         else:
+            this_map = this_map.sel(ivt_str=found_types)
             
          # Get mean, set colormap
          units = var_info['units']
@@ -1062,6 +745,7 @@ for (this_var, var_info) in varList.items():
             if plotting_diffs:
                this_map_vals = (this_map - refcase_map).values
                this_map_vals[this_map_vals > 365/2] -= 365
+               this_map_vals[this_map_vals < -365/2] += 365
                this_map = xr.DataArray(data = this_map_vals,
                                        coords = this_map.coords,
                                        attrs = this_map.attrs)
@@ -1109,10 +793,10 @@ for (this_var, var_info) in varList.items():
          cbs.append(cb)
 
       if ref_casename:
-         equalize_colorbars(ims[:nx])
-         equalize_colorbars(ims[nx:])
+         cc.equalize_colorbars(ims[:nx])
+         cc.equalize_colorbars(ims[nx:])
       elif not vrange:
-         equalize_colorbars(ims)
+         cc.equalize_colorbars(ims)
 
       fig.suptitle(suptitle,
                   x = suptitle_xpos,
@@ -1155,3 +839,661 @@ for (this_var, var_info) in varList.items():
       plt.close()
    
 print('Done making maps.')
+
+
+# %% Make scatter plots, FAOSTAT vs. CLM, of top 10 countries for each crop
+
+Ntop = 10
+# top_y1 = 1961 # First year of FAO data
+top_y1 = 1992 # Pre-1992, you start getting USSR, which isn't in map
+top_yN = 2009
+overwrite = True
+portrait = False
+
+which_to_plot = "Yield"
+# which_to_plot = "Detrended yield"
+# which_to_plot = "Yield anomaly"
+
+if portrait:
+   ny = 4
+   nx = 3
+   figsize = (10, 16)
+   suptitle_ypos = 0.91
+else:
+   ny = 3
+   nx = 4
+   figsize = (16, 13)
+   suptitle_ypos = 0.92
+
+topYears = np.arange(top_y1, top_yN+1)
+NtopYears = len(topYears)
+
+
+fao_crops = np.unique(fao_all_ctry.Crop.values)
+for c, thisCrop in enumerate(fao_crops):
+      
+   thisCrop_clm = cc.cropnames_fao2clm(thisCrop)
+   
+   suptitle = f"{thisCrop}, FAOSTAT vs CLM ({top_y1}-{top_yN})"
+   file_prefix = which_to_plot.replace('aly','')
+   fig_outfile = outDir_figs + f"{file_prefix} scatter top 10 " + suptitle + ".pdf"
+   if os.path.exists(fig_outfile) and not overwrite:
+      print(f'   Skipping {thisCrop_out} (file exists).')
+      continue
+   
+   # Get yield datasets
+   topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats)
+   Ntop_global = Ntop + 1
+   
+   if which_to_plot == "Yield":
+      plot_ds = topN_ds
+   elif which_to_plot == "Detrended yield":
+      plot_ds = topN_dt_ds
+   elif which_to_plot == "Yield anomaly":
+      plot_ds = topN_ya_ds
+   else:
+      raise RuntimeError(f"Which dataset should be used for '{which_to_plot}'?")
+
+   f, axes = plt.subplots(ny, nx, figsize=figsize)
+   axes = axes.flatten()
+
+   # mycode_clmcals will have hollow circles if ctsm5.1.dev092 is included
+   i_h = caselist.index('mycode_clmcals')
+
+   for c, country in enumerate(plot_ds.Country.values):
+      
+      # Text describing R-squared changes for each country
+      r2_change_text = ""
+      
+      ax = axes[c]
+      sc = xr.plot.scatter(plot_ds.sel(Country=country),
+                           x='Yield (FAOSTAT)',
+                           y='Yield',
+                           hue='Case',
+                           ax=ax)
+      
+      for case in caselist:
+         lr = stats.linregress(x = plot_ds['Yield (FAOSTAT)'].sel(Country=country),
+                               y = plot_ds['Yield'].sel(Country=country, Case=case))
+         if case == "mycode_clmcals":
+            t = "{r1:.3g} $\\rightarrow$ "
+            r2_change_text += t.format(r1=lr.rvalue**2)
+         elif case == "mycode_ggcmicals":
+            r2_change_text += "{r2:.3g}".format(r2=lr.rvalue**2)
+            
+      # Set title
+      country_bf = ''
+      for w in country.split(' '):
+         country_bf += r'$\bf{' + w + r'}$' + ' '
+      ax.set_title(country_bf + f'($R^2$ {r2_change_text})')
+      
+      # Set mycode_clmcals to have hollow circles if ctsm5.1.dev092 is included
+      if "ctsm5.1.dev092" in caselist:
+         color = sc[i_h].get_facecolor()
+         sc[i_h].set_facecolor('none')
+         sc[i_h].set_edgecolor(color)
+      
+      xlims = list(ax.get_xlim())
+      ylims = list(ax.get_ylim())
+      newlims = [min(xlims[0], ylims[0]), max(xlims[1], ylims[1])]
+      ax.set_xlim(newlims)
+      ax.set_ylim(newlims)
+      # ax.set_aspect('equal')
+      ax.get_legend().remove()
+      ax.set_xlabel(None)
+      ax.set_ylabel(None)
+      if c == Ntop_global-1:
+         ax.legend(bbox_to_anchor=(1.5,0.5), loc='center')
+
+   # Delete unused axes, if any
+   for a in np.arange(c+1, ny*nx):
+      f.delaxes(axes[a])
+      
+   # Add row labels
+   leftmost = np.arange(0, nx*ny, nx)
+   for i, a in enumerate(leftmost):
+      axes[a].set_ylabel(f"{which_to_plot} (CLM)", fontsize=12, fontweight='bold')
+      axes[a].yaxis.set_label_coords(-0.15, 0.5)
+
+   # Add column labels
+   bottommost = np.arange(Ntop_global)[-nx:]
+   bottommost_cols = bottommost % nx
+   for i, a in enumerate(bottommost):
+      ax = axes[a]
+      x = np.mean(ax.get_xlim())
+      y = ax.get_ylim()[0] - 0.2*np.diff(ax.get_ylim()) # 20% below the bottom edge
+      ax.text(x=x, y=y,
+              s=f"{which_to_plot} (FAOSTAT)",
+              fontsize=12,
+              ha='center',
+              fontweight='bold')
+
+   # Add figure title
+   suptitle_xpos = 0.5
+   f.suptitle(suptitle,
+              x = suptitle_xpos,
+              y = suptitle_ypos,
+              fontsize = 18,
+              fontweight='bold')
+
+   # Make square plots
+   for a, ax in enumerate(axes):
+      xlims = list(ax.get_xlim())
+      ylims = list(ax.get_ylim())
+      newlims = [min(xlims[0], ylims[0]), max(xlims[1], ylims[1])]
+      ax.set_xlim(newlims)
+      ax.set_ylim(newlims)
+      ax.set_aspect('equal')
+   
+   # Add 1:1 lines
+   for ax in axes:
+      xlims = list(ax.get_xlim())
+      ylims = list(ax.get_ylim())
+      p1 = min(xlims[0], ylims[0])
+      p2 = min(xlims[1], ylims[1])
+      ax.plot([p1, p2], [p1, p2], 'k--', lw=0.5, alpha=0.5)
+   
+   f.savefig(fig_outfile,
+             bbox_inches='tight', facecolor='white')
+   plt.close()
+   
+   
+# %% Make line plots, FAOSTAT vs. CLM, of top 10 countries for each crop
+
+Ntop = 10
+# top_y1 = 1961 # First year of FAO data
+top_y1 = 1992 # Pre-1992, you start getting USSR, which isn't in map
+top_yN = 2009
+overwrite = True
+portrait = False
+
+# which_to_plot = "Yield"
+# which_to_plot = "Detrended yield"
+which_to_plot = "Yield anomaly"
+
+if portrait:
+   ny = 4
+   nx = 3
+   figsize = (10, 18)
+   suptitle_ypos = 0.91
+else:
+   ny = 3
+   nx = 4
+   figsize = (18, 14)
+   suptitle_ypos = 0.93
+
+topYears = np.arange(top_y1, top_yN+1)
+NtopYears = len(topYears)
+
+legend_members = caselist + ['FAOSTAT']
+
+fao_crops = np.unique(fao_all_ctry.Crop.values)
+for c, thisCrop in enumerate(fao_crops):
+      
+   thisCrop_clm = cc.cropnames_fao2clm(thisCrop)
+   
+   suptitle = f"{thisCrop}, FAOSTAT vs CLM ({top_y1}-{top_yN})"
+   file_prefix = which_to_plot.replace('aly','')
+   fig_outfile = outDir_figs + f"{file_prefix} timeseries top 10 " + suptitle + ".pdf"
+   if os.path.exists(fig_outfile) and not overwrite:
+      print(f'   Skipping {thisCrop_out} (file exists).')
+      continue
+   
+   # Get yield datasets
+   topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats)
+   Ntop_global = Ntop + 1
+   
+   if which_to_plot == "Yield":
+      plot_ds = topN_ds
+   elif which_to_plot == "Detrended yield":
+      plot_ds = topN_dt_ds
+   elif which_to_plot == "Yield anomaly":
+      plot_ds = topN_ya_ds
+   else:
+      raise RuntimeError(f"Which dataset should be used for '{which_to_plot}'?")
+
+   f, axes = plt.subplots(ny, nx, figsize=figsize)
+   axes = axes.flatten()
+
+   # mycode_clmcals will have hollow circles if ctsm5.1.dev092 is included
+   i_h = caselist.index('mycode_clmcals')
+
+   for c, country in enumerate(plot_ds.Country.values):
+      
+      # Text describing R-squared changes for each country
+      r2_change_text = ""
+            
+      ax = axes[c]
+      xr.plot.line(plot_ds['Yield'].sel(Country=country),
+                   hue='Case',
+                   ax=ax)
+      xr.plot.line(plot_ds['Yield (FAOSTAT)'].sel(Country=country),
+                   'k--', ax=ax)
+      
+      for case in caselist:
+         lr = stats.linregress(x = plot_ds['Yield (FAOSTAT)'].sel(Country=country),
+                               y = plot_ds['Yield'].sel(Country=country, Case=case))
+         if case == "mycode_clmcals":
+            t = "{r1:.3g} $\\rightarrow$ "
+            r2_change_text += t.format(r1=lr.rvalue**2)
+         elif case == "mycode_ggcmicals":
+            r2_change_text += "{r2:.3g}".format(r2=lr.rvalue**2)
+            
+      # Set title
+      country_bf = ''
+      for w in country.split(' '):
+         country_bf += r'$\bf{' + w + r'}$' + ' '
+      ax.set_title(country_bf + f'($R^2$ {r2_change_text})')
+      
+      # Set mycode_clmcals to be dashed line if ctsm5.1.dev092 is included
+      if "ctsm5.1.dev092" in caselist:
+         print('Set mycode_clmcals to be dashed line if ctsm5.1.dev092 is included')
+         # color = sc[i_h].get_facecolor()
+         # sc[i_h].set_facecolor('none')
+         # sc[i_h].set_edgecolor(color)
+      
+      # ax.set_aspect('equal')
+      ax.get_legend().remove()
+      ax.set_xlabel(None)
+      ax.set_ylabel(None)
+      if c == Ntop_global-1:
+         ax.legend(legend_members, bbox_to_anchor=(1.5,0.5), loc='center')
+   
+   # Delete unused axes, if any
+   for a in np.arange(c+1, ny*nx):
+      f.delaxes(axes[a])
+      
+   # Add row labels
+   leftmost = np.arange(0, nx*ny, nx)
+   for i, a in enumerate(leftmost):
+      axes[a].set_ylabel(f"{which_to_plot} (CLM)", fontsize=12, fontweight='bold')
+      axes[a].yaxis.set_label_coords(-0.15, 0.5)
+
+   # Add figure title
+   suptitle_xpos = 0.5
+   f.suptitle(suptitle,
+              x = suptitle_xpos,
+              y = suptitle_ypos,
+              fontsize = 18,
+              fontweight='bold')
+   
+   f.savefig(fig_outfile,
+             bbox_inches='tight', facecolor='white')
+   plt.close()
+   
+   
+# %% Compare mean growing season length to GGCMI models
+
+# varList = ["GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.noOutliers", "GSLEN.onlyMature.useMedian"]
+# varList = ["GSLEN"]
+# varList = ["GSLEN.onlyMature"]
+# varList = ["GSLEN.onlyMature.diffExpected"]
+# varList = ["GSLEN.onlyMature.diffExpected.noOutliers"]
+varList = ["GSLEN.onlyMature.diffExpected.useMedian"]
+# varList = ["GSLEN", "GSLEN.onlyMature"]
+# varList = ["GSLEN.onlyMature.noOutliers"]
+# varList = ["GSLEN.onlyMature.useMedian"]
+
+ggcmi_out_topdir = "/Users/Shared/GGCMI/AgMIP.output"
+ggcmi_cropcal_dir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar"
+
+importlib.reload(cc)
+
+y1_ggcmi = 1980
+yN_ggcmi = 2009
+verbose = False
+
+ggcmi_models_orig = ["ACEA", "CROVER", "CYGMA1p74", "DSSAT-Pythia", "EPIC-IIASA", "ISAM", "LDNDC", "LPJ-GUESS", "LPJmL", "pDSSAT", "PEPIC", "PROMET", "SIMPLACE-LINTUL5"]
+Nggcmi_models_orig = len(ggcmi_models_orig)
+
+fontsize = {}
+fontsize['titles'] = 14
+fontsize['axislabels'] = 12
+fontsize['ticklabels'] = 8
+fontsize['suptitle'] = 16
+# bin_width = 30
+bin_width = None
+
+def get_new_filename(pattern):
+   thisFile = glob.glob(pattern)
+   if len(thisFile) > 1:
+      raise RuntimeError(f"Expected at most 1 match of {pattern}; found {len(thisFile)}")
+   return thisFile
+
+def trim_years_ggcmi(y1, yN, ds_in):
+   Ngs = yN - y1 + 1
+   time_units = ds_in.time.attrs["units"]
+   match = re.search("growing seasons since \d+-01-01, 00:00:00", time_units)
+   if not match:
+      raise RuntimeError(f"Can't process time axis '{time_units}'")
+   sinceyear = int(re.search("since \d+", match.group()).group().replace("since ", ""))
+   thisDS_years = ds_in.time.values + sinceyear - 1
+   ds_in = ds_in.isel(time=np.nonzero(np.bitwise_and(thisDS_years>=y1, thisDS_years <= yN))[0])
+   if ds_in.dims["time"] != Ngs:
+      tmp = ds_in.dims["time"]
+      raise RuntimeError(f"Expected {Ngs} matching growing seasons in GGCMI dataset; found {tmp}")
+   return ds_in
+
+ggcmiDS_started = False
+
+Ngs_ggcmi = yN_ggcmi - y1_ggcmi + 1
+gs_ggcmi = np.arange(y1_ggcmi, yN_ggcmi + 1)
+
+for thisVar_orig in varList:
+   thisVar = thisVar_orig
+   
+   # Processing options
+   title_prefix = ""
+   filename_prefix = ""
+   onlyMature = "onlyMature" in thisVar
+   if onlyMature:
+      thisVar = thisVar.replace(".onlyMature", "")
+      title_prefix = title_prefix + " (if mat.)"
+      filename_prefix = filename_prefix + "_ifmature"
+   noOutliers = "noOutliers" in thisVar
+   if noOutliers:
+      thisVar = thisVar.replace(".noOutliers", "")
+      title_prefix = title_prefix + " (no outl.)"
+      filename_prefix = filename_prefix + "_nooutliers"
+   useMedian = "useMedian" in thisVar
+   if useMedian:
+      thisVar = thisVar.replace(".useMedian", "")
+      title_prefix = title_prefix + " (median)"
+      filename_prefix = filename_prefix + "_median"
+   diffExpected = "diffExpected" in thisVar
+   if diffExpected:
+      thisVar = thisVar.replace(".diffExpected", "")
+      filename_prefix = filename_prefix + "_diffExpected"
+
+   ny = 4
+   nx = 5
+   if Nggcmi_models_orig + len(cases) + 2 > ny*nx:
+      raise RuntimeError(f"2 + {Nggcmi_models_orig} GGCMI models + CLM cases ({len(cases)}) > ny*nx ({ny*nx})")
+   vmin = 0.0
+   title_prefix = "Seas. length" + title_prefix
+   filename_prefix = "seas_length_compGGCMI" + filename_prefix
+   if diffExpected:
+      units = "Season length minus expected"
+      cmap = plt.cm.RdBu
+   else:
+      units = "Days"
+      cmap = plt.cm.viridis
+   vmin = None
+   
+   figsize = (16, 8)
+   cbar_adj_bottom = 0.15
+   cbar_ax_rect = [0.15, 0.05, 0.7, 0.025]
+   if nx != 4 or ny != 4:
+      print(f"Since (nx,ny) = ({nx},{ny}), you may need to rework some parameters")
+
+   for v, vegtype_str in enumerate(clm_sim_veg_types):
+      
+      if "corn" in vegtype_str:
+         vegtype_str_ggcmi = "mai"
+      elif "rice" in vegtype_str:
+         vegtype_str_ggcmi = "ri1" # Ignoring ri2, which isn't simulated in CLM yet
+      elif "soybean" in vegtype_str:
+         vegtype_str_ggcmi = "soy"
+      elif "spring_wheat" in vegtype_str:
+         vegtype_str_ggcmi = "swh"
+      # elif "winter_wheat" in vegtype_str:
+      #    vegtype_str_ggcmi = "wwh"
+      else:
+         print(f"{thisVar}: Skipping {vegtype_str}.")
+         continue
+      print(f"{thisVar}: {vegtype_str}...")
+      if "irrigated" in vegtype_str:
+         irrtype_str_ggcmi = "firr"
+      else:
+         irrtype_str_ggcmi = "noirr"
+      ncvar = f"matyday-{vegtype_str_ggcmi}-{irrtype_str_ggcmi}"
+      vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+      
+      # Get variations on vegtype string
+      vegtype_str_paramfile = cc.get_vegtype_str_paramfile(vegtype_str)
+      vegtype_str_title = cc.get_vegtype_str_for_title(vegtype_str)
+      vegtype_str_figfile = cc.get_vegtype_str_figfile(vegtype_str)
+      
+      # Import GGCMI outputs
+      ggcmi_models_bool = np.full((Nggcmi_models_orig,), False)
+      for g, thisModel in enumerate(ggcmi_models_orig):
+         
+         # Only need to import each variable once
+         if ggcmiDS_started and ncvar in ggcmiDS:
+               did_read = False
+               break
+         did_read = True
+         
+         # Open file
+         pattern = os.path.join(ggcmi_out_topdir, thisModel, "phase3a", "gswp3-w5e5", "obsclim", vegtype_str_ggcmi, f"*{ncvar}*")
+         thisFile = glob.glob(pattern)
+         if not thisFile:
+               if verbose:
+                  print(f"{ncvar}: Skipping {thisModel}")
+               continue
+         elif len(thisFile) != 1:
+               raise RuntimeError(f"Expected 1 match of {pattern}; found {len(thisFile)}")
+         thisDS = xr.open_dataset(thisFile[0], decode_times=False)
+         ggcmi_models_bool[g] = True
+         
+         # Set up GGCMI Dataset
+         if not ggcmiDS_started:
+               ggcmiDS = xr.Dataset(coords={"gs": gs_values,
+                                            "lat": thisDS.lat,
+                                            "lon": thisDS.lon,
+                                            "model": ggcmi_models_orig,
+                                            "cft": clm_sim_veg_types})
+               ggcmiDS_started = True
+         
+         # Set up DataArray for this crop-irr
+         if g==0:
+            matyday_da = xr.DataArray(data=np.full((Ngs_ggcmi,
+                                                   thisDS.dims["lat"],
+                                                   thisDS.dims["lon"],
+                                                   Nggcmi_models_orig
+                                                   ),
+                                                   fill_value=np.nan),
+                                      coords=[(gs_ggcmi)] + [ggcmiDS.coords[x] for x in ["lat", "lon", "model"]])
+         
+         # Get just the seasons you need
+         thisDS = trim_years_ggcmi(y1_ggcmi, yN_ggcmi, thisDS)
+         thisDA = thisDS[ncvar]
+         
+         # Pre-filtering
+         thisMax = np.nanmax(thisDA.values)
+         if thisMax > 10**19:
+            if verbose:
+               print(f"Warning: {ncvar}: {thisModel}: Max {thisMax} (before filtering); setting values >1e19 to NaN")
+            thisDA.values[np.where(thisDA.values > 10**19)] = np.nan
+         thisMax = np.nanmax(thisDA.values)
+         highMax = thisMax > 366
+         if highMax and verbose:
+            print(f"Warning: {ncvar}: {thisModel}: Max {thisMax} (before filtering)")
+         
+         # Figure out which seasons to include
+         if highMax:
+            filterVar = "maturityindex"
+            thisFile = get_new_filename(pattern.replace("matyday", filterVar))
+            filter_str = None
+            if thisFile:
+               filterDS = xr.open_dataset(thisFile[0], decode_times=False)
+               filterDS = trim_years_ggcmi(y1_ggcmi, yN_ggcmi, filterDS)
+               filter_str = f"(after filtering by {filterVar} == 1)"
+               thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] == 1)
+            else:
+               filterVar = "maturitystatus"
+               thisFile = get_new_filename(pattern.replace("matyday", filterVar))
+               if thisFile:
+                  filterDS = xr.open_dataset(thisFile[0], decode_times=False)
+                  filterDS = trim_years_ggcmi(y1_ggcmi, yN_ggcmi, filterDS)
+                  filter_str = f"(after filtering by {filterVar} >= 1)"
+                  thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] >= 1)
+               else:
+                  filterVar = "yield"
+                  thisFile = get_new_filename(pattern.replace("matyday", filterVar))
+                  if thisFile:
+                     filterDS = xr.open_dataset(thisFile[0], decode_times=False)
+                     filterDS = trim_years_ggcmi(y1_ggcmi, yN_ggcmi, filterDS)
+                     filter_str = f"(after filtering by {filterVar} > 0)"
+                     thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] > 0)
+            if not filter_str:
+               filter_str = "(after no filtering)"
+            thisMax = np.nanmax(thisDA.values)
+            if thisMax > 366:
+               if verbose:
+                  print(f"Warning: {ncvar}: {thisModel}: Max {thisMax} {filter_str}; setting values > 364 to NaN")
+               thisDA.values[np.where(thisDA.values > 364)] = np.nan
+                  
+         # Only include cell-seasons with positive yield
+         filterVar = "yield"
+         thisFile = get_new_filename(pattern.replace("matyday", filterVar))
+         if thisFile:
+            filterDS = xr.open_dataset(thisFile[0], decode_times=False)
+            filterDS = trim_years_ggcmi(y1_ggcmi, yN_ggcmi, filterDS)
+            thisDA = thisDA.where(filterDS[ncvar.replace("matyday", filterVar)] > 0)
+               
+         # Don't include cell-years with growing season length < 50 (how Jonas does his: https://ebi-forecast.igb.illinois.edu/ggcmi/issues/421#note-5)
+         this_matyday_array = thisDA.values
+         this_matyday_array[np.where(this_matyday_array < 50)] = np.nan
+         
+         # Rework time axis
+         thisMin = np.nanmin(this_matyday_array)
+         if thisMin < 0:
+            if verbose:
+               print(f"{thisModel}: {ncvar}: Setting negative matyday values (min = {thisMin}) to NaN")
+            this_matyday_array[np.where(this_matyday_array < 0)] = np.nan
+         matyday_da[:,:,:,g] = this_matyday_array
+      
+      if did_read:
+         ggcmiDS[ncvar] = matyday_da
+         ggcmiDS[f"{ncvar}-inclmodels"] = matyday_da = xr.DataArray( \
+            data=ggcmi_models_bool,
+            coords={"model": ggcmiDS.coords["model"]})
+      ggcmiDA = ggcmiDS[ncvar].copy()
+      
+      # If needed, remove outliers
+      if noOutliers:
+         ggcmiDA = cc.remove_outliers(ggcmiDA)
+         
+      # Get summary statistic
+      if useMedian:
+         ggcmiDA_mn = ggcmiDA.median(axis=0)
+      else:
+         ggcmiDA_mn = np.mean(ggcmiDA, axis=0)
+      
+      # If you want to remove models that didn't actually simulate this crop-irr, do that here.
+      # For now, it just uses the entire list.
+      Nggcmi_models = Nggcmi_models_orig
+      ggcmi_models = ggcmi_models_orig
+      
+      # Get GGCMI expected
+      if irrtype_str_ggcmi=="noirr":
+         tmp_rfir_token = "rf"
+      else:
+         tmp_rfir_token = "ir"
+      thisFile = os.path.join(ggcmi_cropcal_dir, f"{vegtype_str_ggcmi}_{tmp_rfir_token}_ggcmi_crop_calendar_phase3_v1.01.nc4")
+      ggcmiExpDS = xr.open_dataset(thisFile)
+      ggcmiExp_gslen_yx = ggcmiExpDS["growing_season_length"] / np.timedelta64(1, 'D')
+      
+      # Get maps from CLM sims
+      gslen_ds = xr.Dataset()
+      clmExp_gslen_ds = xr.Dataset()
+      for casename, case in cases.items():
+         case_ds = case['ds']
+         
+         thisCrop1_gridded = utils.grid_one_variable(case_ds, thisVar, vegtype=vegtype_int).squeeze(drop=True)
+         
+         # If needed, only include seasons where crop reached maturity
+         if onlyMature:
+            thisCrop1_gridded = cc.mask_immature(case_ds, vegtype_int, thisCrop1_gridded)
+               
+         # If needed, remove outliers
+         if noOutliers:
+            thisCrop1_gridded = cc.remove_outliers(thisCrop1_gridded)
+               
+         # Get summary statistic
+         if useMedian:
+            gslen_yx = thisCrop1_gridded.median(axis=0)
+         else:
+            gslen_yx = np.mean(thisCrop1_gridded, axis=0)
+         
+         # Save Dataset
+         gslen_ds[casename] = gslen_yx
+         
+         # Save prescribed crops
+         if 'rx_gslen_ds' in case:
+            if len(clmExp_gslen_ds.dims) > 0:
+               raise RuntimeError('Need to amend figure code to allow for multiple prescribed GS lengths')
+            clmExp_gslen_yx = case['rx_gslen_ds'][f"gs1_{vegtype_int}"].isel(time=0, drop=True)
+            clmExp_gslen_yx = clmExp_gslen_yx.where(np.bitwise_not(np.isnan(gslen_yx)))
+            clmExp_gslen_ds['map2'] = clmExp_gslen_yx
+      
+      
+      # Set up figure
+      importlib.reload(cc)
+      fig = plt.figure(figsize=figsize)
+      subplot_title_suffixes = ["", ""]
+      ims = []
+      
+      # Plot CLM cases
+      for i, (casename, case) in enumerate(cases.items()):
+         gslen_yx = gslen_ds[casename]
+         
+         if diffExpected:
+            map1_yx = gslen_yx - clmExp_gslen_ds['map2']
+         else:
+            map1_yx = gslen_yx
+                  
+         ax = cc.make_axis(fig, ny, nx, i+1)
+         im = make_map(ax, map1_yx, fontsize, this_title=casename, lonlat_bin_width=bin_width, cmap=cmap)
+         ims.append(im[0])
+      
+      if not diffExpected:
+         ax = cc.make_axis(fig, ny, nx, i+2)
+         im = make_map(ax, clmExp_gslen_yx, fontsize, this_title="CLM expected", lonlat_bin_width=bin_width, cmap=cmap)
+         ims.append(im[0])
+         
+         ax = cc.make_axis(fig, ny, nx, i+3)
+         im = make_map(ax, clmExp_gslen_yx, fontsize, this_title="GGCMI expected", lonlat_bin_width=bin_width, cmap=cmap)
+         ims.append(im[0])
+      
+      # Plot GGCMI outputs
+      if diffExpected:
+         ggcmiDA_mn_plot = ggcmiDA_mn - ggcmiExp_gslen_yx
+      else:
+         ggcmiDA_mn_plot = ggcmiDA_mn
+      for g in np.arange(Nggcmi_models):
+         ggcmi_yx = ggcmiDA_mn_plot.isel(model=g, drop=True)
+         if verbose: print(f'{ggcmi_models[g]} map ranges {np.nanmin(ggcmi_yx.values)} to {np.nanmax(ggcmi_yx.values)}')
+         ax = cc.make_axis(fig, ny, nx, 3+g+len(caselist))
+         if not np.any(~np.isnan(ggcmi_yx.values)):
+            ax.set_title(ggcmi_models[g], fontsize=fontsize['titles'])
+            continue
+         im = make_map(ax, ggcmi_yx, fontsize, this_title=ggcmi_models[g], lonlat_bin_width=bin_width, cmap=cmap)
+         ims.append(im[0])
+      
+      cc.equalize_colorbars(ims, center0=diffExpected)
+      
+      suptitle = f"{title_prefix}: {vegtype_str_title} ({y1_ggcmi}-{yN_ggcmi})"
+      fig.suptitle(suptitle, y=0.95, fontsize=fontsize['titles']*2.2)
+      fig.subplots_adjust(bottom=cbar_adj_bottom)
+      
+      cbar_ax = fig.add_axes(cbar_ax_rect)
+      cbar = fig.colorbar(ims[0], cax=cbar_ax, orientation="horizontal")
+      cbar_ax.tick_params(labelsize=fontsize['ticklabels']*2)
+      
+      plt.xlabel(units, fontsize=fontsize['titles']*2)
+      
+      plt.subplots_adjust(wspace=0, hspace=0.3)
+      
+      # weinrueruebr
+      # plt.show()
+      # break
+      
+      # Save
+      outfile = os.path.join(outDir_figs, f"{filename_prefix}_{vegtype_str_figfile}.png")
+      plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+               bbox_inches='tight')
+      plt.close()
+
+# %%

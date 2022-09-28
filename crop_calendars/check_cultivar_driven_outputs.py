@@ -19,18 +19,22 @@ my_clm_ver = 51
 my_clm_subver = "c211112"
 
 # Prescribed sowing and harvest dates
-sdates_rx_file = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
+# sdates_rx_file = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
 # hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.nc"
 # gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220331_144207.nc"
-hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.20220602_230029.nc"
-gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220602_231239.nc"
+# hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.20220602_230029.nc"
+# gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220602_231239.nc"
+sdates_rx_file = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
+hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
+# gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220820_163845.nc"
+gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen2/gdds_20220902_114645.nc"
 
 # Directory where model output file(s) can be found (figure files will be saved in subdir here)
 indirs = list()
-indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/",
-                   used_clm_mxmat = True,
-                   used_rx_sdate = False,
-                   used_rx_harvthresh = False))
+# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/",
+#                    used_clm_mxmat = True,
+#                    used_rx_sdate = False,
+#                    used_rx_harvthresh = False))
 # indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-gddforced/",
 #                    used_clm_mxmat = True,
 #                    used_rx_sdate = True,
@@ -38,10 +42,20 @@ indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-05-orig/",
 # indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37/2022-04-11-gddforced/",
 # indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220601.03.ba902039.gddforced/",
 # indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220606.4d9cfa0e.gddforced/",
-indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220610.299035.gddforced/",
+# indirs.append(dict(path="/Users/Shared/CESM_runs/f10_f10_mg37_20220530/20220610.299035.gddforced/",
+#                    used_clm_mxmat = False,
+#                    used_rx_sdate = True,
+#                    used_rx_harvthresh = True))
+indirs.append(dict(path="/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1958-2014/",
+                   used_clm_mxmat = True,
+                   used_rx_sdate = False,
+                   used_rx_harvthresh = False,
+                   landuse_varies = True))
+indirs.append(dict(path="/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/",
                    used_clm_mxmat = False,
                    used_rx_sdate = True,
-                   used_rx_harvthresh = True))
+                   used_rx_harvthresh = True,
+                   landuse_varies = True))
 
 ggcmi_out_topdir = "/Users/Shared/GGCMI/AgMIP.output"
 ggcmi_cropcal_dir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar"
@@ -56,7 +70,7 @@ import inspect
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
-from cropcal_module import *
+import cropcal_module as cc
 
 import numpy as np
 from scipy import stats
@@ -71,6 +85,7 @@ from matplotlib import cm
 import datetime as dt
 import nc_time_axis
 import re
+import importlib
 
 sys.path.append(my_ctsm_python_gallery)
 import utils
@@ -119,77 +134,23 @@ def make_map(ax, this_map, this_title, ylabel, vmin, vmax, bin_width, fontsize_t
     return im1
 
 
-# Get vegtype str for figure titles
-def get_vegtype_str_for_title(vegtype_str_in):
-    vegtype_str_out = vegtype_str_in
-    if "irrigated" in vegtype_str_in:
-        vegtype_str_out = vegtype_str_out.replace("irrigated_", "") + " (ir)"
-    else:
-        vegtype_str_out = vegtype_str_out + " (rf)"
-    if "temperate" in vegtype_str_in:
-        vegtype_str_out = vegtype_str_out.replace("temperate_", "temp. ")
-    if "tropical" in vegtype_str_in:
-        vegtype_str_out = vegtype_str_out.replace("tropical_", "trop. ")
-    elif "soybean" in vegtype_str_in:
-        vegtype_str_out = "temp. " + vegtype_str_out
-    if "soybean" in vegtype_str_in:
-        vegtype_str_out = vegtype_str_out.replace("soybean", "soy")
-    if "spring" in vegtype_str_in:
-        vegtype_str_out = vegtype_str_out.replace("spring_", "spr. ")
-    if "winter" in vegtype_str_in:
-        vegtype_str_out = vegtype_str_out.replace("winter_", "win.")
-    return vegtype_str_out
-
-def remove_outliers(gridded_da):
-    gs_axis = gridded_da.dims.index("gs")
-    pctle25 = np.nanpercentile(gridded_da, q=25, axis=gs_axis)
-    pctle75 = np.nanpercentile(gridded_da, q=75, axis=gs_axis)
-    iqr = pctle75 - pctle25
-    outlier_thresh_lo = pctle25 - iqr
-    outlier_thresh_up = pctle75 - iqr
-    not_outlier = np.bitwise_and(gridded_da > outlier_thresh_lo, gridded_da < outlier_thresh_up)
-    gridded_da = gridded_da.where(not_outlier)
-    return gridded_da
-
-def get_vegtype_str_paramfile(vegtype_str_in):
-    # Get vegtype str used in parameter file
-    if vegtype_str_in == "soybean":
-        vegtype_str_out = "temperate_soybean"
-    elif vegtype_str_in == "irrigated_soybean":
-        vegtype_str_out = "irrigated_temperate_soybean"
-    else:
-        vegtype_str_out = vegtype_str_in
-    return vegtype_str_out
-
-def get_vegtype_str_figfile(vegtype_str_in):
-    vegtype_str_out = vegtype_str_in
-    if "soybean" in vegtype_str_in and "tropical" not in vegtype_str_in:
-        vegtype_str_out = vegtype_str_out.replace("soybean", "temperate_soybean")
-    for t in ["winter", "spring", "temperate", "tropical"]:
-        if t in vegtype_str_out:
-            vegtype_str_out = vegtype_str_out.replace(f"{t}_", "") + f"_{t}"
-    if "irrigated" in vegtype_str_out:
-        vegtype_str_out = vegtype_str_out.replace("irrigated_", "") + "_ir"
-    else:
-        vegtype_str_out = vegtype_str_out + "_rf"
-    return vegtype_str_out
-
-
 # %% Import output sowing and harvest dates, etc.
 
 print("Importing CLM output sowing and harvest dates...")
 
-myVars = ["SDATES", "HDATES", "GDDACCUM_PERHARV", "GDDHARV_PERHARV", "HARVEST_REASON_PERHARV", "HUI_PERHARV"]
+myVars = ["SDATES", "HDATES", "GDDACCUM_PERHARV", "GDDHARV_PERHARV", "HARVEST_REASON_PERHARV", "HUI_PERHARV", "SDATES_PERHARV"]
 
-dates_ds1_orig = utils.import_ds(glob.glob(indirs[1]["path"] + "*h2.*"), \
-    myVars=myVars + ["GRAINC_TO_FOOD_ACCUM_PERHARV"], 
-    myVegtypes=utils.define_mgdcrop_list())
-dates_ds1_orig = check_and_trim_years(y1, yN, dates_ds1_orig)
-
-dates_ds0_orig = utils.import_ds(glob.glob(indirs[0]["path"] + "*h2.*"), \
+dates_ds1_orig = utils.import_ds(glob.glob(indirs[1]["path"] + "*h1.*"), \
     myVars=myVars, 
-    myVegtypes=utils.define_mgdcrop_list())
-dates_ds0_orig = check_and_trim_years(y1, yN, dates_ds0_orig)
+    myVegtypes=utils.define_mgdcrop_list(),
+    myVars_missing_ok="SDATES_PERHARV")
+dates_ds1_orig = cc.check_and_trim_years(y1, yN, dates_ds1_orig)
+
+dates_ds0_orig = utils.import_ds(glob.glob(indirs[0]["path"] + "*h1.*"), \
+    myVars=myVars, 
+    myVegtypes=utils.define_mgdcrop_list(),
+    myVars_missing_ok="SDATES_PERHARV")
+dates_ds0_orig = cc.check_and_trim_years(y1, yN, dates_ds0_orig)
 
 # How many growing seasons can we use? Ignore last season because it can be incomplete for some gridcells.
 Ngs = dates_ds1_orig.dims['time'] - 1
@@ -216,75 +177,44 @@ print("Done.")
 
 # Import GGCMI sowing and harvest dates
 
-sdates_rx_ds = import_rx_dates("sdate", sdates_rx_file, dates_ds0_orig)
-hdates_rx_ds = import_rx_dates("hdate", hdates_rx_file, dates_ds0_orig)
-gdds_rx_ds = import_rx_dates("gdd", gdds_rx_file, dates_ds0_orig)
+sdates_rx_ds = cc.import_rx_dates("sdate", sdates_rx_file, dates_ds0_orig)
+hdates_rx_ds = cc.import_rx_dates("hdate", hdates_rx_file, dates_ds0_orig)
+gdds_rx_ds = cc.import_rx_dates("gdd", gdds_rx_file, dates_ds0_orig)
 
 gs_len_rx_ds = hdates_rx_ds.copy()
 for v in gs_len_rx_ds:
     if v == "time_bounds":
         continue
-    gs_len_rx_ds[v] = get_gs_len_da(hdates_rx_ds[v] - sdates_rx_ds[v])
+    gs_len_rx_ds[v] = cc.get_gs_len_da(hdates_rx_ds[v] - sdates_rx_ds[v])
 
 
 # Align output sowing and harvest dates/etc.
-
-dates_ds0 = convert_axis_time2gs(dates_ds0_orig, myVars=myVars)
-dates_ds1 = convert_axis_time2gs(dates_ds1_orig, myVars=myVars + ["GRAINC_TO_FOOD_ACCUM_PERHARV"])
+dates_ds0 = cc.convert_axis_time2gs(dates_ds0_orig, myVars=myVars)
+dates_ds1 = cc.convert_axis_time2gs(dates_ds1_orig, myVars=myVars)
 
 # Get growing season length
-dates_ds0["GSLEN"] = get_gs_len_da(dates_ds0["HDATES"] - dates_ds0["SDATES"])
-dates_ds1["GSLEN"] = get_gs_len_da(dates_ds1["HDATES"] - dates_ds1["SDATES"])
+dates_ds0["GSLEN"] = cc.get_gs_len_da(dates_ds0["HDATES"] - dates_ds0["SDATES"])
+dates_ds1["GSLEN"] = cc.get_gs_len_da(dates_ds1["HDATES"] - dates_ds1["SDATES"])
 
 
-# Check that some things are constant across years for ds1
+#%% Check that some things are constant across years for ds1
 
-constantVars = ["SDATES", "GDDHARV_PERHARV"]
+constantVars = ["SDATES", "GDDHARV"]
 verbose = True
 
-t1 = 0 # 0-indexed
-for v in constantVars:
-    ok = True
-
-    t1_yr = dates_ds1.gs.values[t1]
-    t1_vals = np.squeeze(dates_ds1[v].isel(gs=t1).values)
-
-    for t in np.arange(t1+1, dates_ds1.dims["gs"]):
-        t_yr = dates_ds1.gs.values[t]
-        t_vals = np.squeeze(dates_ds1[v].isel(gs=t).values)
-        ok_p = np.squeeze(t1_vals == t_vals)
-        if not np.all(ok_p):
-            if ok:
-                print(f"❌ dates_ds1: CLM output {v} unexpectedly vary over time:")
-            ok = False
-            if verbose:
-                for thisPatch in np.where(np.bitwise_not(ok_p))[0]:
-                    thisLon = dates_ds1.patches1d_lon.values[thisPatch]
-                    thisLat = dates_ds1.patches1d_lat.values[thisPatch]
-                    thisCrop = dates_ds1.patches1d_itype_veg_str.values[thisPatch]
-                    thisCrop_int = dates_ds1.patches1d_itype_veg.values[thisPatch]
-                    thisStr = f"   Patch {thisPatch} (lon {thisLon} lat {thisLat}) {thisCrop} ({thisCrop_int})"
-                    if v == "SDATES":
-                        print(f"{thisStr}: Sowing {t1_yr} jday {int(t1_vals[thisPatch])}, {t_yr} jday {int(t_vals[thisPatch])}")
-                    else:
-                        print(f"{thisStr}: {t1_yr} {v} {int(t1_vals[thisPatch])}, {t_yr} {v} {int(t_vals[thisPatch])}")
-            else:
-                print(f"{v} timestep {t} does not match timestep {t1}")
-
-    if ok:
-        print(f"✅ dates_ds1: CLM output {v} do not vary through {dates_ds1.dims['gs'] - t1} growing seasons of output.")
+importlib.reload(cc)
+bad_patches = cc.check_constant_vars(dates_ds1, constantVars,
+                                     ignore_nan=indirs[1]['landuse_varies'])
 
 
-# For both datasets, check that GDDACCUM_PERHARV <= HUI_PERHARV
+# %% For both datasets, check that GDDACCUM_PERHARV <= HUI_PERHARV
 
-verbose = True
-
-
-check_gddaccum_le_hui(dates_ds0, " dates_ds0: ")
-check_gddaccum_le_hui(dates_ds1, " dates_ds1: ")
+cc.check_v0_le_v1(dates_ds0, ["GDDACCUM", "HUI"], msg_txt=" dates_ds0: ", both_nan_ok=indirs[0]['landuse_varies'])
+cc.check_v0_le_v1(dates_ds1, ["GDDACCUM", "HUI"], msg_txt=" dates_ds1: ", both_nan_ok=indirs[0]['landuse_varies'])
 
 
-# Check that prescribed sowing dates were obeyed
+
+# %% Check that prescribed sowing dates were obeyed
 
 if "time" in sdates_rx_ds.dims:
     if sdates_rx_ds.dims["time"] > 1:
@@ -296,18 +226,21 @@ if "time" in sdates_rx_ds.dims:
     
 
 if indirs[0]["used_rx_sdate"]:
-    check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds0, 0, "SDATES")
+    cc.check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds0, "dates_ds0", "SDATES")
 if indirs[1]["used_rx_sdate"]:
-    check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds1, 1, "SDATES")
+    cc.check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds1, "dates_ds1", "SDATES")
 if indirs[0]["used_rx_harvthresh"]:
-    check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds0, 0, "GDDHARV_PERHARV", gdd_min=gdd_min)
+    cc.check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds0, "dates_ds0", "GDDHARV", gdd_min=gdd_min)
 if indirs[1]["used_rx_harvthresh"]:
-    check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds1, 1, "GDDHARV_PERHARV", gdd_min=gdd_min)
+    cc.check_rx_obeyed(vegtype_list, gdds_rx_ds, dates_ds1, "dates_ds1", "GDDHARV", gdd_min=gdd_min)
     
 
 # %% Make map of harvest reasons
 
-thisVar = "HARVEST_REASON_PERHARV"
+if "HARVEST_REASON_PERHARV" in "dates_ds0":
+    thisVar = "HARVEST_REASON_PERHARV"
+else:
+    thisVar = "HARVEST_REASON"
 
 reason_list_text_all = [ \
     "???",                 # 0; should never actually be saved
@@ -321,9 +254,9 @@ reason_list_text_all = [ \
     ]
 
 reason_list = np.unique(np.concatenate( \
-    (np.unique(dates_ds0.HARVEST_REASON_PERHARV.values), \
-    np.unique(dates_ds1.HARVEST_REASON_PERHARV.values))))
-reason_list = [int(x) for x in reason_list]
+    (np.unique(dates_ds0[thisVar].values), \
+    np.unique(dates_ds1[thisVar].values))))
+reason_list = [int(x) for x in reason_list if not np.isnan(x)]
 
 reason_list_text = [reason_list_text_all[x] for x in reason_list]
 
@@ -347,12 +280,14 @@ elif nx != 2:
     print(f"Since nx = {nx}, you may need to rework some parameters")
 
 for v, vegtype_str in enumerate(vegtype_list):
+    if 'winter' in vegtype_str or 'miscanthus' in vegtype_str:
+        continue
     print(f"{thisVar}: {vegtype_str}...")
     vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
     
     # Get variations on vegtype string
-    vegtype_str_title = get_vegtype_str_for_title(vegtype_str)
-    vegtype_str_figfile = get_vegtype_str_figfile(vegtype_str)
+    vegtype_str_title = cc.get_vegtype_str_for_title(vegtype_str)
+    vegtype_str_figfile = cc.get_vegtype_str_figfile(vegtype_str)
     
     # Grid
     thisCrop0_gridded = utils.grid_one_variable(dates_ds0, thisVar, \
@@ -368,13 +303,13 @@ for v, vegtype_str in enumerate(vegtype_list):
         reason_text = reason_list_text[f]
         
         ylabel = "CLM5-style" if f==0 else None
-        map0_yx = get_reason_freq_map(Ngs, thisCrop0_gridded, reason)
-        ax = make_axis(fig, ny, nx, f+1)
+        map0_yx = cc.get_reason_freq_map(Ngs, thisCrop0_gridded, reason)
+        ax = cc.make_axis(fig, ny, nx, f+1)
         im0 = make_map(ax, map0_yx, f"v0: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
         ylabel = "GGCMI-style" if f==0 else None
-        ax = make_axis(fig, ny, nx, f+nx+1)
-        map1_yx = get_reason_freq_map(Ngs, thisCrop1_gridded, reason)
+        ax = cc.make_axis(fig, ny, nx, f+nx+1)
+        map1_yx = cc.get_reason_freq_map(Ngs, thisCrop1_gridded, reason)
         im1 = make_map(ax, map1_yx, f"v1: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
     fig.suptitle(f"Harvest reason: {vegtype_str_title}")
@@ -400,7 +335,7 @@ for v, vegtype_str in enumerate(vegtype_list):
 
 # %% Make map of means 
 
-# varList = ["GDDHARV_PERHARV", "HUI_PERHARV", "HUI_PERHARV.onlyMature", "GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.useMedian", "SDATES", "HDATES.onlyMature"]
+varList = ["GSLEN.onlyMature.useMedian", "GDDHARV_PERHARV", "HUI_PERHARV", "HUI_PERHARV.onlyMature", "GSLEN", "GSLEN.onlyMature", "SDATES", "HDATES.onlyMature"]
 # varList = ["GDDHARV_PERHARV"]
 # varList = ["HUI_PERHARV"]
 # varList = ["GSLEN"]
@@ -409,7 +344,10 @@ for v, vegtype_str in enumerate(vegtype_list):
 # varList = ["GSLEN.onlyMature.noOutliers"]
 # varList = ["GSLEN.onlyMature.useMedian"]
 # varList = ["SDATES", "HDATES.onlyMature"]
-varList = ["SDATES"]
+# varList = ["SDATES"]
+
+varList2 = [v.replace('_PERHARV','') for v in varList if v not in dates_ds0]
+varList = varList2
 
 vertical = False
 
@@ -442,12 +380,12 @@ for thisVar in varList:
     nx = 1
     vmin = 0.0
     cmap = plt.cm.viridis
-    if thisVar == "GDDHARV_PERHARV":
+    if 'GDDHARV' in thisVar:
         title_prefix = "Harv. thresh." + title_prefix
         filename_prefix = "harvest_thresh" + filename_prefix
         ny = 3
         units = "GDD"
-    elif thisVar == "HUI_PERHARV":
+    elif 'HUI' in thisVar:
         title_prefix = "HUI @harv." + title_prefix
         filename_prefix = "hui" + filename_prefix
         ny = 3
@@ -504,13 +442,17 @@ for thisVar in varList:
     nplots = nx*ny
 
     for v, vegtype_str in enumerate(vegtype_list):
+        
+        if "winter" in vegtype_str or "miscanthus" in vegtype_str:
+            continue
+        
         print(f"{thisVar}: {vegtype_str}...")
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         
         # Get variations on vegtype string
-        vegtype_str_paramfile = get_vegtype_str_paramfile(vegtype_str)
-        vegtype_str_title = get_vegtype_str_for_title(vegtype_str)
-        vegtype_str_figfile = get_vegtype_str_figfile(vegtype_str)
+        vegtype_str_paramfile = cc.get_vegtype_str_paramfile(vegtype_str)
+        vegtype_str_title = cc.get_vegtype_str_for_title(vegtype_str)
+        vegtype_str_figfile = cc.get_vegtype_str_figfile(vegtype_str)
         
         # Grid
         thisCrop0_gridded = utils.grid_one_variable(dates_ds0, thisVar, \
@@ -520,13 +462,13 @@ for thisVar in varList:
         
         # If needed, only include seasons where crop reached maturity
         if onlyMature:
-            thisCrop0_gridded = mask_immature(dates_ds0, vegtype_int, thisCrop0_gridded)
-            thisCrop1_gridded = mask_immature(dates_ds1, vegtype_int, thisCrop1_gridded)
+            thisCrop0_gridded = cc.mask_immature(dates_ds0, vegtype_int, thisCrop0_gridded)
+            thisCrop1_gridded = cc.mask_immature(dates_ds1, vegtype_int, thisCrop1_gridded)
             
         # If needed, remove outliers
         if noOutliers:
-            thisCrop0_gridded = remove_outliers(thisCrop0_gridded)
-            thisCrop1_gridded = remove_outliers(thisCrop1_gridded)
+            thisCrop0_gridded = cc.remove_outliers(thisCrop0_gridded)
+            thisCrop1_gridded = cc.remove_outliers(thisCrop1_gridded)
             
         # Get summary statistic
         if useMedian:
@@ -579,9 +521,9 @@ for thisVar in varList:
                     cmap_to_mxmat = plt.cm.viridis(np.linspace(0, 1, num=Nok))
                     cmap_after_mxmat = plt.cm.OrRd(np.linspace(0, 1, num=Nbad))
                     cmap = mcolors.LinearSegmentedColormap.from_list('my_colormap', np.vstack((cmap_to_mxmat, cmap_after_mxmat)))
-            elif thisVar in ["HUI_PERHARV", "GDDHARV_PERHARV", "SDATES", "HDATES"]:
+            elif thisVar in ["HUI_PERHARV", "GDDHARV_PERHARV", "HUI", "GDDHARV", "SDATES", "HDATES"]:
                 thisVar_rx = f"gs1_{vegtype_int}"
-                if thisVar in ["HUI_PERHARV", "GDDHARV_PERHARV"]:
+                if thisVar in ["HUI_PERHARV", "GDDHARV_PERHARV", "HUI", "GDDHARV"]:
                     this_rx_ds = gdds_rx_ds
                 elif thisVar == "SDATES":
                     this_rx_ds = sdates_rx_ds
@@ -602,18 +544,18 @@ for thisVar in varList:
                 raise RuntimeError(f"thisVar {thisVar} not recognized: Setting up third plot")
         
         ylabel = "CLM5-style"
-        ax = make_axis(fig, ny, nx, 1)
+        ax = cc.make_axis(fig, ny, nx, 1)
         im0 = make_map(ax, map0_yx, f"v0{subplot_title_suffixes[0]}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
         ylabel = "GGCMI-style"
-        ax = make_axis(fig, ny, nx, 2)
+        ax = cc.make_axis(fig, ny, nx, 2)
         im1 = make_map(ax, map1_yx, f"v1{subplot_title_suffixes[1]}", ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
         
         if nplots == 3:
-            ax = make_axis(fig, ny, nx, 3)
+            ax = cc.make_axis(fig, ny, nx, 3)
             if thisVar == "GSLEN":
                 tmp_title = f"GGCMI (max={max2})"
-            elif thisVar in ["HUI_PERHARV", "GDDHARV_PERHARV", "SDATES"]:
+            elif thisVar in ["HUI_PERHARV", "GDDHARV_PERHARV", "HUI", "GDDHARV", "SDATES"]:
                 tmp_title = "Prescribed"
             elif thisVar == "HDATES":
                 tmp_title = "GGCMI"
@@ -740,8 +682,8 @@ for thisVar_orig in varList:
             vegtype_str_ggcmi = "soy"
         elif "spring_wheat" in vegtype_str:
             vegtype_str_ggcmi = "swh"
-        elif "winter_wheat" in vegtype_str:
-            vegtype_str_ggcmi = "wwh"
+        # elif "winter_wheat" in vegtype_str:
+        #     vegtype_str_ggcmi = "wwh"
         else:
             continue
         print(f"{thisVar}: {vegtype_str}...")
@@ -753,9 +695,9 @@ for thisVar_orig in varList:
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         
         # Get variations on vegtype string
-        vegtype_str_paramfile = get_vegtype_str_paramfile(vegtype_str)
-        vegtype_str_title = get_vegtype_str_for_title(vegtype_str)
-        vegtype_str_figfile = get_vegtype_str_figfile(vegtype_str)
+        vegtype_str_paramfile = cc.get_vegtype_str_paramfile(vegtype_str)
+        vegtype_str_title = cc.get_vegtype_str_for_title(vegtype_str)
+        vegtype_str_figfile = cc.get_vegtype_str_figfile(vegtype_str)
         
         # Import GGCMI outputs
         ggcmi_models_bool = np.full((Nggcmi_models_orig,), False)
@@ -894,12 +836,12 @@ for thisVar_orig in varList:
         
         # If needed, only include seasons where crop reached maturity
         if onlyMature:
-            thisCrop1_gridded = mask_immature(dates_ds1, vegtype_int, thisCrop1_gridded)
+            thisCrop1_gridded = cc.mask_immature(dates_ds1, vegtype_int, thisCrop1_gridded)
             
         # If needed, remove outliers
         if noOutliers:
-            thisCrop1_gridded = remove_outliers(thisCrop1_gridded)
-            ggcmiDA = remove_outliers(ggcmiDA)
+            thisCrop1_gridded = cc.remove_outliers(thisCrop1_gridded)
+            ggcmiDA = cc.remove_outliers(ggcmiDA)
             
         # Get summary statistic
         if useMedian:
@@ -936,19 +878,19 @@ for thisVar_orig in varList:
             max3 = int(np.ceil(np.nanmax(map3_yx)))
             vmax = max(max1, max2, max3, np.nanmax(ggcmiDA_mn.values))
         
-        ax = make_axis(fig, ny, nx, 1)
+        ax = cc.make_axis(fig, ny, nx, 1)
         im1 = make_map(ax, map1_yx, "CLM", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
         
         if not diffExpected:
-            ax = make_axis(fig, ny, nx, 2)
+            ax = cc.make_axis(fig, ny, nx, 2)
             im1 = make_map(ax, map2_yx, "CLM expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
             
-            ax = make_axis(fig, ny, nx, 3)
+            ax = cc.make_axis(fig, ny, nx, 3)
             im1 = make_map(ax, map3_yx, "GGCMI expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
         
         for g in np.arange(Nggcmi_models):
             ggcmi_yx = ggcmiDA_mn.isel(model=g, drop=True)
-            ax = make_axis(fig, ny, nx, 3+g+1)
+            ax = cc.make_axis(fig, ny, nx, 3+g+1)
             im1 = make_map(ax, ggcmi_yx, ggcmi_models[g], "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
             
         fig.suptitle(f"{title_prefix}: {vegtype_str_title}", y=0.95, fontsize=fontsize_titles*2.2)
@@ -970,29 +912,29 @@ for thisVar_orig in varList:
         plt.close()
 
 
-# %% Grid a variable and save to netCDF
+# # %% Grid a variable and save to netCDF
 
-thisVar = "GRAINC_TO_FOOD_ACCUM_PERHARV"
+# thisVar = "GRAINC_TO_FOOD_ACCUM_PERHARV"
 
-outdir_nc = os.path.join(indirs[1]["path"], "netcdfs")
-if not os.path.exists(outdir_nc):
-    os.makedirs(outdir_nc)
+# outdir_nc = os.path.join(indirs[1]["path"], "netcdfs")
+# if not os.path.exists(outdir_nc):
+#     os.makedirs(outdir_nc)
 
-for v, vegtype_str in enumerate(vegtype_list):
-    print(f"{thisVar}: {vegtype_str}...")
-    vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
-    thisCrop_gridded = utils.grid_one_variable(dates_ds1, thisVar, \
-            vegtype=vegtype_int).squeeze(drop=True)
-    thisCrop_gridded = thisCrop_gridded.rename(vegtype_str)
-    thisCrop_gridded = utils.lon_pm2idl(thisCrop_gridded)
+# for v, vegtype_str in enumerate(vegtype_list):
+#     print(f"{thisVar}: {vegtype_str}...")
+#     vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+#     thisCrop_gridded = utils.grid_one_variable(dates_ds1, thisVar, \
+#             vegtype=vegtype_int).squeeze(drop=True)
+#     thisCrop_gridded = thisCrop_gridded.rename(vegtype_str)
+#     thisCrop_gridded = utils.lon_pm2idl(thisCrop_gridded)
     
-    if v==0:
-        out_ds = thisCrop_gridded.to_dataset()
-    else:
-        out_ds[vegtype_str] = thisCrop_gridded
+#     if v==0:
+#         out_ds = thisCrop_gridded.to_dataset()
+#     else:
+#         out_ds[vegtype_str] = thisCrop_gridded
 
-outFile = os.path.join(outdir_nc, thisVar+".nc")
-out_ds.to_netcdf(outFile)
+# outFile = os.path.join(outdir_nc, thisVar+".nc")
+# out_ds.to_netcdf(outFile)
 
 
 
