@@ -123,14 +123,22 @@ cases['mycode_clmcals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3
                            'constantGSs': None,
                            'res': 'f19_g17'}
 # My run with rx_crop_calendars2 code and GGCMI calendars
-cases['mycode_ggcmicals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced.clm2.h1.1958-01-01-00000.nc',
-                           #   'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced.clm2.h1.1958-01-01-00000.nc',
+# cases['mycode_ggcmicals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced.clm2.h1.1958-01-01-00000.nc',
+#                            #   'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced.clm2.h1.1958-01-01-00000.nc',
+#                              'constantVars': ["SDATES", "GDDHARV"],
+#                              'constantGSs': None, # 'None' with constantVars specified means all should be constant
+#                              'res': 'f19_g17',
+#                              'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
+#                              'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
+#                              'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen2/gdds_20220902_114645.nc"}
+cases['mycode_ggcmicals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3.clm2.h1.1958-01-01-00000.nc',
                              'constantVars': ["SDATES", "GDDHARV"],
                              'constantGSs': None, # 'None' with constantVars specified means all should be constant
                              'res': 'f19_g17',
                              'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
                              'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
-                             'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen2/gdds_20220902_114645.nc"}
+                             'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/gdds_20220927_174954.nc"}
+
 
 # Note that _PERHARV will be stripped off upon import
 myVars = ['GRAINC_TO_FOOD_PERHARV', 'GRAINC_TO_FOOD_ANN', 'SDATES', 'SDATES_PERHARV', 'SYEARS_PERHARV', 'HDATES', 'HYEARS', 'GDDHARV_PERHARV', 'GDDACCUM_PERHARV', 'HUI_PERHARV', 'SOWING_REASON_PERHARV', 'HARVEST_REASON_PERHARV']
