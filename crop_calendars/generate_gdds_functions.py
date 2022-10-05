@@ -17,6 +17,7 @@ import warnings
 import os
 import glob
 import cftime
+import datetime as dt
 
 
 def check_sdates(dates_ds, sdates_rx, verbose=False):
@@ -151,11 +152,10 @@ def yp_list_to_ds(yp_list, daily_ds, incl_vegtypes_str, dates_rx, longname_prefi
 
 def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str_in, h1_ds_file):
     print(f'netCDF year {thisYear}...')
+    print(dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     
     # Get h2 file (list)
-    if indir[-1] != os.path.sep:
-        indir = indir + os.path.sep
-    h2_pattern = indir + "*h2.*"
+    h2_pattern = os.path.join(indir, "*h2.*")
     h2_filelist = glob.glob(h2_pattern)
     if not h2_filelist:
         raise RuntimeError(f"No files found matching pattern: {h2_pattern}")
@@ -302,12 +302,14 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
     myVars = [clm_gdd_var]
     if save_figs and not gddharv_in_h3:
         myVars.append("GDDHARV")
-    h1_ds = utils.import_ds(glob.glob(indir + f"*h1.{thisYear-1}-01-01*"), myVars=myVars, myVegtypes=utils.define_mgdcrop_list(), myVars_missing_ok=['GDDHARV'])
+    pattern = os.path.join(indir, f"*h1.{thisYear-1}-01-01*")
+    h1_ds = utils.import_ds(glob.glob(pattern), myVars=myVars, myVegtypes=utils.define_mgdcrop_list(), myVars_missing_ok=['GDDHARV'])
     if save_figs and 'GDDHARV' not in h1_ds:
         if not gddharv_in_h3:
             print('Trying to get GDDHARV from h3 file(s) instead.')
         try:
-            h3_ds = utils.import_ds(glob.glob(indir + f"*h3.{thisYear-1}-01-01*"), myVars=['GDDHARV'], myVegtypes=utils.define_mgdcrop_list())
+            pattern = os.path.join(indir, f"*h3.{thisYear-1}-01-01*")
+            h3_ds = utils.import_ds(glob.glob(pattern), myVars=['GDDHARV'], myVegtypes=utils.define_mgdcrop_list())
             h1_ds['GDDHARV'] = h3_ds['GDDHARV']
             if not gddharv_in_h3:
                 print('Success! Will look in h3 files from now on.')
@@ -377,11 +379,12 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
             patches += list(thisCrop_gddaccum_da.patch.values[here])
             i_patches += list(here)
             i_times += list(np.full((len(here),), int(hdate-1)))
-        # Sort patches back to correct order
+        # Sort back to correct order
         if not np.all(thisCrop_gddaccum_da.patch.values[:-1] <= thisCrop_gddaccum_da.patch.values[1:]):
             raise RuntimeError("This code depends on DataArray patch list being sorted.")
         sortorder = np.argsort(patches)
         i_patches = list(np.array(i_patches)[np.array(sortorder)])
+        i_times = list(np.array(i_times)[np.array(sortorder)])
         # Select using the indexing tuple
         gddaccum_atharv_p = thisCrop_gddaccum_da.values[(i_times, i_patches)]
         if save_figs: gddharv_atharv_p = thisCrop_gddharv_da.values[(i_times, i_patches)]

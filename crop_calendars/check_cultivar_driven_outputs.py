@@ -27,7 +27,7 @@ my_clm_subver = "c211112"
 sdates_rx_file = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
 hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
 # gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220820_163845.nc"
-gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen2/gdds_20220902_114645.nc"
+gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/gdds_20220927_174954.nc"
 
 # Directory where model output file(s) can be found (figure files will be saved in subdir here)
 indirs = list()
@@ -51,7 +51,7 @@ indirs.append(dict(path="/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-
                    used_rx_sdate = False,
                    used_rx_harvthresh = False,
                    landuse_varies = True))
-indirs.append(dict(path="/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/",
+indirs.append(dict(path="/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3/",
                    used_clm_mxmat = False,
                    used_rx_sdate = True,
                    used_rx_harvthresh = True,
@@ -346,7 +346,7 @@ varList = ["GSLEN.onlyMature.useMedian", "GDDHARV_PERHARV", "HUI_PERHARV", "HUI_
 # varList = ["SDATES", "HDATES.onlyMature"]
 # varList = ["SDATES"]
 
-varList2 = [v.replace('_PERHARV','') for v in varList if v not in dates_ds0]
+varList2 = [v.replace('_PERHARV','') if v not in dates_ds0 else v for v in varList]
 varList = varList2
 
 vertical = False
@@ -667,6 +667,7 @@ for thisVar_orig in varList:
     vmin = None
     
     figsize = (16, 8)
+    # figsize = (40, 20)
     cbar_adj_bottom = 0.15
     cbar_ax_rect = [0.15, 0.05, 0.7, 0.025]
     if nx != 4 or ny != 4:

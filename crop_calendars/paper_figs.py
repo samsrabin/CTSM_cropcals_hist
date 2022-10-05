@@ -1,6 +1,6 @@
 # %% Setup
 
-all_cases = False
+all_cases = True
 
 # Import shared functions
 import os
@@ -113,24 +113,32 @@ if all_cases:
                      'constantGSs': None,
                      'res': 'f09_g17'}
    # My run with normal CLM code + my outputs
-   cases['ctsm5.1.dev092'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1958-2014/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1958-2014.clm2.h1.1958-01-01-00000.nc',
-                              'constantVars': None,
-                              'constantGSs': None,
-                              'res': 'f19_g17'}
+   cases['Original baseline'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1958-2014/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1958-2014.clm2.h1.1958-01-01-00000.nc',
+                                 'constantVars': None,
+                                 'constantGSs': None,
+                                 'res': 'f19_g17'}
 # My run with rx_crop_calendars2 code but CLM calendars
-cases['mycode_clmcals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1958-2014/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1958-2014.clm2.h1.1958-01-01-00000.nc',
-                           'constantVars': None,
-                           'constantGSs': None,
-                           'res': 'f19_g17'}
+cases['New baseline'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1958-2014/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1958-2014.clm2.h1.1958-01-01-00000.nc',
+                         'constantVars': None,
+                         'constantGSs': None,
+                         'res': 'f19_g17'}
 # My run with rx_crop_calendars2 code and GGCMI calendars
-cases['mycode_ggcmicals'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced.clm2.h1.1958-01-01-00000.nc',
-                           #   'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced.clm2.h1.1958-01-01-00000.nc',
+# cases['Prescribed calendars'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced.clm2.h1.1958-01-01-00000.nc',
+#                            #   'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced.clm2.h1.1958-01-01-00000.nc',
+#                              'constantVars': ["SDATES", "GDDHARV"],
+#                              'constantGSs': None, # 'None' with constantVars specified means all should be constant
+#                              'res': 'f19_g17',
+#                              'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
+#                              'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
+#                              'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen2/gdds_20220902_114645.nc"}
+cases['Prescribed calendars'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3.clm2.h1.1958-01-01-00000.nc',
                              'constantVars': ["SDATES", "GDDHARV"],
                              'constantGSs': None, # 'None' with constantVars specified means all should be constant
                              'res': 'f19_g17',
                              'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
                              'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
-                             'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen2/gdds_20220902_114645.nc"}
+                             'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/gdds_20220927_174954.nc"}
+
 
 # Note that _PERHARV will be stripped off upon import
 myVars = ['GRAINC_TO_FOOD_PERHARV', 'GRAINC_TO_FOOD_ANN', 'SDATES', 'SDATES_PERHARV', 'SYEARS_PERHARV', 'HDATES', 'HYEARS', 'GDDHARV_PERHARV', 'GDDACCUM_PERHARV', 'HUI_PERHARV', 'SOWING_REASON_PERHARV', 'HARVEST_REASON_PERHARV']
@@ -565,7 +573,7 @@ finishup_allcrops_plot(c, ny, nx, axes_yield_dt, f_yield_dt, "Global crop yield 
 
 # Define reference case, if you want to plot differences
 ref_casename = None
-# ref_casename = 'mycode_clmcals'
+# ref_casename = 'New baseline'
 
 overwrite = True
 
@@ -897,8 +905,8 @@ for c, thisCrop in enumerate(fao_crops):
    f, axes = plt.subplots(ny, nx, figsize=figsize)
    axes = axes.flatten()
 
-   # mycode_clmcals will have hollow circles if ctsm5.1.dev092 is included
-   i_h = caselist.index('mycode_clmcals')
+   # New baseline will have hollow circles if Original baseline is included
+   i_h = caselist.index('New baseline')
 
    for c, country in enumerate(plot_ds.Country.values):
       
@@ -915,10 +923,10 @@ for c, thisCrop in enumerate(fao_crops):
       for case in caselist:
          lr = stats.linregress(x = plot_ds['Yield (FAOSTAT)'].sel(Country=country),
                                y = plot_ds['Yield'].sel(Country=country, Case=case))
-         if case == "mycode_clmcals":
+         if case == "New baseline":
             t = "{r1:.3g} $\\rightarrow$ "
             r2_change_text += t.format(r1=lr.rvalue**2)
-         elif case == "mycode_ggcmicals":
+         elif case == "Prescribed calendars":
             r2_change_text += "{r2:.3g}".format(r2=lr.rvalue**2)
             
       # Set title
@@ -927,8 +935,8 @@ for c, thisCrop in enumerate(fao_crops):
          country_bf += r'$\bf{' + w + r'}$' + ' '
       ax.set_title(country_bf + f'($R^2$ {r2_change_text})')
       
-      # Set mycode_clmcals to have hollow circles if ctsm5.1.dev092 is included
-      if "ctsm5.1.dev092" in caselist:
+      # Set New baseline to have hollow circles if Original baseline is included
+      if "Original baseline" in caselist:
          color = sc[i_h].get_facecolor()
          sc[i_h].set_facecolor('none')
          sc[i_h].set_edgecolor(color)
@@ -1055,8 +1063,8 @@ for c, thisCrop in enumerate(fao_crops):
    f, axes = plt.subplots(ny, nx, figsize=figsize)
    axes = axes.flatten()
 
-   # mycode_clmcals will have hollow circles if ctsm5.1.dev092 is included
-   i_h = caselist.index('mycode_clmcals')
+   # New baseline will have hollow circles if Original baseline is included
+   i_h = caselist.index('New baseline')
 
    for c, country in enumerate(plot_ds.Country.values):
       
@@ -1073,10 +1081,10 @@ for c, thisCrop in enumerate(fao_crops):
       for case in caselist:
          lr = stats.linregress(x = plot_ds['Yield (FAOSTAT)'].sel(Country=country),
                                y = plot_ds['Yield'].sel(Country=country, Case=case))
-         if case == "mycode_clmcals":
+         if case == "New baseline":
             t = "{r1:.3g} $\\rightarrow$ "
             r2_change_text += t.format(r1=lr.rvalue**2)
-         elif case == "mycode_ggcmicals":
+         elif case == "Prescribed calendars":
             r2_change_text += "{r2:.3g}".format(r2=lr.rvalue**2)
             
       # Set title
@@ -1085,9 +1093,9 @@ for c, thisCrop in enumerate(fao_crops):
          country_bf += r'$\bf{' + w + r'}$' + ' '
       ax.set_title(country_bf + f'($R^2$ {r2_change_text})')
       
-      # Set mycode_clmcals to be dashed line if ctsm5.1.dev092 is included
-      if "ctsm5.1.dev092" in caselist:
-         print('Set mycode_clmcals to be dashed line if ctsm5.1.dev092 is included')
+      # Set New baseline to be dashed line if Original baseline is included
+      if "Original baseline" in caselist:
+         print('Set New baseline to be dashed line if Original baseline is included')
          # color = sc[i_h].get_facecolor()
          # sc[i_h].set_facecolor('none')
          # sc[i_h].set_edgecolor(color)
