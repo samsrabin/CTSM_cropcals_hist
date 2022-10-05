@@ -33,7 +33,7 @@ warnings.filterwarnings("ignore", message="Iteration over multi-part geometries 
 
 def main(argv):
 
-    help_string = "generate_gdds.py -r <run-dir> -s <sdates-file> -h <hdates-file> -1 <first-season> -N <last-season> [--no-save-figs]"
+    help_string = "generate_gdds.py -r <run-dir> -s <sdates-file> -h <hdates-file> -1 <first-season> -N <last-season> [--no-save-figs --preprocessed]"
 
     ###############################
     ### Process input arguments ###
@@ -46,8 +46,9 @@ def main(argv):
     sdate_inFile = None
     hdate_inFile = None
     save_figs = True
+    preprocessed = False
     try:
-        opts, args = getopt.getopt(argv, "r:1:n:N:s:h:", ["run-dir", "first-season", "last-season", "sdates-file", "hdates-file", "help", "no-save-figs"])
+        opts, args = getopt.getopt(argv, "r:1:n:N:s:h:", ["run-dir", "first-season", "last-season", "sdates-file", "hdates-file", "help", "no-save-figs", "preprocessed"])
     except getopt.GetoptError:
         print(help_string)
         print("Error parsing arguments. Probably an incorrect option specified?")
@@ -73,6 +74,8 @@ def main(argv):
                 print("Do not specify both --overwrite and --no-overwrite")
                 sys.exit(1)
             overwrite = 1
+        elif opt == "--preprocessed":
+            preprocessed = True
 
     # Check arguments
     if not indir:
@@ -92,167 +95,174 @@ def main(argv):
         print("You must provide both -1/--first-season and -N/--last-season")
         sys.exit(2)
     
-    # Directory to save output files
+    # Directories to save output files and figures
     outdir = os.path.join(indir, "generate_gdds")
+    outdir_figs = os.path.join(outdir, "figs")
     
     
     ##########################
     ### Import and process ###
     ##########################
     
-    # Keep 1 extra year to avoid incomplete final growing season for crops harvested after Dec. 31.
-    y1_import_str = f"{y1+1}-01-01"
-    yN_import_str = f"{yN+2}-01-01"
+    if not preprocessed:
     
-    print(f"Importing netCDF time steps {y1_import_str} through {yN_import_str} (years are +1 because of CTSM output naming)")
-    
-    pickle_file = os.path.join(outdir, f'{y1}-{yN}.pickle')
-    h1_ds_file = os.path.join(outdir, f'{y1}-{yN}.h1_ds.nc')
-    if os.path.exists(pickle_file):
-        with open(pickle_file, 'rb') as f:
-            y1, yN, pickle_year, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = pickle.load(f)
-        print(f'Will resume import at {pickle_year+1}')
-        h1_ds = None
-    else:
-        incorrectly_daily = False
-        skip_patches_for_isel_nan_lastyear = np.ndarray([])
-        gddharv_in_h3 = False
-        pickle_year = -np.inf
-        gddaccum_yp_list = []
-        gddharv_yp_list = []
-        incl_vegtypes_str = None
-        lastYear_active_patch_indices_list = None
-    sdates_rx = sdate_inFile
-    hdates_rx = hdate_inFile
-    
-    for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
+        # Keep 1 extra year to avoid incomplete final growing season for crops harvested after Dec. 31.
+        y1_import_str = f"{y1+1}-01-01"
+        yN_import_str = f"{yN+2}-01-01"
         
-        if thisYear <= pickle_year:
-            continue
+        print(f"Importing netCDF time steps {y1_import_str} through {yN_import_str} (years are +1 because of CTSM output naming)")
         
-        h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = gddfn.import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str, h1_ds_file)
-         
-        print(f'   Saving pickle file ({pickle_file})...')
-        with open(pickle_file, 'wb') as f:
-            pickle.dump([y1, yN, thisYear, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings], f, protocol=-1)
+        pickle_file = os.path.join(outdir, f'{y1}-{yN}.pickle')
+        h1_ds_file = os.path.join(outdir, f'{y1}-{yN}.h1_ds.nc')
+        if os.path.exists(pickle_file):
+            with open(pickle_file, 'rb') as f:
+                y1, yN, pickle_year, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = pickle.load(f)
+            print(f'Will resume import at {pickle_year+1}')
+            h1_ds = None
+        else:
+            incorrectly_daily = False
+            skip_patches_for_isel_nan_lastyear = np.ndarray([])
+            gddharv_in_h3 = False
+            pickle_year = -np.inf
+            gddaccum_yp_list = []
+            gddharv_yp_list = []
+            incl_vegtypes_str = None
+            lastYear_active_patch_indices_list = None
+        sdates_rx = sdate_inFile
+        hdates_rx = hdate_inFile
+        
+        for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
             
-    
-    if isinstance(incl_vegtypes_str, list):
-        incl_vegtypes_str = np.array(incl_vegtypes_str)
-    plot_vegtypes_str = incl_vegtypes_str[[i for i,c in enumerate(gddaccum_yp_list) if not isinstance(c,type(None))]]
-    
-    print("Done")
-    
-    if not h1_ds:
-        h1_ds = xr.open_dataset(h1_ds_file)
+            if thisYear <= pickle_year:
+                continue
+            
+            h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = gddfn.import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str, h1_ds_file)
+            
+            print(f'   Saving pickle file ({pickle_file})...')
+            with open(pickle_file, 'wb') as f:
+                pickle.dump([y1, yN, thisYear, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings], f, protocol=-1)
+                
+        
+        if isinstance(incl_vegtypes_str, list):
+            incl_vegtypes_str = np.array(incl_vegtypes_str)
+        plot_vegtypes_str = incl_vegtypes_str[[i for i,c in enumerate(gddaccum_yp_list) if not isinstance(c,type(None))]]
+        
+        print("Done")
+        
+        if not h1_ds:
+            h1_ds = xr.open_dataset(h1_ds_file)
     
     
     ######################################################
     ### Get and grid mean GDDs in GGCMI growing season ###
     ######################################################
     
-    longname_prefix = "GDD harvest target for "
+    if not preprocessed:
     
-    # Could skip this by saving sdates_rx['time_bounds']
-    sdates_rx = gddfn.import_rx_dates("s", sdates_rx, incl_patches1d_itype_veg, mxsowings)
-    
-    print('Getting and gridding mean GDDs...')
-    gdd_maps_ds = gddfn.yp_list_to_ds(gddaccum_yp_list, h1_ds, incl_vegtypes_str, sdates_rx, longname_prefix)
-    if save_figs:gddharv_maps_ds = gddfn.yp_list_to_ds(gddharv_yp_list, h1_ds, incl_vegtypes_str, sdates_rx, longname_prefix)
-    
-    # Fill NAs with dummy values
-    dummy_fill = -1
-    gdd_fill0_maps_ds = gdd_maps_ds.fillna(0)
-    gdd_maps_ds = gdd_maps_ds.fillna(dummy_fill)
-    print('Done getting and gridding means.')
-    
-    # Add dummy variables for crops not actually simulated
-    print("Adding dummy variables...")
-    # Unnecessary?
-    template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
-    all_vars = [v.replace("sdate","gdd") for v in template_ds if "sdate" in v]
-    all_longnames = [template_ds[v].attrs["long_name"].replace("Planting day ", longname_prefix) + " (dummy)" for v in template_ds if "sdate" in v]
-    dummy_vars = []
-    dummy_longnames = []
-    for v, thisVar in enumerate(all_vars):
-        if thisVar not in gdd_maps_ds:
-            dummy_vars.append(thisVar)
-            dummy_longnames.append(all_longnames[v])
-    
-    def make_dummy(thisCrop_gridded, addend):
-        dummy_gridded = thisCrop_gridded
-        dummy_gridded.values = dummy_gridded.values*0 + addend
-        return dummy_gridded
-    for v in gdd_maps_ds:
-        thisCrop_gridded = gdd_maps_ds[v].copy()
-        thisCrop_fill0_gridded = gdd_fill0_maps_ds[v].copy()
-        break
-    dummy_gridded = make_dummy(thisCrop_gridded, -1)
-    dummy_gridded0 = make_dummy(thisCrop_fill0_gridded, 0)
-    
-    for v, thisVar in enumerate(dummy_vars):
-        if thisVar in gdd_maps_ds:
-            raise RuntimeError(f'{thisVar} is already in gdd_maps_ds. Why overwrite it with dummy?')
-        dummy_gridded.name = thisVar
-        dummy_gridded.attrs["long_name"] = dummy_longnames[v]
-        gdd_maps_ds[thisVar] = dummy_gridded
-        dummy_gridded0.name = thisVar
-        dummy_gridded0.attrs["long_name"] = dummy_longnames[v]
-        gdd_fill0_maps_ds[thisVar] = dummy_gridded0
-    
-    # Add lon/lat attributes
-    def add_lonlat_attrs(ds):
-        ds.lon.attrs = {\
-            "long_name": "coordinate_longitude",
-            "units": "degrees_east"}
-        ds.lat.attrs = {\
-            "long_name": "coordinate_latitude",
-            "units": "degrees_north"}
-        return ds
-    gdd_maps_ds = add_lonlat_attrs(gdd_maps_ds)
-    gdd_fill0_maps_ds = add_lonlat_attrs(gdd_fill0_maps_ds)
-    if save_figs: gddharv_maps_ds = add_lonlat_attrs(gddharv_maps_ds)
-    
-    print("Done.")
+        longname_prefix = "GDD harvest target for "
+        
+        # Could skip this by saving sdates_rx['time_bounds']
+        sdates_rx = gddfn.import_rx_dates("s", sdates_rx, incl_patches1d_itype_veg, mxsowings)
+        
+        print('Getting and gridding mean GDDs...')
+        gdd_maps_ds = gddfn.yp_list_to_ds(gddaccum_yp_list, h1_ds, incl_vegtypes_str, sdates_rx, longname_prefix)
+        if save_figs:gddharv_maps_ds = gddfn.yp_list_to_ds(gddharv_yp_list, h1_ds, incl_vegtypes_str, sdates_rx, longname_prefix)
+        
+        # Fill NAs with dummy values
+        dummy_fill = -1
+        gdd_fill0_maps_ds = gdd_maps_ds.fillna(0)
+        gdd_maps_ds = gdd_maps_ds.fillna(dummy_fill)
+        print('Done getting and gridding means.')
+        
+        # Add dummy variables for crops not actually simulated
+        print("Adding dummy variables...")
+        # Unnecessary?
+        template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
+        all_vars = [v.replace("sdate","gdd") for v in template_ds if "sdate" in v]
+        all_longnames = [template_ds[v].attrs["long_name"].replace("Planting day ", longname_prefix) + " (dummy)" for v in template_ds if "sdate" in v]
+        dummy_vars = []
+        dummy_longnames = []
+        for v, thisVar in enumerate(all_vars):
+            if thisVar not in gdd_maps_ds:
+                dummy_vars.append(thisVar)
+                dummy_longnames.append(all_longnames[v])
+        
+        def make_dummy(thisCrop_gridded, addend):
+            dummy_gridded = thisCrop_gridded
+            dummy_gridded.values = dummy_gridded.values*0 + addend
+            return dummy_gridded
+        for v in gdd_maps_ds:
+            thisCrop_gridded = gdd_maps_ds[v].copy()
+            thisCrop_fill0_gridded = gdd_fill0_maps_ds[v].copy()
+            break
+        dummy_gridded = make_dummy(thisCrop_gridded, -1)
+        dummy_gridded0 = make_dummy(thisCrop_fill0_gridded, 0)
+        
+        for v, thisVar in enumerate(dummy_vars):
+            if thisVar in gdd_maps_ds:
+                raise RuntimeError(f'{thisVar} is already in gdd_maps_ds. Why overwrite it with dummy?')
+            dummy_gridded.name = thisVar
+            dummy_gridded.attrs["long_name"] = dummy_longnames[v]
+            gdd_maps_ds[thisVar] = dummy_gridded
+            dummy_gridded0.name = thisVar
+            dummy_gridded0.attrs["long_name"] = dummy_longnames[v]
+            gdd_fill0_maps_ds[thisVar] = dummy_gridded0
+        
+        # Add lon/lat attributes
+        def add_lonlat_attrs(ds):
+            ds.lon.attrs = {\
+                "long_name": "coordinate_longitude",
+                "units": "degrees_east"}
+            ds.lat.attrs = {\
+                "long_name": "coordinate_latitude",
+                "units": "degrees_north"}
+            return ds
+        gdd_maps_ds = add_lonlat_attrs(gdd_maps_ds)
+        gdd_fill0_maps_ds = add_lonlat_attrs(gdd_fill0_maps_ds)
+        if save_figs: gddharv_maps_ds = add_lonlat_attrs(gddharv_maps_ds)
+        
+        print("Done.")
     
     
     ######################
     ### Save to netCDF ###
     ######################
-    print("Saving...")
     
-    # Get output file path
-    datestr = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    outfile = os.path.join(outdir, "gdds_" + datestr + ".nc")
-    outfile_fill0 = os.path.join(outdir, "gdds_fill0_" + datestr + ".nc")
-    
-    def save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx):
-        # Set up output file from template (i.e., prescribed sowing dates).
-        template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
-        for v in template_ds:
-            if "sdate" in v:
-                template_ds = template_ds.drop(v)
-        template_ds.to_netcdf(path=outfile, format="NETCDF3_CLASSIC")
-        template_ds.close()
-    
-        # Add global attributes
-        comment = f"Derived from CLM run plus crop calendar input files {os.path.basename(sdate_inFile) and {os.path.basename(hdate_inFile)}}."
-        gdd_maps_ds.attrs = {\
-            "author": "Sam Rabin (sam.rabin@gmail.com)",
-            "comment": comment,
-            "created": dt.datetime.now().astimezone().isoformat()
-            }
-    
-        # Add time_bounds
-        gdd_maps_ds["time_bounds"] = sdates_rx.time_bounds
-    
-        # Save cultivar GDDs
-        gdd_maps_ds.to_netcdf(outfile, mode="w", format="NETCDF3_CLASSIC")
-    
-    save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx)
-    save_gdds(sdate_inFile, hdate_inFile, outfile_fill0, gdd_fill0_maps_ds, sdates_rx)
-    
-    print("Done saving.")
+    if not preprocessed:
+        print("Saving...")
+        
+        # Get output file path
+        datestr = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+        outfile = os.path.join(outdir, "gdds_" + datestr + ".nc")
+        outfile_fill0 = os.path.join(outdir, "gdds_fill0_" + datestr + ".nc")
+        
+        def save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx):
+            # Set up output file from template (i.e., prescribed sowing dates).
+            template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
+            for v in template_ds:
+                if "sdate" in v:
+                    template_ds = template_ds.drop(v)
+            template_ds.to_netcdf(path=outfile, format="NETCDF3_CLASSIC")
+            template_ds.close()
+        
+            # Add global attributes
+            comment = f"Derived from CLM run plus crop calendar input files {os.path.basename(sdate_inFile) and {os.path.basename(hdate_inFile)}}."
+            gdd_maps_ds.attrs = {\
+                "author": "Sam Rabin (sam.rabin@gmail.com)",
+                "comment": comment,
+                "created": dt.datetime.now().astimezone().isoformat()
+                }
+        
+            # Add time_bounds
+            gdd_maps_ds["time_bounds"] = sdates_rx.time_bounds
+        
+            # Save cultivar GDDs
+            gdd_maps_ds.to_netcdf(outfile, mode="w", format="NETCDF3_CLASSIC")
+        
+        save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx)
+        save_gdds(sdate_inFile, hdate_inFile, outfile_fill0, gdd_fill0_maps_ds, sdates_rx)
+        
+        print("Done saving.")
     
     
     ########################################
@@ -266,8 +276,7 @@ def main(argv):
                                     'y1': y1,
                                     'yN': yN})
     
-    if save_figs:
-        outdir_figs = os.path.join(outdir, "figs")
+    if save_figs and not preprocessed:
         if not os.path.exists(outdir_figs):
             os.makedirs(outdir_figs)
 
@@ -457,7 +466,11 @@ def main(argv):
     
         print("Done.")
     
-    if save_figs: make_figures(gdd_maps_ds=gdd_maps_ds, gddharv_maps_ds=gddharv_maps_ds, outdir_figs=outdir_figs)
+    if save_figs: 
+        if preprocessed:
+            gdd_maps_ds = xr.open_dataset(os.path.join(indir, "generate_gdds", "figs", "gdd_maps.nc"))
+            gddharv_maps_ds = xr.open_dataset(os.path.join(indir, "generate_gdds", "figs", "gddharv_maps.nc"))
+        make_figures(gdd_maps_ds=gdd_maps_ds, gddharv_maps_ds=gddharv_maps_ds, outdir_figs=outdir_figs)
 
 
 if __name__ == "__main__":
