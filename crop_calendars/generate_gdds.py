@@ -25,6 +25,9 @@ import datetime as dt
 import pickle
 import getopt
 
+plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+
+
 # Suppress some warnings
 import warnings
 warnings.filterwarnings("ignore", message="__len__ for multi-part geometries is deprecated and will be removed in Shapely 2.0. Check the length of the `geoms` property instead to get the  number of parts of a multi-part geometry.")
@@ -462,7 +465,7 @@ def main(argv):
             plt.xticks(range(0, len(bin_names) * 2, 2), bin_names,
                        fontsize=fontsize_ticklabels)
             plt.yticks(fontsize=fontsize_ticklabels)
-            plt.xlabel("|latitude| zone", fontsize=fontsize_axislabels)
+            plt.xlabel("latitude zone (absolute value)", fontsize=fontsize_axislabels)
             plt.ylabel("Growing degree-days", fontsize=fontsize_axislabels)
             plt.title(f"Zonal changes: {vegtype_str_title}", fontsize=fontsize_titles)
             outfile = os.path.join(outdir_figs, f"{thisVar}_{vegtype_str}_gs{y1}-{yN}.png")
