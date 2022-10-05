@@ -346,7 +346,7 @@ varList = ["GSLEN.onlyMature.useMedian", "GDDHARV_PERHARV", "HUI_PERHARV", "HUI_
 # varList = ["SDATES", "HDATES.onlyMature"]
 # varList = ["SDATES"]
 
-varList2 = [v.replace('_PERHARV','') for v in varList if v not in dates_ds0]
+varList2 = [v.replace('_PERHARV','') if v not in dates_ds0 else v for v in varList]
 varList = varList2
 
 vertical = False
