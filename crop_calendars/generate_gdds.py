@@ -375,7 +375,13 @@ def main(argv):
         for v, vegtype_str in enumerate(incl_vegtypes_str):
             vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
             thisVar = f"gdd1_{vegtype_int}"
-            print(f"   {vegtype_str} ({vegtype_int})...")
+            
+            vegtype_str_title = vegtype_str.replace("_", " ")
+            if "irrigated" not in vegtype_str:
+                vegtype_str_title = "rainfed " + vegtype_str_title
+            vegtype_str_title = vegtype_str_title.capitalize()
+            
+            print(f"   {vegtype_str_title} ({vegtype_int})...")
             
             
             # Maps #####################
@@ -403,7 +409,7 @@ def main(argv):
             
             thisMin = int(np.round(np.nanmin(gddharv_map_yx)))
             thisMax = int(np.round(np.nanmax(gddharv_map_yx)))
-            thisTitle = f"{vegtype_str}: Old (range {thisMin}–{thisMax})"
+            thisTitle = f"{vegtype_str_title}: Old (range {thisMin}–{thisMax})"
             make_map(ax, gddharv_map_yx, thisTitle, vmax, bin_width,
                      fontsize_ticklabels, fontsize_titles)
             
@@ -415,7 +421,7 @@ def main(argv):
                 raise RuntimeError(f"layout {layout} not recognized")
             thisMin = int(np.round(np.nanmin(gdd_map_yx)))
             thisMax = int(np.round(np.nanmax(gdd_map_yx)))
-            thisTitle = f"{vegtype_str}: New (range {thisMin}–{thisMax})"
+            thisTitle = f"{vegtype_str_title}: New (range {thisMin}–{thisMax})"
             make_map(ax, gdd_map_yx, thisTitle, vmax, bin_width,
                      fontsize_ticklabels, fontsize_titles)
             
@@ -458,7 +464,7 @@ def main(argv):
             plt.yticks(fontsize=fontsize_ticklabels)
             plt.xlabel("|latitude| zone", fontsize=fontsize_axislabels)
             plt.ylabel("Growing degree-days", fontsize=fontsize_axislabels)
-            plt.title(f"Zonal changes: {vegtype_str}", fontsize=fontsize_titles)
+            plt.title(f"Zonal changes: {vegtype_str_title}", fontsize=fontsize_titles)
             outfile = os.path.join(outdir_figs, f"{thisVar}_{vegtype_str}_gs{y1}-{yN}.png")
             plt.savefig(outfile, dpi=300, transparent=False, facecolor='white',
                         bbox_inches='tight')
