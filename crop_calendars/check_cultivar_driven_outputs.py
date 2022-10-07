@@ -27,7 +27,7 @@ my_clm_subver = "c211112"
 sdates_rx_file = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
 hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
 # gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220820_163845.nc"
-gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/gdds_20220927_174954.nc"
+gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc"
 
 # Directory where model output file(s) can be found (figure files will be saved in subdir here)
 indirs = list()
