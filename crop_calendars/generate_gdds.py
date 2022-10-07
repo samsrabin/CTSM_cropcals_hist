@@ -19,11 +19,15 @@ import os
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import warnings
 import cartopy.crs as ccrs
 import datetime as dt
 import pickle
-import getopt
+import argparse
+
+plt.rc('font',**{'family':'sans-serif','sans-serif':['Arial']})
+
 
 # Suppress some warnings
 import warnings
@@ -33,246 +37,236 @@ warnings.filterwarnings("ignore", message="Iteration over multi-part geometries 
 
 def main(argv):
 
-    help_string = "generate_gdds.py -r <run-dir> -s <sdates-file> -h <hdates-file> -1 <first-season> -N <last-season> [--no-save-figs]"
+    help_string = "generate_gdds.py -r <run-dir> -s <sdates-file> -h <hdates-file> -1 <first-season> -N <last-season> [--no-save-figs --args.only_make_figs]"
 
     ###############################
     ### Process input arguments ###
     ###############################
-
-    # Get arguments
-    indir = None
-    y1 = None
-    yN = None
-    sdate_inFile = None
-    hdate_inFile = None
-    save_figs = True
-    try:
-        opts, args = getopt.getopt(argv, "r:1:n:N:s:h:", ["run-dir", "first-season", "last-season", "sdates-file", "hdates-file", "help", "no-save-figs"])
-    except getopt.GetoptError:
-        print(help_string)
-        print("Error parsing arguments. Probably an incorrect option specified?")
-        sys.exit(1)
-    for opt, arg in opts:
-        if opt == "--help":
-            print(help_string)
-            sys.exit()
-        elif opt in ("-r", "--run-dir"):
-            indir = arg
-        elif opt in ("-s", "--sdates-file"):
-            sdate_inFile = arg
-        elif opt in ("-h", "--hdates-file"):
-            hdate_inFile = arg
-        elif opt in ("-1", "--first-season"):
-            y1 = int(arg)
-        elif opt in ("-N", "-n", "--last-season"):
-            yN = int(arg)
-        elif opt == "--no-save-figs":
-            save_figs = False
-            if overwrite != 0:
-                print(help_string)
-                print("Do not specify both --overwrite and --no-overwrite")
-                sys.exit(1)
-            overwrite = 1
-
-    # Check arguments
-    if not indir:
-        print(help_string)
-        print("You must provide a directory where run outputs can be found (and where outputs will go), with -r/--run-dir.")
-        sys.exit(2)
-    elif not sdate_inFile:
-        print(help_string)
-        print("You must provide file of prescribed sowing dates, with -s/--sdates-file.")
-        sys.exit(2)
-    elif not hdate_inFile:
-        print(help_string)
-        print("You must provide file of prescribed harvest dates, with -h/--hdates-file.")
-        sys.exit(2)
-    elif y1 == None or yN == None:
-        print(help_string)
-        print("You must provide both -1/--first-season and -N/--last-season")
-        sys.exit(2)
     
-    # Directory to save output files
-    outdir = os.path.join(indir, "generate_gdds")
+    # Set arguments
+    parser = argparse.ArgumentParser(description="ADD DESCRIPTION HERE")
+    parser.add_argument("-r", "--run-dir", 
+                        help="Directory where run outputs can be found (and where outputs will go)",
+                        required=True)
+    parser.add_argument("-1", "--first-season", 
+                        help="First growing season to include in calculation of mean",
+                        required=True)
+    parser.add_argument("-n", "-N", "--last-season", 
+                        help="Last growing season to include in calculation of mean",
+                        required=True)
+    parser.add_argument("-sd", "--sdates-file", 
+                        help="File of prescribed sowing dates",
+                        required=True)
+    parser.add_argument("-hd", "--hdates-file", 
+                        help="File of prescribed harvest dates",
+                        required=True)
+    figsgroup = parser.add_mutually_exclusive_group()
+    figsgroup.add_argument("--dont-save-figs", 
+                           help="Do not save figures or files needed to create them",
+                           action="store_true", default=False)
+    figsgroup.add_argument("--only-make-figs", 
+                           help="Use preprocessed files to make figures only",
+                           action="store_true", default=False)
+    parser.add_argument("--run1-name", 
+                        help="Name of original values to show in figures",
+                        default="Old")
+    parser.add_argument("--run2-name", 
+                        help="Name of new values to show in figures",
+                        default="New")
+    
+    # Get arguments
+    args = parser.parse_args()
+    for k, v in sorted(vars(args).items()):
+        print(f"{k}: {v}")
+    save_figs = not args.dont_save_figs
+        
+    # Directories to save output files and figures
+    outdir = os.path.join(args.run_dir, "generate_gdds")
+    outdir_figs = os.path.join(outdir, "figs")
     
     
     ##########################
     ### Import and process ###
     ##########################
     
-    # Keep 1 extra year to avoid incomplete final growing season for crops harvested after Dec. 31.
-    y1_import_str = f"{y1+1}-01-01"
-    yN_import_str = f"{yN+2}-01-01"
+    if not args.only_make_figs:
     
-    print(f"Importing netCDF time steps {y1_import_str} through {yN_import_str} (years are +1 because of CTSM output naming)")
-    
-    pickle_file = os.path.join(outdir, f'{y1}-{yN}.pickle')
-    h1_ds_file = os.path.join(outdir, f'{y1}-{yN}.h1_ds.nc')
-    if os.path.exists(pickle_file):
-        with open(pickle_file, 'rb') as f:
-            y1, yN, pickle_year, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = pickle.load(f)
-        print(f'Will resume import at {pickle_year+1}')
-        h1_ds = None
-    else:
-        incorrectly_daily = False
-        skip_patches_for_isel_nan_lastyear = np.ndarray([])
-        gddharv_in_h3 = False
-        pickle_year = -np.inf
-        gddaccum_yp_list = []
-        gddharv_yp_list = []
-        incl_vegtypes_str = None
-        lastYear_active_patch_indices_list = None
-    sdates_rx = sdate_inFile
-    hdates_rx = hdate_inFile
-    
-    for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
+        # Keep 1 extra year to avoid incomplete final growing season for crops harvested after Dec. 31.
+        y1_import_str = f"{args.first_season+1}-01-01"
+        yN_import_str = f"{args.last_season+2}-01-01"
         
-        if thisYear <= pickle_year:
-            continue
+        print(f"Importing netCDF time steps {y1_import_str} through {yN_import_str} (years are +1 because of CTSM output naming)")
         
-        h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = gddfn.import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str, h1_ds_file)
-         
-        print(f'   Saving pickle file ({pickle_file})...')
-        with open(pickle_file, 'wb') as f:
-            pickle.dump([y1, yN, thisYear, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings], f, protocol=-1)
+        pickle_file = os.path.join(outdir, f'{args.first_season}-{args.last_season}.pickle')
+        h1_ds_file = os.path.join(outdir, f'{args.first_season}-{args.last_season}.h1_ds.nc')
+        if os.path.exists(pickle_file):
+            with open(pickle_file, 'rb') as f:
+                args.first_season, args.last_season, pickle_year, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = pickle.load(f)
+            print(f'Will resume import at {pickle_year+1}')
+            h1_ds = None
+        else:
+            incorrectly_daily = False
+            skip_patches_for_isel_nan_lastyear = np.ndarray([])
+            gddharv_in_h3 = False
+            pickle_year = -np.inf
+            gddaccum_yp_list = []
+            gddharv_yp_list = []
+            incl_vegtypes_str = None
+            lastYear_active_patch_indices_list = None
+        sdates_rx = args.sdates_file
+        hdates_rx = args.hdates_file
+        
+        for y, thisYear in enumerate(np.arange(args.first_season+1,args.last_season+3)):
             
-    
-    if isinstance(incl_vegtypes_str, list):
-        incl_vegtypes_str = np.array(incl_vegtypes_str)
-    plot_vegtypes_str = incl_vegtypes_str[[i for i,c in enumerate(gddaccum_yp_list) if not isinstance(c,type(None))]]
-    
-    print("Done")
-    
-    if not h1_ds:
-        h1_ds = xr.open_dataset(h1_ds_file)
+            if thisYear <= pickle_year:
+                continue
+            
+            h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = gddfn.import_and_process_1yr(args.first_season, args.last_season, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, args.run_dir, incl_vegtypes_str, h1_ds_file)
+            
+            print(f'   Saving pickle file ({pickle_file})...')
+            with open(pickle_file, 'wb') as f:
+                pickle.dump([args.first_season, args.last_season, thisYear, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings], f, protocol=-1)
+                
+        
+        if isinstance(incl_vegtypes_str, list):
+            incl_vegtypes_str = np.array(incl_vegtypes_str)
+        plot_vegtypes_str = incl_vegtypes_str[[i for i,c in enumerate(gddaccum_yp_list) if not isinstance(c,type(None))]]
+        
+        print("Done")
+        
+        if not h1_ds:
+            h1_ds = xr.open_dataset(h1_ds_file)
     
     
     ######################################################
     ### Get and grid mean GDDs in GGCMI growing season ###
     ######################################################
     
-    longname_prefix = "GDD harvest target for "
+    if not args.only_make_figs:
     
-    # Could skip this by saving sdates_rx['time_bounds']
-    sdates_rx = gddfn.import_rx_dates("s", sdates_rx, incl_patches1d_itype_veg, mxsowings)
-    
-    print('Getting and gridding mean GDDs...')
-    gdd_maps_ds = gddfn.yp_list_to_ds(gddaccum_yp_list, h1_ds, incl_vegtypes_str, sdates_rx, longname_prefix)
-    if save_figs:gddharv_maps_ds = gddfn.yp_list_to_ds(gddharv_yp_list, h1_ds, incl_vegtypes_str, sdates_rx, longname_prefix)
-    
-    # Fill NAs with dummy values
-    dummy_fill = -1
-    gdd_fill0_maps_ds = gdd_maps_ds.fillna(0)
-    gdd_maps_ds = gdd_maps_ds.fillna(dummy_fill)
-    print('Done getting and gridding means.')
-    
-    # Add dummy variables for crops not actually simulated
-    print("Adding dummy variables...")
-    # Unnecessary?
-    template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
-    all_vars = [v.replace("sdate","gdd") for v in template_ds if "sdate" in v]
-    all_longnames = [template_ds[v].attrs["long_name"].replace("Planting day ", longname_prefix) + " (dummy)" for v in template_ds if "sdate" in v]
-    dummy_vars = []
-    dummy_longnames = []
-    for v, thisVar in enumerate(all_vars):
-        if thisVar not in gdd_maps_ds:
-            dummy_vars.append(thisVar)
-            dummy_longnames.append(all_longnames[v])
-    
-    def make_dummy(thisCrop_gridded, addend):
-        dummy_gridded = thisCrop_gridded
-        dummy_gridded.values = dummy_gridded.values*0 + addend
-        return dummy_gridded
-    for v in gdd_maps_ds:
-        thisCrop_gridded = gdd_maps_ds[v].copy()
-        thisCrop_fill0_gridded = gdd_fill0_maps_ds[v].copy()
-        break
-    dummy_gridded = make_dummy(thisCrop_gridded, -1)
-    dummy_gridded0 = make_dummy(thisCrop_fill0_gridded, 0)
-    
-    for v, thisVar in enumerate(dummy_vars):
-        if thisVar in gdd_maps_ds:
-            raise RuntimeError(f'{thisVar} is already in gdd_maps_ds. Why overwrite it with dummy?')
-        dummy_gridded.name = thisVar
-        dummy_gridded.attrs["long_name"] = dummy_longnames[v]
-        gdd_maps_ds[thisVar] = dummy_gridded
-        dummy_gridded0.name = thisVar
-        dummy_gridded0.attrs["long_name"] = dummy_longnames[v]
-        gdd_fill0_maps_ds[thisVar] = dummy_gridded0
-    
-    # Add lon/lat attributes
-    def add_lonlat_attrs(ds):
-        ds.lon.attrs = {\
-            "long_name": "coordinate_longitude",
-            "units": "degrees_east"}
-        ds.lat.attrs = {\
-            "long_name": "coordinate_latitude",
-            "units": "degrees_north"}
-        return ds
-    gdd_maps_ds = add_lonlat_attrs(gdd_maps_ds)
-    gdd_fill0_maps_ds = add_lonlat_attrs(gdd_fill0_maps_ds)
-    if save_figs: gddharv_maps_ds = add_lonlat_attrs(gddharv_maps_ds)
-    
-    print("Done.")
+        longname_prefix = "GDD harvest target for "
+        
+        # Could skip this by saving sdates_rx['time_bounds']
+        sdates_rx = gddfn.import_rx_dates("s", sdates_rx, incl_patches1d_itype_veg, mxsowings)
+        
+        print('Getting and gridding mean GDDs...')
+        gdd_maps_ds = gddfn.yp_list_to_ds(gddaccum_yp_list, h1_ds, incl_vegtypes_str, sdates_rx, longname_prefix)
+        if save_figs:gddharv_maps_ds = gddfn.yp_list_to_ds(gddharv_yp_list, h1_ds, incl_vegtypes_str, sdates_rx, longname_prefix)
+        
+        # Fill NAs with dummy values
+        dummy_fill = -1
+        gdd_fill0_maps_ds = gdd_maps_ds.fillna(0)
+        gdd_maps_ds = gdd_maps_ds.fillna(dummy_fill)
+        print('Done getting and gridding means.')
+        
+        # Add dummy variables for crops not actually simulated
+        print("Adding dummy variables...")
+        # Unnecessary?
+        template_ds = xr.open_dataset(args.sdates_file, decode_times=True)
+        all_vars = [v.replace("sdate","gdd") for v in template_ds if "sdate" in v]
+        all_longnames = [template_ds[v].attrs["long_name"].replace("Planting day ", longname_prefix) + " (dummy)" for v in template_ds if "sdate" in v]
+        dummy_vars = []
+        dummy_longnames = []
+        for v, thisVar in enumerate(all_vars):
+            if thisVar not in gdd_maps_ds:
+                dummy_vars.append(thisVar)
+                dummy_longnames.append(all_longnames[v])
+        
+        def make_dummy(thisCrop_gridded, addend):
+            dummy_gridded = thisCrop_gridded
+            dummy_gridded.values = dummy_gridded.values*0 + addend
+            return dummy_gridded
+        for v in gdd_maps_ds:
+            thisCrop_gridded = gdd_maps_ds[v].copy()
+            thisCrop_fill0_gridded = gdd_fill0_maps_ds[v].copy()
+            break
+        dummy_gridded = make_dummy(thisCrop_gridded, -1)
+        dummy_gridded0 = make_dummy(thisCrop_fill0_gridded, 0)
+        
+        for v, thisVar in enumerate(dummy_vars):
+            if thisVar in gdd_maps_ds:
+                raise RuntimeError(f'{thisVar} is already in gdd_maps_ds. Why overwrite it with dummy?')
+            dummy_gridded.name = thisVar
+            dummy_gridded.attrs["long_name"] = dummy_longnames[v]
+            gdd_maps_ds[thisVar] = dummy_gridded
+            dummy_gridded0.name = thisVar
+            dummy_gridded0.attrs["long_name"] = dummy_longnames[v]
+            gdd_fill0_maps_ds[thisVar] = dummy_gridded0
+        
+        # Add lon/lat attributes
+        def add_lonlat_attrs(ds):
+            ds.lon.attrs = {\
+                "long_name": "coordinate_longitude",
+                "units": "degrees_east"}
+            ds.lat.attrs = {\
+                "long_name": "coordinate_latitude",
+                "units": "degrees_north"}
+            return ds
+        gdd_maps_ds = add_lonlat_attrs(gdd_maps_ds)
+        gdd_fill0_maps_ds = add_lonlat_attrs(gdd_fill0_maps_ds)
+        if save_figs: gddharv_maps_ds = add_lonlat_attrs(gddharv_maps_ds)
+        
+        print("Done.")
     
     
     ######################
     ### Save to netCDF ###
     ######################
-    print("Saving...")
     
-    # Get output file path
-    datestr = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    outfile = os.path.join(outdir, "gdds_" + datestr + ".nc")
-    outfile_fill0 = os.path.join(outdir, "gdds_fill0_" + datestr + ".nc")
-    
-    def save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx):
-        # Set up output file from template (i.e., prescribed sowing dates).
-        template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
-        for v in template_ds:
-            if "sdate" in v:
-                template_ds = template_ds.drop(v)
-        template_ds.to_netcdf(path=outfile, format="NETCDF3_CLASSIC")
-        template_ds.close()
-    
-        # Add global attributes
-        comment = f"Derived from CLM run plus crop calendar input files {os.path.basename(sdate_inFile) and {os.path.basename(hdate_inFile)}}."
-        gdd_maps_ds.attrs = {\
-            "author": "Sam Rabin (sam.rabin@gmail.com)",
-            "comment": comment,
-            "created": dt.datetime.now().astimezone().isoformat()
-            }
-    
-        # Add time_bounds
-        gdd_maps_ds["time_bounds"] = sdates_rx.time_bounds
-    
-        # Save cultivar GDDs
-        gdd_maps_ds.to_netcdf(outfile, mode="w", format="NETCDF3_CLASSIC")
-    
-    save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx)
-    save_gdds(sdate_inFile, hdate_inFile, outfile_fill0, gdd_fill0_maps_ds, sdates_rx)
-    
-    print("Done saving.")
+    if not args.only_make_figs:
+        print("Saving...")
+        
+        # Get output file path
+        datestr = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+        outfile = os.path.join(outdir, "gdds_" + datestr + ".nc")
+        outfile_fill0 = os.path.join(outdir, "gdds_fill0_" + datestr + ".nc")
+        
+        def save_gdds(args, outfile, gdd_maps_ds, sdates_rx):
+            # Set up output file from template (i.e., prescribed sowing dates).
+            template_ds = xr.open_dataset(args.sdates_file, decode_times=True)
+            for v in template_ds:
+                if "sdate" in v:
+                    template_ds = template_ds.drop(v)
+            template_ds.to_netcdf(path=outfile, format="NETCDF3_CLASSIC")
+            template_ds.close()
+        
+            # Add global attributes
+            comment = f"Derived from CLM run plus crop calendar input files {os.path.basename(args.sdates_file) and {os.path.basename(args.hdates_file)}}."
+            gdd_maps_ds.attrs = {\
+                "author": "Sam Rabin (sam.rabin@gmail.com)",
+                "comment": comment,
+                "created": dt.datetime.now().astimezone().isoformat()
+                }
+        
+            # Add time_bounds
+            gdd_maps_ds["time_bounds"] = sdates_rx.time_bounds
+        
+            # Save cultivar GDDs
+            gdd_maps_ds.to_netcdf(outfile, mode="w", format="NETCDF3_CLASSIC")
+        
+        save_gdds(args, outfile, gdd_maps_ds, sdates_rx)
+        save_gdds(args, outfile_fill0, gdd_fill0_maps_ds, sdates_rx)
+        
+        print("Done saving.")
     
     
     ########################################
     ### Save things needed for mapmaking ###
     ########################################
     
-    def add_attrs_to_map_ds(map_ds, incl_vegtypes_str, dummy_fill, outdir_figs, y1, yN):
+    def add_attrs_to_map_ds(map_ds, incl_vegtypes_str, dummy_fill, outdir_figs, args):
         return map_ds.assign_attrs({'incl_vegtypes_str': incl_vegtypes_str,
                                     'dummy_fill': dummy_fill,
                                     'outdir_figs': outdir_figs,
-                                    'y1': y1,
-                                    'yN': yN})
+                                    'args.first_season': args.first_season,
+                                    'args.last_season': args.last_season})
     
-    if save_figs:
-        outdir_figs = os.path.join(outdir, "figs")
+    if save_figs and not args.only_make_figs:
         if not os.path.exists(outdir_figs):
             os.makedirs(outdir_figs)
 
-        gdd_maps_ds = add_attrs_to_map_ds(gdd_maps_ds, plot_vegtypes_str, dummy_fill, outdir_figs, y1, yN)
-        gddharv_maps_ds = add_attrs_to_map_ds(gddharv_maps_ds, plot_vegtypes_str, dummy_fill, outdir_figs, y1, yN)
+        gdd_maps_ds = add_attrs_to_map_ds(gdd_maps_ds, plot_vegtypes_str, dummy_fill, outdir_figs, args)
+        gddharv_maps_ds = add_attrs_to_map_ds(gddharv_maps_ds, plot_vegtypes_str, dummy_fill, outdir_figs, args)
         
         gdd_maps_ds.to_netcdf(os.path.join(outdir_figs, "gdd_maps.nc"))
         gddharv_maps_ds.to_netcdf(os.path.join(outdir_figs, "gddharv_maps.nc"))
@@ -282,15 +276,45 @@ def main(argv):
     ### Save before/after map and boxplot figures ###
     #################################################
     
-    def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles): 
+    def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles):
+        if np.any(this_map.values < 0):
+            gdd_spacing = 500
+            vmax = np.floor(np.nanmax(this_map.values)/gdd_spacing)*gdd_spacing
+            vmin = -vmax
+            Ncolors = vmax/gdd_spacing
+            if Ncolors % 2 == 0: Ncolors += 1
+            cmap = cm.get_cmap("RdYlBu", Ncolors)
+            
+            if np.any(this_map.values > vmax) and np.any(this_map.values < vmin):
+                extend = 'both'
+            elif np.any(this_map.values > vmax):
+                extend = 'max'
+            elif np.any(this_map.values < vmin):
+                extend = 'min'
+            else:
+                extend = 'neither'
+            
+        else:
+            vmin = 0
+            vmax = np.floor(vmax/500)*500
+            Ncolors = vmax/500
+            cmap=cm.get_cmap("jet", Ncolors)
+            extend = 'max'
+            
         im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
                 this_map, shading="auto",
-                vmin=0, vmax=vmax)
+                vmin=vmin, vmax=vmax,
+                cmap=cmap)
+            
         ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
-        ax.coastlines()
-        ax.set_title(this_title, fontsize=fontsize_titles)
-        cbar = plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02)
+        ax.coastlines(linewidth=0.3)
+        ax.set_title(this_title, fontsize=fontsize_titles, fontweight="bold", y=0.96)
+        cbar = plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02,
+                            aspect=40, extend=extend)
         cbar.ax.tick_params(labelsize=fontsize_ticklabels)
+        cbar.ax.set_xlabel(this_map.attrs['units'],
+                           fontsize=fontsize_ticklabels)
+        cbar.ax.xaxis.set_label_coords(x=0.115, y=2.6)
         
         ticks = np.arange(-60, 91, bin_width)
         ticklabels = [str(x) for x in ticks]
@@ -305,16 +329,16 @@ def main(argv):
         in_da = in_da.where(in_da != fillValue)
         return in_da.values[~np.isnan(in_da.values)]
     
-    def set_boxplot_props(bp, color):
-        linewidth = 3
+    linewidth = 1.5
+    def set_boxplot_props(bp, color, linewidth):
+        linewidth = linewidth
         plt.setp(bp['boxes'], color=color, linewidth=linewidth)
         plt.setp(bp['whiskers'], color=color, linewidth=linewidth)
         plt.setp(bp['caps'], color=color, linewidth=linewidth)
         plt.setp(bp['medians'], color=color, linewidth=linewidth)
         plt.setp(bp['fliers'], markeredgecolor=color, markersize=6, linewidth=linewidth, markeredgewidth=linewidth/2)
     
-    def make_plot(data, offset):
-        linewidth = 1.5
+    def make_plot(data, offset, linewidth):
         offset = 0.4*offset
         bpl = plt.boxplot(data, positions=np.array(range(len(data)))*2.0+offset, widths=0.6, 
                           boxprops=dict(linewidth=linewidth), whiskerprops=dict(linewidth=linewidth), 
@@ -322,7 +346,7 @@ def main(argv):
                           flierprops=dict(markeredgewidth=0.5))
         return bpl
     
-    def make_figures(thisDir=None, gdd_maps_ds=None, gddharv_maps_ds=None, outdir_figs=None):
+    def make_figures(args, thisDir=None, gdd_maps_ds=None, gddharv_maps_ds=None, outdir_figs=None, linewidth=1.5):
         if not gdd_maps_ds:
             if not thisDir:
                 raise RuntimeError('If not providing gdd_maps_ds, you must provide thisDir (location of gdd_maps.nc)')
@@ -341,13 +365,14 @@ def main(argv):
         yN = gdd_maps_ds.attrs['yN']
     
         # layout = "3x1"
-        layout = "2x2"
+        # layout = "2x2"
+        layout = "3x2"
         bin_width = 15
         lat_bin_edges = np.arange(0, 91, bin_width)
     
-        fontsize_titles = 18
-        fontsize_axislabels = 15
-        fontsize_ticklabels = 15
+        fontsize_titles = 12
+        fontsize_axislabels = 12
+        fontsize_ticklabels = 12
     
         Nbins = len(lat_bin_edges)-1
         bin_names = ["All"]
@@ -358,6 +383,7 @@ def main(argv):
             
         color_old = '#beaed4'
         color_new = '#7fc97f'
+        gdd_units = 'GDD (°C • day)'
     
         # Maps
         ny = 3
@@ -366,7 +392,13 @@ def main(argv):
         for v, vegtype_str in enumerate(incl_vegtypes_str):
             vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
             thisVar = f"gdd1_{vegtype_int}"
-            print(f"   {vegtype_str} ({vegtype_int})...")
+            
+            vegtype_str_title = vegtype_str.replace("_", " ")
+            if "irrigated" not in vegtype_str:
+                vegtype_str_title = "rainfed " + vegtype_str_title
+            vegtype_str_title = vegtype_str_title.capitalize()
+            
+            print(f"   {vegtype_str_title} ({vegtype_int})...")
             
             
             # Maps #####################
@@ -377,38 +409,58 @@ def main(argv):
             if "time" in gddharv_map.dims:
                 gddharv_map = gddharv_map.isel(time=0, drop=True)
             gddharv_map_yx = gddharv_map.where(gddharv_map != dummy_fill)
+            
+            gdd_map_yx.attrs['units'] = gdd_units
+            gddharv_map_yx.attrs['units'] = gdd_units
                     
-            vmax = max(np.max(gdd_map_yx), np.max(gddharv_map_yx))
+            vmax = max(np.max(gdd_map_yx), np.max(gddharv_map_yx)).values
             
             # Set up figure and first subplot
             if layout == "3x1":
                 fig = plt.figure(figsize=(7.5,14))
                 ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
             elif layout == "2x2":
-                fig = plt.figure(figsize=(24,12))
+                fig = plt.figure(figsize=(12,6))
                 spec = fig.add_gridspec(nrows=2, ncols=2,
                                         width_ratios=[0.4,0.6])
+                ax = fig.add_subplot(spec[0,0],projection=ccrs.PlateCarree())
+            elif layout == "3x2":
+                fig = plt.figure(figsize=(14,9))
+                spec = fig.add_gridspec(nrows=3, ncols=2,
+                                        width_ratios=[0.5,0.5],
+                                        wspace=0.2)
                 ax = fig.add_subplot(spec[0,0],projection=ccrs.PlateCarree())
             else:
                 raise RuntimeError(f"layout {layout} not recognized")
             
             thisMin = int(np.round(np.nanmin(gddharv_map_yx)))
             thisMax = int(np.round(np.nanmax(gddharv_map_yx)))
-            thisTitle = f"{vegtype_str}: Old (range {thisMin}–{thisMax})"
+            thisTitle = f"{args.run1_name} (range {thisMin}–{thisMax})"
             make_map(ax, gddharv_map_yx, thisTitle, vmax, bin_width,
                      fontsize_ticklabels, fontsize_titles)
             
             if layout == "3x1":
                 ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
-            elif layout == "2x2":
+            elif layout in ["2x2", "3x2"]:
                 ax = fig.add_subplot(spec[1,0],projection=ccrs.PlateCarree())
             else:
                 raise RuntimeError(f"layout {layout} not recognized")
             thisMin = int(np.round(np.nanmin(gdd_map_yx)))
             thisMax = int(np.round(np.nanmax(gdd_map_yx)))
-            thisTitle = f"{vegtype_str}: New (range {thisMin}–{thisMax})"
+            thisTitle = f"{args.run2_name} (range {thisMin}–{thisMax})"
             make_map(ax, gdd_map_yx, thisTitle, vmax, bin_width,
                      fontsize_ticklabels, fontsize_titles)
+            
+            # Difference
+            if layout == "3x2":
+                ax = fig.add_subplot(spec[2,0],projection=ccrs.PlateCarree())
+                thisMin = int(np.round(np.nanmin(gdd_map_yx)))
+                thisMax = int(np.round(np.nanmax(gdd_map_yx)))
+                thisTitle = "ISIMIP3 minus CLM"
+                diff_map_yx = gdd_map_yx - gddharv_map_yx
+                diff_map_yx.attrs['units'] = gdd_units
+                make_map(ax, diff_map_yx, thisTitle, vmax, bin_width,
+                        fontsize_ticklabels, fontsize_titles)
             
             # Boxplots #####################
             
@@ -429,27 +481,37 @@ def main(argv):
                     
             if layout == "3x1":
                 ax = fig.add_subplot(ny,nx,3)
-            elif layout == "2x2":
+            elif layout in ["2x2", "3x2"]:
                 ax = fig.add_subplot(spec[:,1])
             else:
                 raise RuntimeError(f"layout {layout} not recognized")
     
-            bpl = make_plot(gdd_bybin_old, -1)
-            bpr = make_plot(gdd_bybin_new, 1)
-            set_boxplot_props(bpl, color_old)
-            set_boxplot_props(bpr, color_new)
+            bpl = make_plot(gdd_bybin_old, -1, linewidth)
+            bpr = make_plot(gdd_bybin_new, 1, linewidth)
+            set_boxplot_props(bpl, color_old, linewidth)
+            set_boxplot_props(bpr, color_new, linewidth)
             
             # draw temporary lines to create a legend
-            plt.plot([], c=color_old, label='Old')
-            plt.plot([], c=color_new, label='New')
+            plt.plot([], c=color_old, label=args.run1_name, linewidth=linewidth)
+            plt.plot([], c=color_new, label=args.run2_name, linewidth=linewidth)
             plt.legend(fontsize=fontsize_titles)
             
             plt.xticks(range(0, len(bin_names) * 2, 2), bin_names,
                        fontsize=fontsize_ticklabels)
             plt.yticks(fontsize=fontsize_ticklabels)
-            plt.xlabel("|latitude| zone", fontsize=fontsize_axislabels)
-            plt.ylabel("Growing degree-days", fontsize=fontsize_axislabels)
-            plt.title(f"Zonal changes: {vegtype_str}", fontsize=fontsize_titles)
+            ax.spines['right'].set_visible(False)
+            ax.spines['top'].set_visible(False)
+            
+            plt.xlabel("latitude zone (absolute value)", fontsize=fontsize_axislabels)
+            plt.ylabel(gdd_units, fontsize=fontsize_axislabels)
+            ax.yaxis.set_label_coords(-0.11, 0.5)
+            plt.title(f"Zonal changes", fontsize=fontsize_titles, fontweight="bold")
+            
+            plt.suptitle(f"Maturity requirements: {vegtype_str_title}",
+                         fontsize=fontsize_titles*1.2,
+                         fontweight="bold",
+                         y=0.95)
+            
             outfile = os.path.join(outdir_figs, f"{thisVar}_{vegtype_str}_gs{y1}-{yN}.png")
             plt.savefig(outfile, dpi=300, transparent=False, facecolor='white',
                         bbox_inches='tight')
@@ -457,7 +519,11 @@ def main(argv):
     
         print("Done.")
     
-    if save_figs: make_figures(gdd_maps_ds=gdd_maps_ds, gddharv_maps_ds=gddharv_maps_ds, outdir_figs=outdir_figs)
+    if save_figs: 
+        if args.only_make_figs:
+            gdd_maps_ds = xr.open_dataset(os.path.join(args.run_dir, "generate_gdds", "figs", "gdd_maps.nc"))
+            gddharv_maps_ds = xr.open_dataset(os.path.join(args.run_dir, "generate_gdds", "figs", "gddharv_maps.nc"))
+        make_figures(args, gdd_maps_ds=gdd_maps_ds, gddharv_maps_ds=gddharv_maps_ds, outdir_figs=outdir_figs, linewidth=linewidth)
 
 
 if __name__ == "__main__":
