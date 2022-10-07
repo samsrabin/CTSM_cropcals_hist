@@ -19,13 +19,14 @@ import os
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import warnings
 import cartopy.crs as ccrs
 import datetime as dt
 import pickle
 import argparse
 
-plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+plt.rc('font',**{'family':'sans-serif','sans-serif':['Arial']})
 
 
 # Suppress some warnings
@@ -275,15 +276,45 @@ def main(argv):
     ### Save before/after map and boxplot figures ###
     #################################################
     
-    def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles): 
+    def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles):
+        if np.any(this_map.values < 0):
+            gdd_spacing = 500
+            vmax = np.floor(np.nanmax(this_map.values)/gdd_spacing)*gdd_spacing
+            vmin = -vmax
+            Ncolors = vmax/gdd_spacing
+            if Ncolors % 2 == 0: Ncolors += 1
+            cmap = cm.get_cmap("RdYlBu", Ncolors)
+            
+            if np.any(this_map.values > vmax) and np.any(this_map.values < vmin):
+                extend = 'both'
+            elif np.any(this_map.values > vmax):
+                extend = 'max'
+            elif np.any(this_map.values < vmin):
+                extend = 'min'
+            else:
+                extend = 'neither'
+            
+        else:
+            vmin = 0
+            vmax = np.floor(vmax/500)*500
+            Ncolors = vmax/500
+            cmap=cm.get_cmap("jet", Ncolors)
+            extend = 'max'
+            
         im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
                 this_map, shading="auto",
-                vmin=0, vmax=vmax)
+                vmin=vmin, vmax=vmax,
+                cmap=cmap)
+            
         ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
-        ax.coastlines()
-        ax.set_title(this_title, fontsize=fontsize_titles)
-        cbar = plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02)
+        ax.coastlines(linewidth=0.3)
+        ax.set_title(this_title, fontsize=fontsize_titles, fontweight="bold", y=0.96)
+        cbar = plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02,
+                            aspect=40, extend=extend)
         cbar.ax.tick_params(labelsize=fontsize_ticklabels)
+        cbar.ax.set_xlabel(this_map.attrs['units'],
+                           fontsize=fontsize_ticklabels)
+        cbar.ax.xaxis.set_label_coords(x=0.115, y=2.6)
         
         ticks = np.arange(-60, 91, bin_width)
         ticklabels = [str(x) for x in ticks]
@@ -298,16 +329,16 @@ def main(argv):
         in_da = in_da.where(in_da != fillValue)
         return in_da.values[~np.isnan(in_da.values)]
     
-    def set_boxplot_props(bp, color):
-        linewidth = 3
+    linewidth = 1.5
+    def set_boxplot_props(bp, color, linewidth):
+        linewidth = linewidth
         plt.setp(bp['boxes'], color=color, linewidth=linewidth)
         plt.setp(bp['whiskers'], color=color, linewidth=linewidth)
         plt.setp(bp['caps'], color=color, linewidth=linewidth)
         plt.setp(bp['medians'], color=color, linewidth=linewidth)
         plt.setp(bp['fliers'], markeredgecolor=color, markersize=6, linewidth=linewidth, markeredgewidth=linewidth/2)
     
-    def make_plot(data, offset):
-        linewidth = 1.5
+    def make_plot(data, offset, linewidth):
         offset = 0.4*offset
         bpl = plt.boxplot(data, positions=np.array(range(len(data)))*2.0+offset, widths=0.6, 
                           boxprops=dict(linewidth=linewidth), whiskerprops=dict(linewidth=linewidth), 
@@ -315,7 +346,7 @@ def main(argv):
                           flierprops=dict(markeredgewidth=0.5))
         return bpl
     
-    def make_figures(args, thisDir=None, gdd_maps_ds=None, gddharv_maps_ds=None, outdir_figs=None):
+    def make_figures(args, thisDir=None, gdd_maps_ds=None, gddharv_maps_ds=None, outdir_figs=None, linewidth=1.5):
         if not gdd_maps_ds:
             if not thisDir:
                 raise RuntimeError('If not providing gdd_maps_ds, you must provide thisDir (location of gdd_maps.nc)')
@@ -334,13 +365,14 @@ def main(argv):
         yN = gdd_maps_ds.attrs['yN']
     
         # layout = "3x1"
-        layout = "2x2"
+        # layout = "2x2"
+        layout = "3x2"
         bin_width = 15
         lat_bin_edges = np.arange(0, 91, bin_width)
     
-        fontsize_titles = 18
-        fontsize_axislabels = 15
-        fontsize_ticklabels = 15
+        fontsize_titles = 12
+        fontsize_axislabels = 12
+        fontsize_ticklabels = 12
     
         Nbins = len(lat_bin_edges)-1
         bin_names = ["All"]
@@ -351,6 +383,7 @@ def main(argv):
             
         color_old = '#beaed4'
         color_new = '#7fc97f'
+        gdd_units = 'GDD (°C • day)'
     
         # Maps
         ny = 3
@@ -376,38 +409,58 @@ def main(argv):
             if "time" in gddharv_map.dims:
                 gddharv_map = gddharv_map.isel(time=0, drop=True)
             gddharv_map_yx = gddharv_map.where(gddharv_map != dummy_fill)
+            
+            gdd_map_yx.attrs['units'] = gdd_units
+            gddharv_map_yx.attrs['units'] = gdd_units
                     
-            vmax = max(np.max(gdd_map_yx), np.max(gddharv_map_yx))
+            vmax = max(np.max(gdd_map_yx), np.max(gddharv_map_yx)).values
             
             # Set up figure and first subplot
             if layout == "3x1":
                 fig = plt.figure(figsize=(7.5,14))
                 ax = fig.add_subplot(ny,nx,1,projection=ccrs.PlateCarree())
             elif layout == "2x2":
-                fig = plt.figure(figsize=(24,12))
+                fig = plt.figure(figsize=(12,6))
                 spec = fig.add_gridspec(nrows=2, ncols=2,
                                         width_ratios=[0.4,0.6])
+                ax = fig.add_subplot(spec[0,0],projection=ccrs.PlateCarree())
+            elif layout == "3x2":
+                fig = plt.figure(figsize=(14,9))
+                spec = fig.add_gridspec(nrows=3, ncols=2,
+                                        width_ratios=[0.5,0.5],
+                                        wspace=0.2)
                 ax = fig.add_subplot(spec[0,0],projection=ccrs.PlateCarree())
             else:
                 raise RuntimeError(f"layout {layout} not recognized")
             
             thisMin = int(np.round(np.nanmin(gddharv_map_yx)))
             thisMax = int(np.round(np.nanmax(gddharv_map_yx)))
-            thisTitle = f"{vegtype_str_title}: {args.run1_name} (range {thisMin}–{thisMax})"
+            thisTitle = f"{args.run1_name} (range {thisMin}–{thisMax})"
             make_map(ax, gddharv_map_yx, thisTitle, vmax, bin_width,
                      fontsize_ticklabels, fontsize_titles)
             
             if layout == "3x1":
                 ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
-            elif layout == "2x2":
+            elif layout in ["2x2", "3x2"]:
                 ax = fig.add_subplot(spec[1,0],projection=ccrs.PlateCarree())
             else:
                 raise RuntimeError(f"layout {layout} not recognized")
             thisMin = int(np.round(np.nanmin(gdd_map_yx)))
             thisMax = int(np.round(np.nanmax(gdd_map_yx)))
-            thisTitle = f"{vegtype_str_title}: {args.run2_name} (range {thisMin}–{thisMax})"
+            thisTitle = f"{args.run2_name} (range {thisMin}–{thisMax})"
             make_map(ax, gdd_map_yx, thisTitle, vmax, bin_width,
                      fontsize_ticklabels, fontsize_titles)
+            
+            # Difference
+            if layout == "3x2":
+                ax = fig.add_subplot(spec[2,0],projection=ccrs.PlateCarree())
+                thisMin = int(np.round(np.nanmin(gdd_map_yx)))
+                thisMax = int(np.round(np.nanmax(gdd_map_yx)))
+                thisTitle = "ISIMIP3 minus CLM"
+                diff_map_yx = gdd_map_yx - gddharv_map_yx
+                diff_map_yx.attrs['units'] = gdd_units
+                make_map(ax, diff_map_yx, thisTitle, vmax, bin_width,
+                        fontsize_ticklabels, fontsize_titles)
             
             # Boxplots #####################
             
@@ -428,27 +481,37 @@ def main(argv):
                     
             if layout == "3x1":
                 ax = fig.add_subplot(ny,nx,3)
-            elif layout == "2x2":
+            elif layout in ["2x2", "3x2"]:
                 ax = fig.add_subplot(spec[:,1])
             else:
                 raise RuntimeError(f"layout {layout} not recognized")
     
-            bpl = make_plot(gdd_bybin_old, -1)
-            bpr = make_plot(gdd_bybin_new, 1)
-            set_boxplot_props(bpl, color_old)
-            set_boxplot_props(bpr, color_new)
+            bpl = make_plot(gdd_bybin_old, -1, linewidth)
+            bpr = make_plot(gdd_bybin_new, 1, linewidth)
+            set_boxplot_props(bpl, color_old, linewidth)
+            set_boxplot_props(bpr, color_new, linewidth)
             
             # draw temporary lines to create a legend
-            plt.plot([], c=color_old, label=args.run1_name)
-            plt.plot([], c=color_new, label=args.run2_name)
+            plt.plot([], c=color_old, label=args.run1_name, linewidth=linewidth)
+            plt.plot([], c=color_new, label=args.run2_name, linewidth=linewidth)
             plt.legend(fontsize=fontsize_titles)
             
             plt.xticks(range(0, len(bin_names) * 2, 2), bin_names,
                        fontsize=fontsize_ticklabels)
             plt.yticks(fontsize=fontsize_ticklabels)
+            ax.spines['right'].set_visible(False)
+            ax.spines['top'].set_visible(False)
+            
             plt.xlabel("latitude zone (absolute value)", fontsize=fontsize_axislabels)
-            plt.ylabel("Growing degree-days", fontsize=fontsize_axislabels)
-            plt.title(f"Zonal changes: {vegtype_str_title}", fontsize=fontsize_titles)
+            plt.ylabel(gdd_units, fontsize=fontsize_axislabels)
+            ax.yaxis.set_label_coords(-0.11, 0.5)
+            plt.title(f"Zonal changes", fontsize=fontsize_titles, fontweight="bold")
+            
+            plt.suptitle(f"Maturity requirements: {vegtype_str_title}",
+                         fontsize=fontsize_titles*1.2,
+                         fontweight="bold",
+                         y=0.95)
+            
             outfile = os.path.join(outdir_figs, f"{thisVar}_{vegtype_str}_gs{y1}-{yN}.png")
             plt.savefig(outfile, dpi=300, transparent=False, facecolor='white',
                         bbox_inches='tight')
@@ -460,7 +523,7 @@ def main(argv):
         if args.only_make_figs:
             gdd_maps_ds = xr.open_dataset(os.path.join(args.run_dir, "generate_gdds", "figs", "gdd_maps.nc"))
             gddharv_maps_ds = xr.open_dataset(os.path.join(args.run_dir, "generate_gdds", "figs", "gddharv_maps.nc"))
-        make_figures(args, gdd_maps_ds=gdd_maps_ds, gddharv_maps_ds=gddharv_maps_ds, outdir_figs=outdir_figs)
+        make_figures(args, gdd_maps_ds=gdd_maps_ds, gddharv_maps_ds=gddharv_maps_ds, outdir_figs=outdir_figs, linewidth=linewidth)
 
 
 if __name__ == "__main__":
