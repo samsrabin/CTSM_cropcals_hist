@@ -66,6 +66,12 @@ def main(argv):
     figsgroup.add_argument("--only-make-figs", 
                            help="Use preprocessed files to make figures only",
                            action="store_true", default=False)
+    parser.add_argument("--run1-name", 
+                        help="Name of original values to show in figures",
+                        default="Old")
+    parser.add_argument("--run2-name", 
+                        help="Name of new values to show in figures",
+                        default="New")
     
     # Get arguments
     args = parser.parse_args()
@@ -387,7 +393,7 @@ def main(argv):
             
             thisMin = int(np.round(np.nanmin(gddharv_map_yx)))
             thisMax = int(np.round(np.nanmax(gddharv_map_yx)))
-            thisTitle = f"{vegtype_str_title}: Old (range {thisMin}–{thisMax})"
+            thisTitle = f"{vegtype_str_title}: {args.run1_name} (range {thisMin}–{thisMax})"
             make_map(ax, gddharv_map_yx, thisTitle, vmax, bin_width,
                      fontsize_ticklabels, fontsize_titles)
             
@@ -399,7 +405,7 @@ def main(argv):
                 raise RuntimeError(f"layout {layout} not recognized")
             thisMin = int(np.round(np.nanmin(gdd_map_yx)))
             thisMax = int(np.round(np.nanmax(gdd_map_yx)))
-            thisTitle = f"{vegtype_str_title}: New (range {thisMin}–{thisMax})"
+            thisTitle = f"{vegtype_str_title}: {args.run2_name} (range {thisMin}–{thisMax})"
             make_map(ax, gdd_map_yx, thisTitle, vmax, bin_width,
                      fontsize_ticklabels, fontsize_titles)
             
@@ -433,8 +439,8 @@ def main(argv):
             set_boxplot_props(bpr, color_new)
             
             # draw temporary lines to create a legend
-            plt.plot([], c=color_old, label='Old')
-            plt.plot([], c=color_new, label='New')
+            plt.plot([], c=color_old, label=args.run1_name)
+            plt.plot([], c=color_new, label=args.run2_name)
             plt.legend(fontsize=fontsize_titles)
             
             plt.xticks(range(0, len(bin_names) * 2, 2), bin_names,
