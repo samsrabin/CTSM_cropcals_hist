@@ -23,7 +23,7 @@ import warnings
 import cartopy.crs as ccrs
 import datetime as dt
 import pickle
-import getopt
+import argparse
 
 plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 
@@ -36,70 +36,45 @@ warnings.filterwarnings("ignore", message="Iteration over multi-part geometries 
 
 def main(argv):
 
-    help_string = "generate_gdds.py -r <run-dir> -s <sdates-file> -h <hdates-file> -1 <first-season> -N <last-season> [--no-save-figs --preprocessed]"
+    help_string = "generate_gdds.py -r <run-dir> -s <sdates-file> -h <hdates-file> -1 <first-season> -N <last-season> [--no-save-figs --args.only_make_figs]"
 
     ###############################
     ### Process input arguments ###
     ###############################
-
-    # Get arguments
-    indir = None
-    y1 = None
-    yN = None
-    sdate_inFile = None
-    hdate_inFile = None
-    save_figs = True
-    preprocessed = False
-    try:
-        opts, args = getopt.getopt(argv, "r:1:n:N:s:h:", ["run-dir", "first-season", "last-season", "sdates-file", "hdates-file", "help", "no-save-figs", "preprocessed"])
-    except getopt.GetoptError:
-        print(help_string)
-        print("Error parsing arguments. Probably an incorrect option specified?")
-        sys.exit(1)
-    for opt, arg in opts:
-        if opt == "--help":
-            print(help_string)
-            sys.exit()
-        elif opt in ("-r", "--run-dir"):
-            indir = arg
-        elif opt in ("-s", "--sdates-file"):
-            sdate_inFile = arg
-        elif opt in ("-h", "--hdates-file"):
-            hdate_inFile = arg
-        elif opt in ("-1", "--first-season"):
-            y1 = int(arg)
-        elif opt in ("-N", "-n", "--last-season"):
-            yN = int(arg)
-        elif opt == "--no-save-figs":
-            save_figs = False
-            if overwrite != 0:
-                print(help_string)
-                print("Do not specify both --overwrite and --no-overwrite")
-                sys.exit(1)
-            overwrite = 1
-        elif opt == "--preprocessed":
-            preprocessed = True
-
-    # Check arguments
-    if not indir:
-        print(help_string)
-        print("You must provide a directory where run outputs can be found (and where outputs will go), with -r/--run-dir.")
-        sys.exit(2)
-    elif not sdate_inFile:
-        print(help_string)
-        print("You must provide file of prescribed sowing dates, with -s/--sdates-file.")
-        sys.exit(2)
-    elif not hdate_inFile:
-        print(help_string)
-        print("You must provide file of prescribed harvest dates, with -h/--hdates-file.")
-        sys.exit(2)
-    elif y1 == None or yN == None:
-        print(help_string)
-        print("You must provide both -1/--first-season and -N/--last-season")
-        sys.exit(2)
     
+    # Set arguments
+    parser = argparse.ArgumentParser(description="ADD DESCRIPTION HERE")
+    parser.add_argument("-r", "--run-dir", 
+                        help="Directory where run outputs can be found (and where outputs will go)",
+                        required=True)
+    parser.add_argument("-1", "--first-season", 
+                        help="First growing season to include in calculation of mean",
+                        required=True)
+    parser.add_argument("-n", "-N", "--last-season", 
+                        help="Last growing season to include in calculation of mean",
+                        required=True)
+    parser.add_argument("-sd", "--sdates-file", 
+                        help="File of prescribed sowing dates",
+                        required=True)
+    parser.add_argument("-hd", "--hdates-file", 
+                        help="File of prescribed harvest dates",
+                        required=True)
+    figsgroup = parser.add_mutually_exclusive_group()
+    figsgroup.add_argument("--dont-save-figs", 
+                           help="Do not save figures or files needed to create them",
+                           action="store_true", default=False)
+    figsgroup.add_argument("--only-make-figs", 
+                           help="Use preprocessed files to make figures only",
+                           action="store_true", default=False)
+    
+    # Get arguments
+    args = parser.parse_args()
+    for k, v in sorted(vars(args).items()):
+        print(f"{k}: {v}")
+    save_figs = not args.dont_save_figs
+        
     # Directories to save output files and figures
-    outdir = os.path.join(indir, "generate_gdds")
+    outdir = os.path.join(args.run_dir, "generate_gdds")
     outdir_figs = os.path.join(outdir, "figs")
     
     
@@ -107,19 +82,19 @@ def main(argv):
     ### Import and process ###
     ##########################
     
-    if not preprocessed:
+    if not args.only_make_figs:
     
         # Keep 1 extra year to avoid incomplete final growing season for crops harvested after Dec. 31.
-        y1_import_str = f"{y1+1}-01-01"
-        yN_import_str = f"{yN+2}-01-01"
+        y1_import_str = f"{args.first_season+1}-01-01"
+        yN_import_str = f"{args.last_season+2}-01-01"
         
         print(f"Importing netCDF time steps {y1_import_str} through {yN_import_str} (years are +1 because of CTSM output naming)")
         
-        pickle_file = os.path.join(outdir, f'{y1}-{yN}.pickle')
-        h1_ds_file = os.path.join(outdir, f'{y1}-{yN}.h1_ds.nc')
+        pickle_file = os.path.join(outdir, f'{args.first_season}-{args.last_season}.pickle')
+        h1_ds_file = os.path.join(outdir, f'{args.first_season}-{args.last_season}.h1_ds.nc')
         if os.path.exists(pickle_file):
             with open(pickle_file, 'rb') as f:
-                y1, yN, pickle_year, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = pickle.load(f)
+                args.first_season, args.last_season, pickle_year, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = pickle.load(f)
             print(f'Will resume import at {pickle_year+1}')
             h1_ds = None
         else:
@@ -131,19 +106,19 @@ def main(argv):
             gddharv_yp_list = []
             incl_vegtypes_str = None
             lastYear_active_patch_indices_list = None
-        sdates_rx = sdate_inFile
-        hdates_rx = hdate_inFile
+        sdates_rx = args.sdates_file
+        hdates_rx = args.hdates_file
         
-        for y, thisYear in enumerate(np.arange(y1+1,yN+3)):
+        for y, thisYear in enumerate(np.arange(args.first_season+1,args.last_season+3)):
             
             if thisYear <= pickle_year:
                 continue
             
-            h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = gddfn.import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str, h1_ds_file)
+            h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = gddfn.import_and_process_1yr(args.first_season, args.last_season, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, args.run_dir, incl_vegtypes_str, h1_ds_file)
             
             print(f'   Saving pickle file ({pickle_file})...')
             with open(pickle_file, 'wb') as f:
-                pickle.dump([y1, yN, thisYear, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings], f, protocol=-1)
+                pickle.dump([args.first_season, args.last_season, thisYear, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings], f, protocol=-1)
                 
         
         if isinstance(incl_vegtypes_str, list):
@@ -160,7 +135,7 @@ def main(argv):
     ### Get and grid mean GDDs in GGCMI growing season ###
     ######################################################
     
-    if not preprocessed:
+    if not args.only_make_figs:
     
         longname_prefix = "GDD harvest target for "
         
@@ -180,7 +155,7 @@ def main(argv):
         # Add dummy variables for crops not actually simulated
         print("Adding dummy variables...")
         # Unnecessary?
-        template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
+        template_ds = xr.open_dataset(args.sdates_file, decode_times=True)
         all_vars = [v.replace("sdate","gdd") for v in template_ds if "sdate" in v]
         all_longnames = [template_ds[v].attrs["long_name"].replace("Planting day ", longname_prefix) + " (dummy)" for v in template_ds if "sdate" in v]
         dummy_vars = []
@@ -231,7 +206,7 @@ def main(argv):
     ### Save to netCDF ###
     ######################
     
-    if not preprocessed:
+    if not args.only_make_figs:
         print("Saving...")
         
         # Get output file path
@@ -239,9 +214,9 @@ def main(argv):
         outfile = os.path.join(outdir, "gdds_" + datestr + ".nc")
         outfile_fill0 = os.path.join(outdir, "gdds_fill0_" + datestr + ".nc")
         
-        def save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx):
+        def save_gdds(args, outfile, gdd_maps_ds, sdates_rx):
             # Set up output file from template (i.e., prescribed sowing dates).
-            template_ds = xr.open_dataset(sdate_inFile, decode_times=True)
+            template_ds = xr.open_dataset(args.sdates_file, decode_times=True)
             for v in template_ds:
                 if "sdate" in v:
                     template_ds = template_ds.drop(v)
@@ -249,7 +224,7 @@ def main(argv):
             template_ds.close()
         
             # Add global attributes
-            comment = f"Derived from CLM run plus crop calendar input files {os.path.basename(sdate_inFile) and {os.path.basename(hdate_inFile)}}."
+            comment = f"Derived from CLM run plus crop calendar input files {os.path.basename(args.sdates_file) and {os.path.basename(args.hdates_file)}}."
             gdd_maps_ds.attrs = {\
                 "author": "Sam Rabin (sam.rabin@gmail.com)",
                 "comment": comment,
@@ -262,8 +237,8 @@ def main(argv):
             # Save cultivar GDDs
             gdd_maps_ds.to_netcdf(outfile, mode="w", format="NETCDF3_CLASSIC")
         
-        save_gdds(sdate_inFile, hdate_inFile, outfile, gdd_maps_ds, sdates_rx)
-        save_gdds(sdate_inFile, hdate_inFile, outfile_fill0, gdd_fill0_maps_ds, sdates_rx)
+        save_gdds(args, outfile, gdd_maps_ds, sdates_rx)
+        save_gdds(args, outfile_fill0, gdd_fill0_maps_ds, sdates_rx)
         
         print("Done saving.")
     
@@ -272,19 +247,19 @@ def main(argv):
     ### Save things needed for mapmaking ###
     ########################################
     
-    def add_attrs_to_map_ds(map_ds, incl_vegtypes_str, dummy_fill, outdir_figs, y1, yN):
+    def add_attrs_to_map_ds(map_ds, incl_vegtypes_str, dummy_fill, outdir_figs, args):
         return map_ds.assign_attrs({'incl_vegtypes_str': incl_vegtypes_str,
                                     'dummy_fill': dummy_fill,
                                     'outdir_figs': outdir_figs,
-                                    'y1': y1,
-                                    'yN': yN})
+                                    'args.first_season': args.first_season,
+                                    'args.last_season': args.last_season})
     
-    if save_figs and not preprocessed:
+    if save_figs and not args.only_make_figs:
         if not os.path.exists(outdir_figs):
             os.makedirs(outdir_figs)
 
-        gdd_maps_ds = add_attrs_to_map_ds(gdd_maps_ds, plot_vegtypes_str, dummy_fill, outdir_figs, y1, yN)
-        gddharv_maps_ds = add_attrs_to_map_ds(gddharv_maps_ds, plot_vegtypes_str, dummy_fill, outdir_figs, y1, yN)
+        gdd_maps_ds = add_attrs_to_map_ds(gdd_maps_ds, plot_vegtypes_str, dummy_fill, outdir_figs, args)
+        gddharv_maps_ds = add_attrs_to_map_ds(gddharv_maps_ds, plot_vegtypes_str, dummy_fill, outdir_figs, args)
         
         gdd_maps_ds.to_netcdf(os.path.join(outdir_figs, "gdd_maps.nc"))
         gddharv_maps_ds.to_netcdf(os.path.join(outdir_figs, "gddharv_maps.nc"))
@@ -334,7 +309,7 @@ def main(argv):
                           flierprops=dict(markeredgewidth=0.5))
         return bpl
     
-    def make_figures(thisDir=None, gdd_maps_ds=None, gddharv_maps_ds=None, outdir_figs=None):
+    def make_figures(args, thisDir=None, gdd_maps_ds=None, gddharv_maps_ds=None, outdir_figs=None):
         if not gdd_maps_ds:
             if not thisDir:
                 raise RuntimeError('If not providing gdd_maps_ds, you must provide thisDir (location of gdd_maps.nc)')
@@ -476,10 +451,10 @@ def main(argv):
         print("Done.")
     
     if save_figs: 
-        if preprocessed:
-            gdd_maps_ds = xr.open_dataset(os.path.join(indir, "generate_gdds", "figs", "gdd_maps.nc"))
-            gddharv_maps_ds = xr.open_dataset(os.path.join(indir, "generate_gdds", "figs", "gddharv_maps.nc"))
-        make_figures(gdd_maps_ds=gdd_maps_ds, gddharv_maps_ds=gddharv_maps_ds, outdir_figs=outdir_figs)
+        if args.only_make_figs:
+            gdd_maps_ds = xr.open_dataset(os.path.join(args.run_dir, "generate_gdds", "figs", "gdd_maps.nc"))
+            gddharv_maps_ds = xr.open_dataset(os.path.join(args.run_dir, "generate_gdds", "figs", "gddharv_maps.nc"))
+        make_figures(args, gdd_maps_ds=gdd_maps_ds, gddharv_maps_ds=gddharv_maps_ds, outdir_figs=outdir_figs)
 
 
 if __name__ == "__main__":
