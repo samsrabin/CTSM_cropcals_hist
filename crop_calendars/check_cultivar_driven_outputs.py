@@ -101,7 +101,7 @@ outdir_figs = os.path.join(indirs[1]["path"], f"figs_comp_{os.path.basename(os.p
 if not os.path.exists(outdir_figs):
     os.makedirs(outdir_figs)
 
-
+plt.rc('font',**{'family':'sans-serif','sans-serif':['Arial']})
 fontsize_titles = 8
 fontsize_axislabels = 8
 fontsize_ticklabels = 7
@@ -625,6 +625,10 @@ def trim_years(y1, yN, Ngs, ds_in):
 
 ggcmiDS_started = False
 
+fontsize_titles = 6
+fontsize_axislabels = 6
+fontsize_ticklabels = 6
+
 for thisVar_orig in varList:
     thisVar = thisVar_orig
     
@@ -651,27 +655,33 @@ for thisVar_orig in varList:
         thisVar = thisVar.replace(".diffExpected", "")
         filename_prefix = filename_prefix + "_diffExpected"
 
-    ny = 4
-    nx = 4
+    ny = 5
+    nx = 3
     if Nggcmi_models_orig > ny*nx + 3:
         raise RuntimeError(f"{Nggcmi_models_orig} GGCMI models + 3 other maps > ny*nx ({ny*nx})")
     vmin = 0.0
     title_prefix = "Seas. length" + title_prefix
     filename_prefix = "seas_length_compGGCMI" + filename_prefix
     if diffExpected:
-        units = "Season length minus expected"
+        units = "Season length minus ISIMIP3"
         cmap = plt.cm.RdBu
     else:
         units = "Days"
         cmap = plt.cm.viridis
     vmin = None
     
-    figsize = (16, 8)
-    # figsize = (40, 20)
-    cbar_adj_bottom = 0.15
-    cbar_ax_rect = [0.15, 0.05, 0.7, 0.025]
-    if nx != 4 or ny != 4:
-        print(f"Since (nx,ny) = ({nx},{ny}), you may need to rework some parameters")
+    if ny == 5 and nx == 3:
+        figsize = (9, 9)
+        # figsize = (40, 20)
+        cbar_adj_bottom = 0.15
+        cbar_ax_rect = [0.15, 0.05, 0.7, 0.025]
+    else:
+        figsize = (16, 8)
+        # figsize = (40, 20)
+        cbar_adj_bottom = 0.15
+        cbar_ax_rect = [0.15, 0.05, 0.7, 0.025]
+        if nx != 4 or ny != 4:
+            print(f"Since (nx,ny) = ({nx},{ny}), you may need to rework some parameters")
 
     for v, vegtype_str in enumerate(vegtype_list):
         
@@ -891,10 +901,10 @@ for thisVar_orig in varList:
         
         for g in np.arange(Nggcmi_models):
             ggcmi_yx = ggcmiDA_mn.isel(model=g, drop=True)
-            ax = cc.make_axis(fig, ny, nx, 3+g+1)
+            ax = cc.make_axis(fig, ny, nx, 3+g + (ny*nx - Nggcmi_models - 2))
             im1 = make_map(ax, ggcmi_yx, ggcmi_models[g], "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
             
-        fig.suptitle(f"{title_prefix}: {vegtype_str_title}", y=0.95, fontsize=fontsize_titles*2.2)
+        fig.suptitle(f"{title_prefix}: {vegtype_str_title}", y=0.95, fontsize=fontsize_titles*2, fontweight="bold")
         fig.subplots_adjust(bottom=cbar_adj_bottom)
         cbar_ax = fig.add_axes(cbar_ax_rect)
         cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
