@@ -212,12 +212,34 @@ def check_constant_vars(this_ds, case, ignore_nan, constantGSs=None, verbose=Tru
                     bad_patches = np.concatenate((bad_patches, np.array(thesePatches)[bad_patches_thisT]))
                     if rx_ds:
                         found_in_rx = np.array([False for x in bad_patches])
+                    varyPatches = list(np.array(thesePatches)[bad_patches_thisT])
+                    varyLons = this_ds.patches1d_lon.values[bad_patches_thisT]
+                    varyLats = this_ds.patches1d_lat.values[bad_patches_thisT]
+                    varyCrops = this_ds.patches1d_itype_veg_str.values[bad_patches_thisT]
+                    varyCrops_int = this_ds.patches1d_itype_veg.values[bad_patches_thisT]
+                    
+                    any_bad_anyCrop = False
+                    for c in np.unique(varyCrops_int):
+                        rx_var = f'gs1_{c}'
+                        varyLons_thisCrop = varyLons[np.where(varyCrops_int==c)]
+                        varyLats_thisCrop = varyLats[np.where(varyCrops_int==c)]
+                        theseRxVals = np.diag(rx_ds[rx_var].sel(lon=varyLons_thisCrop, lat=varyLats_thisCrop).values)
+                        if len(theseRxVals) != len(varyLats_thisCrop):
+                            raise RuntimeError(f"Expected {len(varyLats_thisCrop)} rx values; got {len(theseRxVals)}")
+                        if not np.any(theseRxVals != -1):
+                            continue
+                        any_bad_anyCrop = True
+                        break
+                    if not any_bad_anyCrop:
+                        continue
+                    
+                    # This bit is pretty inefficient, but I'm not going to optimize it until I actually need to use it.
                     for i, p in enumerate(bad_patches_thisT):
-                        thisPatch = thesePatches[p]
-                        thisLon = this_ds.patches1d_lon.values[p]
-                        thisLat = this_ds.patches1d_lat.values[p]
-                        thisCrop = this_ds.patches1d_itype_veg_str.values[p]
-                        thisCrop_int = this_ds.patches1d_itype_veg.values[p]
+                        thisPatch = varyPatches[i]
+                        thisLon = varyLons[i]
+                        thisLat = varyLats[i]
+                        thisCrop = varyCrops[i]
+                        thisCrop_int = varyCrops_int[i]
                         
                         # If prescribed input had missing value (-1), it's fine for it to vary.
                         if rx_ds:
@@ -231,6 +253,8 @@ def check_constant_vars(this_ds, case, ignore_nan, constantGSs=None, verbose=Tru
                                         continue
                                 elif Nunique > 1:
                                     raise RuntimeError(f'How does lon {thisLon} lat {thisLat} {thisCrop} have time-varying {v}?')
+                            else:
+                                raise RuntimeError('lon {thisLon} lat {thisLat} {thisCrop} not in rx dataset?')
                         
                         # Print info (or save to print later)
                         any_bad = True
