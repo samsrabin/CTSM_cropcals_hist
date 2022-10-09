@@ -107,10 +107,21 @@ fontsize_axislabels = 8
 fontsize_ticklabels = 7
 bin_width = 30
 lat_bin_edges = np.arange(0, 91, bin_width)
-def make_map(ax, this_map, this_title, ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap): 
-    im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+def make_map(ax, this_map, this_title, ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap, bounds=None): 
+    
+    if bounds:
+        norm = mcolors.BoundaryNorm(bounds, cmap.N, extend='both')
+        im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
             this_map, shading="auto",
-            vmin=vmin, vmax=vmax, cmap=cmap)
+            norm=norm,
+            cmap=cmap)
+    else:
+        im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+            this_map, shading="auto",
+            vmin=vmin, vmax=vmax,
+            cmap=cmap)
+    
+    
     ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
     ax.coastlines(linewidth=0.5, color="white")
     ax.coastlines(linewidth=0.3)
@@ -118,19 +129,7 @@ def make_map(ax, this_map, this_title, ylabel, vmin, vmax, bin_width, fontsize_t
         ax.set_title(this_title, fontsize=fontsize_titles)
     if ylabel:
         ax.set_ylabel(ylabel)
-    # cbar = plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02)
-    # cbar.ax.tick_params(labelsize=fontsize_ticklabels)
-    
-    # ax.yaxis.set_tick_params(width=0.2)
-    # ticks = np.arange(-90, 91, bin_width)
-    # ticklabels = [str(x) for x in ticks]
-    # for i,x in enumerate(ticks):
-    #     if x%2:
-    #         ticklabels[i] = ''
-    # # ticklabels = []
-    # plt.yticks(np.arange(-90,91,bin_width), labels=ticklabels,
-    #            fontsize=fontsize_ticklabels,
-    #            fontweight=0.1)
+
     return im1
 
 
@@ -224,7 +223,7 @@ if "time" in sdates_rx_ds.dims:
     hdates_rx_ds = hdates_rx_ds.isel(time=0, drop=True)
     gdds_rx_ds = gdds_rx_ds.isel(time=0, drop=True)
     
-
+importlib.reload(cc)
 if indirs[0]["used_rx_sdate"]:
     cc.check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds0, "dates_ds0", "SDATES")
 if indirs[1]["used_rx_sdate"]:
@@ -592,9 +591,9 @@ for thisVar in varList:
 # varList = ["GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.noOutliers", "GSLEN.onlyMature.useMedian"]
 # varList = ["GSLEN"]
 # varList = ["GSLEN.onlyMature"]
-# varList = ["GSLEN.onlyMature.diffExpected"]
+varList = ["GSLEN.onlyMature.diffExpected"]
 # varList = ["GSLEN.onlyMature.diffExpected.noOutliers"]
-varList = ["GSLEN.onlyMature.diffExpected.useMedian"]
+# varList = ["GSLEN.onlyMature.diffExpected.useMedian"]
 # varList = ["GSLEN", "GSLEN.onlyMature"]
 # varList = ["GSLEN.onlyMature.noOutliers"]
 # varList = ["GSLEN.onlyMature.useMedian"]
@@ -638,8 +637,8 @@ for thisVar_orig in varList:
     onlyMature = "onlyMature" in thisVar
     if onlyMature:
         thisVar = thisVar.replace(".onlyMature", "")
-        title_prefix = title_prefix + " (if mat.)"
-        filename_prefix = filename_prefix + "_ifmature"
+        title_prefix = title_prefix + " (when mature)"
+        filename_prefix = filename_prefix + "_whenmature"
     noOutliers = "noOutliers" in thisVar
     if noOutliers:
         thisVar = thisVar.replace(".noOutliers", "")
@@ -648,22 +647,29 @@ for thisVar_orig in varList:
     useMedian = "useMedian" in thisVar
     if useMedian:
         thisVar = thisVar.replace(".useMedian", "")
-        title_prefix = title_prefix + " (median)"
         filename_prefix = filename_prefix + "_median"
+    else:
+        filename_prefix = filename_prefix + "_mean"
     diffExpected = "diffExpected" in thisVar
+    bounds = None
     if diffExpected:
         thisVar = thisVar.replace(".diffExpected", "")
         filename_prefix = filename_prefix + "_diffExpected"
+        bounds = [-120, -90, -60, -30, -7, 7, 30, 60, 90, 120]
 
     ny = 5
     nx = 3
     if Nggcmi_models_orig > ny*nx + 3:
         raise RuntimeError(f"{Nggcmi_models_orig} GGCMI models + 3 other maps > ny*nx ({ny*nx})")
     vmin = 0.0
-    title_prefix = "Seas. length" + title_prefix
+    title_prefix = "season length" + title_prefix
+    if useMedian:
+        title_prefix = "Median " + title_prefix
+    else:
+        title_prefix = "Mean " + title_prefix
     filename_prefix = "seas_length_compGGCMI" + filename_prefix
     if diffExpected:
-        units = "Season length minus ISIMIP3"
+        units = "Simulated season length minus ISIMIP3 (days)"
         cmap = plt.cm.RdBu
     else:
         units = "Days"
@@ -671,10 +677,10 @@ for thisVar_orig in varList:
     vmin = None
     
     if ny == 5 and nx == 3:
-        figsize = (9, 9)
+        figsize = (10, 8)
         # figsize = (40, 20)
-        cbar_adj_bottom = 0.15
-        cbar_ax_rect = [0.15, 0.05, 0.7, 0.025]
+        cbar_adj_bottom = 0.09
+        cbar_ax_rect = [0.15, 0.05, 0.7, 0.015]
     else:
         figsize = (16, 8)
         # figsize = (40, 20)
@@ -707,7 +713,7 @@ for thisVar_orig in varList:
         
         # Get variations on vegtype string
         vegtype_str_paramfile = cc.get_vegtype_str_paramfile(vegtype_str)
-        vegtype_str_title = cc.get_vegtype_str_for_title(vegtype_str)
+        vegtype_str_title = cc.get_vegtype_str_for_title_long(vegtype_str)
         vegtype_str_figfile = cc.get_vegtype_str_figfile(vegtype_str)
         
         # Import GGCMI outputs
@@ -890,24 +896,34 @@ for thisVar_orig in varList:
             vmax = max(max1, max2, max3, np.nanmax(ggcmiDA_mn.values))
         
         ax = cc.make_axis(fig, ny, nx, 1)
-        im1 = make_map(ax, map1_yx, "CLM", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
+        im1 = make_map(ax, map1_yx, "CLM", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap, bounds=bounds)
         
         if not diffExpected:
             ax = cc.make_axis(fig, ny, nx, 2)
-            im1 = make_map(ax, map2_yx, "CLM expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
+            im1 = make_map(ax, map2_yx, "CLM expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap, bounds=bounds)
             
             ax = cc.make_axis(fig, ny, nx, 3)
-            im1 = make_map(ax, map3_yx, "GGCMI expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
+            im1 = make_map(ax, map3_yx, "GGCMI expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap, bounds=bounds)
         
         for g in np.arange(Nggcmi_models):
             ggcmi_yx = ggcmiDA_mn.isel(model=g, drop=True)
             ax = cc.make_axis(fig, ny, nx, 3+g + (ny*nx - Nggcmi_models - 2))
-            im1 = make_map(ax, ggcmi_yx, ggcmi_models[g], "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
+            im1 = make_map(ax, ggcmi_yx, ggcmi_models[g], "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap, bounds=bounds)
             
         fig.suptitle(f"{title_prefix}: {vegtype_str_title}", y=0.95, fontsize=fontsize_titles*2, fontweight="bold")
         fig.subplots_adjust(bottom=cbar_adj_bottom)
         cbar_ax = fig.add_axes(cbar_ax_rect)
-        cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
+        
+        if diffExpected:
+            norm = mcolors.BoundaryNorm(bounds, cmap.N, extend='both')
+            cbar = fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap),
+                    orientation='horizontal',
+                    spacing='proportional',
+                    cax=cbar_ax)
+        else:
+            cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
+        
+        
         cbar_ax.tick_params(labelsize=fontsize_ticklabels*2)
         plt.xlabel(units, fontsize=fontsize_titles*2)
         
@@ -918,10 +934,11 @@ for thisVar_orig in varList:
         
         # Save
         outfile = os.path.join(outdir_figs, f"{filename_prefix}_{vegtype_str_figfile}.png")
-        plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+        plt.savefig(outfile, dpi=300, transparent=False, facecolor='white', \
                 bbox_inches='tight')
         plt.close()
-
+    #     break
+    # break
 
 # # %% Grid a variable and save to netCDF
 

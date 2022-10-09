@@ -1148,6 +1148,19 @@ def get_vegtype_str_for_title(vegtype_str_in):
     return vegtype_str_out
 
 
+# Get vegtype str for figure titles
+def get_vegtype_str_for_title_long(vegtype_str_in):
+    vegtype_str_out = vegtype_str_in
+    if "irrigated" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("irrigated_", "Irrigated ")
+    else:
+        vegtype_str_out = "Rainfed " + vegtype_str_out
+    vegtype_str_out = vegtype_str_out.replace("_", " ")
+    if "soybean" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("soybean", "soy")
+    return vegtype_str_out
+
+
 def get_vegtype_str_paramfile(vegtype_str_in):
     # Get vegtype str used in parameter file
     if vegtype_str_in == "soybean":
