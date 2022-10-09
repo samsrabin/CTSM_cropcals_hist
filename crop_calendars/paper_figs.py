@@ -1,8 +1,9 @@
 # %% Setup
 
-# which_cases = "main2"
+which_cases = "main2"
 # which_cases = "originalCLM"
-which_cases = "diagnose"
+# which_cases = "originalBaseline" # As originalCLM, but without cmip6
+# which_cases = "diagnose"
 
 # Import shared functions
 import os
@@ -112,6 +113,7 @@ if which_cases == "originalCLM":
                      'constantVars': None,
                      'constantGSs': None,
                      'res': 'f09_g17'}
+if "original" in which_cases:
    # My run with normal CLM code + my outputs
    cases['Original baseline'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1958-2014/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1958-2014.clm2.h1.1958-01-01-00000.nc',
                                  'constantVars': None,
