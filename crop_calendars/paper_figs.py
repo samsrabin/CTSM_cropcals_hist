@@ -1,6 +1,8 @@
 # %% Setup
 
-all_cases = True
+# which_cases = "main2"
+# which_cases = "originalCLM"
+which_cases = "diagnose"
 
 # Import shared functions
 import os
@@ -16,10 +18,8 @@ my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myf
 sys.path.append(my_ctsm_python_gallery)
 import utils
 
-if all_cases:
-   outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures/"
-else:
-   outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures_main2/"
+outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures_" \
+   + which_cases + "/"
 if not os.path.exists(outDir_figs):
    os.mkdir(outDir_figs)
 
@@ -106,7 +106,7 @@ Nyears = len(yearList)
 
 # Define cases
 cases = {}
-if all_cases:
+if which_cases == "originalCLM":
    # A run that someone else did
    cases['cmip6'] = {'filepath': '/Users/Shared/CESM_work/CropEvalData_ssr/danica_timeseries-cmip6_i.e21.IHIST.f09_g17/month_1/ssr_trimmed_annual.nc',
                      'constantVars': None,
@@ -123,21 +123,30 @@ cases['New baseline'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/c
                          'constantGSs': None,
                          'res': 'f19_g17'}
 # My run with rx_crop_calendars2 code and GGCMI calendars
-# cases['Prescribed calendars'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced.clm2.h1.1958-01-01-00000.nc',
-#                            #   'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced.clm2.h1.1958-01-01-00000.nc',
-#                              'constantVars': ["SDATES", "GDDHARV"],
-#                              'constantGSs': None, # 'None' with constantVars specified means all should be constant
-#                              'res': 'f19_g17',
-#                              'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
-#                              'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
-#                              'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen2/gdds_20220902_114645.nc"}
 cases['Prescribed calendars'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3.clm2.h1.1958-01-01-00000.nc',
                              'constantVars': ["SDATES", "GDDHARV"],
                              'constantGSs': None, # 'None' with constantVars specified means all should be constant
                              'res': 'f19_g17',
                              'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
                              'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
-                             'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/gdds_20220927_174954.nc"}
+                             'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc"}
+if which_cases == "diagnose":
+   # My run with rx_crop_calendars2 code and GGCMI sowing dates but CLM maturity reqts
+   cases['Prescribed sowing'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.sdateforced_not_gdd/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.sdateforced_not_gdd.clm2.h1.1958-01-01-00000.nc',
+                              'constantVars': ["SDATES"],
+                              'constantGSs': None, # 'None' with constantVars specified means all should be constant
+                              'res': 'f19_g17',
+                              'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
+                              'rx_hdates_file': None,
+                              'rx_gdds_file': None}
+   # My run with rx_crop_calendars2 code and CLM sowing dates but GGCMI maturity reqts
+   cases['Prescribed maturity reqts.'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced_not_sdate/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced_not_sdate.clm2.h1.1958-01-01-00000.nc',
+                              'constantVars': ["GDDHARV"],
+                              'constantGSs': None, # 'None' with constantVars specified means all should be constant
+                              'res': 'f19_g17',
+                              'rx_sdates_file': None,
+                              'rx_hdates_file': None,
+                              'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc"}
 
 
 # Note that _PERHARV will be stripped off upon import
@@ -249,50 +258,48 @@ for i, (casename, case) in enumerate(cases.items()):
 print("Done.")
 
 
-# %% Import GGCMI sowing and harvest dates
+# %% Import GGCMI sowing and harvest dates, and check sims
 # Minimum harvest threshold allowed in PlantCrop()
 gdd_min = 50
 
 for i, (casename, case) in enumerate(cases.items()):
    
    if 'rx_sdates_file' in case:
-      if 'rx_hdates_file' not in case:
-         raise RuntimeError(f'{casename} had prescribed sdates but not hdates?')
-      elif 'rx_gdds_file' not in case:
-         raise RuntimeError(f'{casename} had prescribed s/hdates but not GDDs?')
-      case['rx_sdates_ds'] = cc.import_rx_dates("sdate", case['rx_sdates_file'], case['ds'])
-      case['rx_hdates_ds'] = cc.import_rx_dates("hdate", case['rx_hdates_file'], case['ds'])
-      case['rx_gdds_ds'] = cc.import_rx_dates("gdd", case['rx_gdds_file'], case['ds'])
+      if case['rx_sdates_file']:
+         case['rx_sdates_ds'] = cc.import_rx_dates("sdate", case['rx_sdates_file'], case['ds'])
+      if case['rx_hdates_file']:
+         case['rx_hdates_ds'] = cc.import_rx_dates("hdate", case['rx_hdates_file'], case['ds'])
+      if case['rx_gdds_file']:
+         case['rx_gdds_ds'] = cc.import_rx_dates("gdd", case['rx_gdds_file'], case['ds'])
       
       # Equalize lons/lats
       lonlat_tol = 1e-4
       for v in ['rx_sdates_ds', 'rx_hdates_ds', 'rx_gdds_ds']:
-         for l in ['lon', 'lat']:
-            max_diff_orig = np.max(np.abs(case[v][l].values - case['ds'][l].values))
-            if max_diff_orig > lonlat_tol:
-               raise RuntimeError(f'{v} {l} values differ too much from {casename} ({max_diff_orig} > {lonlat_tol})')
-            elif max_diff_orig > 0:
-               case[v] = case[v].assign_coords({l: case['ds'][l].values})
-               max_diff = np.max(np.abs(case[v][l].values - case['ds'][l].values))
-               print(f'{v} {l} max_diff {max_diff_orig} → {max_diff}')
-            else:
-               print(f'{v} {l} max_diff {max_diff_orig}')
+         if v in case:
+            for l in ['lon', 'lat']:
+               max_diff_orig = np.max(np.abs(case[v][l].values - case['ds'][l].values))
+               if max_diff_orig > lonlat_tol:
+                  raise RuntimeError(f'{v} {l} values differ too much from {casename} ({max_diff_orig} > {lonlat_tol})')
+               elif max_diff_orig > 0:
+                  case[v] = case[v].assign_coords({l: case['ds'][l].values})
+                  max_diff = np.max(np.abs(case[v][l].values - case['ds'][l].values))
+                  print(f'{v} {l} max_diff {max_diff_orig} → {max_diff}')
+               else:
+                  print(f'{v} {l} max_diff {max_diff_orig}')
       
-      case['rx_gslen_ds'] = case['rx_hdates_ds'].copy()
-      for v in case['rx_gslen_ds']:
-         if v == "time_bounds":
-            continue
-         case['rx_gslen_ds'][v] = cc.get_gs_len_da(case['rx_hdates_ds'][v] - case['rx_sdates_ds'][v])
+      if case['rx_sdates_file'] and case['rx_hdates_file']:
+         case['rx_gslen_ds'] = case['rx_hdates_ds'].copy()
+         for v in case['rx_gslen_ds']:
+            if v == "time_bounds":
+               continue
+            case['rx_gslen_ds'][v] = cc.get_gs_len_da(case['rx_hdates_ds'][v] - case['rx_sdates_ds'][v])
          
       # Check
-      cc.check_rx_obeyed(case['ds'].vegtype_str.values, case['rx_sdates_ds'].isel(time=0), case['ds'], casename, "SDATES")
-      cc.check_rx_obeyed(case['ds'].vegtype_str.values, case['rx_gdds_ds'].isel(time=0), case['ds'], casename, "GDDHARV", gdd_min=gdd_min)
+      if case['rx_sdates_file']:
+         cc.check_rx_obeyed(case['ds'].vegtype_str.values, case['rx_sdates_ds'].isel(time=0), case['ds'], casename, "SDATES")
+      if case['rx_gdds_file']:
+         cc.check_rx_obeyed(case['ds'].vegtype_str.values, case['rx_gdds_ds'].isel(time=0), case['ds'], casename, "GDDHARV", gdd_min=gdd_min)
       
-   elif 'rx_hdates_file' in case:
-      raise RuntimeError(f'{casename} had prescribed hdates but not sdates?')
-   elif 'rx_gdds_file' in case:
-      raise RuntimeError(f'{casename} had prescribed GDDs but not s/hdates?')
-
 
 # %% Get FAO data from CSV
 
