@@ -320,7 +320,7 @@ def check_constant_vars(this_ds, case, ignore_nan, constantGSs=None, verbose=Tru
 def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min=None, verbose=False):
     all_ok = 2
     diff_str_list = []
-    gdd_tolerance = 0
+    gdd_tolerance = 1
     
     if "GDDHARV" in output_var and verbose:
         harvest_reason_da = dates_ds['HARVEST_REASON']
@@ -373,6 +373,10 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
                 diff_array = np.ma.masked_array(diff_array, mask= \
                     (diff_array < 0) & 
                     (ds_thisVeg["HARVEST_REASON_PERHARV"].values==5))
+            elif output_var=="GDDHARV":
+                diff_array = np.ma.masked_array(diff_array, mask= \
+                    (diff_array < 0) & 
+                    (ds_thisVeg["HARVEST_REASON"].values==5))
     
             if np.any(np.abs(diff_array[abs(diff_array) > 0]) > 0):
                 min_diff, minLon, minLat, minGS, minRx = get_extreme_info(diff_array, rx_array, np.nanmin, sim_array_dims, dates_ds.gs, patch_lons_thisVeg, patch_lats_thisVeg)
@@ -381,7 +385,7 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
                 diffs_eg_txt = f"{vegtype_str} ({vegtype_int}): diffs range {min_diff} (lon {minLon}, lat {minLat}, gs {minGS}, rx ~{minRx}) to {max_diff} (lon {maxLon}, lat {maxLat}, gs {maxGS}, rx ~{maxRx})"
                 if "GDDHARV" in output_var:
                     diffs_eg_txt += f"; harvest reasons: {unique_harvest_reasons} ({pct_harv_at_mature}% harvested at maturity)"
-                if output_var=="GDDHARV_PERHARV" and np.max(abs(diff_array)) <= gdd_tolerance:
+                if "GDDHARV" in output_var and np.nanmax(abs(diff_array)) <= gdd_tolerance:
                     all_ok = 1
                     diff_str_list.append(f"   {diffs_eg_txt}")
                 else:
