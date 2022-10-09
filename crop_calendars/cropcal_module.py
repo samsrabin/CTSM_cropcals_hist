@@ -317,10 +317,17 @@ def check_constant_vars(this_ds, case, ignore_nan, constantGSs=None, verbose=Tru
     return [int(p) for p in bad_patches]
 
 
-def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min=None):
+def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min=None, verbose=False):
     all_ok = 2
     diff_str_list = []
     gdd_tolerance = 0
+    
+    if "GDDHARV" in output_var and verbose:
+        harvest_reason_da = dates_ds['HARVEST_REASON']
+        unique_harvest_reasons = np.unique(harvest_reason_da.values[np.where(~np.isnan(harvest_reason_da.values))])
+        pct_harv_at_mature = get_pct_harv_at_mature(harvest_reason_da)
+        print(f"{which_ds} harvest reasons: {unique_harvest_reasons} ({pct_harv_at_mature}% harv at maturity)")
+    
     for vegtype_str in vegtype_list:
         thisVeg_patches = np.where(dates_ds.patches1d_itype_veg_str == vegtype_str)[0]
         if thisVeg_patches.size == 0:
@@ -338,11 +345,25 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
         sim_array = ds_thisVeg[output_var].values
         sim_array_dims = ds_thisVeg[output_var].dims
         
-        # Account for GDD harvest threshold minimum set in PlantCrop()
-        if output_var=="GDDHARV_PERHARV":
+        # Account for...
+        if "GDDHARV" in output_var:
+            # ...GDD harvest threshold minimum set in PlantCrop()
             if gdd_min == None:
-                raise RuntimeError(f"gdd_min must be provided when doing check_rx_obeyed() for GDDHARV_PERHARV")
+                raise RuntimeError(f"gdd_min must be provided when doing check_rx_obeyed() for {output_var}")
             rx_array[rx_array < gdd_min] = gdd_min
+            
+            # ...harvest reason
+            # 0: Should never happen in any simulation
+            # 1: Harvesting at maturity
+            # 2: Harvesting at max season length (mxmat)
+            # 3: Crop was incorrectly planted in last time step of Dec. 31
+            # 4: Today was supposed to be the planting day, but the previous crop still hasn't been harvested.
+            # 5: Harvest the day before the next sowing date this year.
+            # 6: Same as #5.
+            # 7: Harvest the day before the next sowing date (today is Dec. 31 and the sowing date is Jan. 1)
+            harvest_reason_da = ds_thisVeg['HARVEST_REASON']
+            unique_harvest_reasons = np.unique(harvest_reason_da.values[np.where(~np.isnan(harvest_reason_da.values))])
+            pct_harv_at_mature = get_pct_harv_at_mature(harvest_reason_da)
         
         if np.any(sim_array != rx_array):
             diff_array = sim_array - rx_array
@@ -358,12 +379,17 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
                 max_diff, maxLon, maxLat, maxGS, maxRx = get_extreme_info(diff_array, rx_array, np.nanmax, sim_array_dims, dates_ds.gs, patch_lons_thisVeg, patch_lats_thisVeg)
                 
                 diffs_eg_txt = f"{vegtype_str} ({vegtype_int}): diffs range {min_diff} (lon {minLon}, lat {minLat}, gs {minGS}, rx ~{minRx}) to {max_diff} (lon {maxLon}, lat {maxLat}, gs {maxGS}, rx ~{maxRx})"
+                if "GDDHARV" in output_var:
+                    diffs_eg_txt += f"; harvest reasons: {unique_harvest_reasons} ({pct_harv_at_mature}% harvested at maturity)"
                 if output_var=="GDDHARV_PERHARV" and np.max(abs(diff_array)) <= gdd_tolerance:
                     all_ok = 1
                     diff_str_list.append(f"   {diffs_eg_txt}")
                 else:
                     all_ok = 0
-                    break
+                    if verbose:
+                        print(f"❌ {which_ds}: Prescribed {output_var} *not* always obeyed. E.g., {diffs_eg_txt}")
+                    else:
+                        break
     
     if all_ok == 2:
         print(f"✅ {which_ds}: Prescribed {output_var} always obeyed")
@@ -860,6 +886,14 @@ def get_Nharv(array_in, these_dims):
     sum_indices = tuple(these_dims.index(x) for x in ["time", "mxharvests"])
     Nevents_eachPatch = np.sum(array_in > 0, axis=sum_indices)
     return Nevents_eachPatch
+
+
+def get_pct_harv_at_mature(harvest_reason_da):
+    Nharv_at_mature = len(np.where(harvest_reason_da.values==1)[0])
+    Nharv = len(np.where(harvest_reason_da.values>0)[0])
+    pct_harv_at_mature = Nharv_at_mature / Nharv * 100
+    pct_harv_at_mature = np.format_float_positional(pct_harv_at_mature, precision=2, unique=False, fractional=False, trim='k') # Round to 2 significant digits
+    return pct_harv_at_mature
 
 
 def get_reason_freq_map(Ngs, thisCrop_gridded, reason):
