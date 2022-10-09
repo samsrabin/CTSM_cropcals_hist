@@ -891,6 +891,8 @@ def get_Nharv(array_in, these_dims):
 def get_pct_harv_at_mature(harvest_reason_da):
     Nharv_at_mature = len(np.where(harvest_reason_da.values==1)[0])
     Nharv = len(np.where(harvest_reason_da.values>0)[0])
+    if Nharv == 0:
+        return np.nan
     pct_harv_at_mature = Nharv_at_mature / Nharv * 100
     pct_harv_at_mature = np.format_float_positional(pct_harv_at_mature, precision=2, unique=False, fractional=False, trim='k') # Round to 2 significant digits
     return pct_harv_at_mature
