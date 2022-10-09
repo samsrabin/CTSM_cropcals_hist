@@ -657,10 +657,17 @@ for thisVar_orig in varList:
         filename_prefix = filename_prefix + "_diffExpected"
         bounds = [-120, -90, -60, -30, -7, 7, 30, 60, 90, 120]
 
-    ny = 5
-    nx = 3
-    if Nggcmi_models_orig > ny*nx + 3:
-        raise RuntimeError(f"{Nggcmi_models_orig} GGCMI models + 3 other maps > ny*nx ({ny*nx})")
+    Nplots = Nggcmi_models_orig + 1
+    if not diffExpected:
+        Nplots += 2
+    if Nplots == 16:
+        ny = 4
+        nx = 4
+    else:
+        ny = 5
+        nx = 3
+    if Nplots > ny*nx + 3:
+        raise RuntimeError(f"{Nplots} plots > ny*nx ({ny*nx})")
     vmin = 0.0
     title_prefix = "season length" + title_prefix
     if useMedian:
@@ -708,7 +715,10 @@ for thisVar_orig in varList:
             irrtype_str_ggcmi = "firr"
         else:
             irrtype_str_ggcmi = "noirr"
-        ncvar = f"matyday-{vegtype_str_ggcmi}-{irrtype_str_ggcmi}"
+        if thisVar == "GSLEN":
+            ncvar = f"matyday-{vegtype_str_ggcmi}-{irrtype_str_ggcmi}"
+        else:
+            raise RuntimeError(f"What GGCMI variable should I use for {thisVar}?")
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         
         # Get variations on vegtype string
@@ -929,8 +939,8 @@ for thisVar_orig in varList:
         
         plt.subplots_adjust(wspace=0, hspace=0.3)
         
-        # plt.show()
-        # break
+        plt.show()
+        break
         
         # Save
         outfile = os.path.join(outdir_figs, f"{filename_prefix}_{vegtype_str_figfile}.png")
@@ -938,7 +948,7 @@ for thisVar_orig in varList:
                 bbox_inches='tight')
         plt.close()
     #     break
-    # break
+    break
 
 # # %% Grid a variable and save to netCDF
 
