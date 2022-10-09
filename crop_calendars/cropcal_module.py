@@ -345,12 +345,15 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
         sim_array = ds_thisVeg[output_var].values
         sim_array_dims = ds_thisVeg[output_var].dims
         
+        # Ignore patches without prescribed value
+        rx_array[np.where(rx_array < 0)] = np.nan
+        
         # Account for...
         if "GDDHARV" in output_var:
             # ...GDD harvest threshold minimum set in PlantCrop()
             if gdd_min == None:
                 raise RuntimeError(f"gdd_min must be provided when doing check_rx_obeyed() for {output_var}")
-            rx_array[rx_array < gdd_min] = gdd_min
+            rx_array[(rx_array >= 0) & (rx_array < gdd_min)] = gdd_min
             
             # ...harvest reason
             # 0: Should never happen in any simulation
@@ -377,7 +380,7 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
                 diff_array = np.ma.masked_array(diff_array, mask= \
                     (diff_array < 0) & 
                     (ds_thisVeg["HARVEST_REASON"].values==5))
-    
+
             if np.any(np.abs(diff_array[abs(diff_array) > 0]) > 0):
                 min_diff, minLon, minLat, minGS, minRx = get_extreme_info(diff_array, rx_array, np.nanmin, sim_array_dims, dates_ds.gs, patch_lons_thisVeg, patch_lats_thisVeg)
                 max_diff, maxLon, maxLat, maxGS, maxRx = get_extreme_info(diff_array, rx_array, np.nanmax, sim_array_dims, dates_ds.gs, patch_lons_thisVeg, patch_lats_thisVeg)
