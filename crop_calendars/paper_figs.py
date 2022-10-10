@@ -46,7 +46,9 @@ warnings.filterwarnings("ignore", message="All-NaN slice encountered")
 warnings.filterwarnings("ignore", message="This figure includes Axes that are not compatible with tight_layout, so results might be incorrect.")
 
 
-# %% Define functions
+# %% Define functions etc.
+
+cropList_combined_clm = ["Corn", "Rice", "Cotton", "Soybean", "Sugarcane", "Wheat", "Total"]
 
 def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False): 
    im = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
@@ -313,8 +315,6 @@ fao_area, fao_area_nosgc = cc.fao_data_get(fao_all, 'Area harvested', y1, yN)
 
 
 # %% Get CLM crop production
-
-cropList_combined_clm = ["Corn", "Rice", "Cotton", "Soybean", "Sugarcane", "Wheat", "Total"]
 
 for i, (casename, case) in enumerate(cases.items()):
    print(f"Gridding {casename}...")
@@ -588,7 +588,7 @@ overwrite = True
 
 varList = {
    'GDDHARV': {
-      'suptitle':   'Mean harvest reqt',
+      'suptitle':   'Mean harvest requirement',
       'time_dim':   'gs',
       'units':      'GDD',
       'multiplier': 1},
@@ -608,9 +608,14 @@ varList = {
       'units':      'day of year',
       'multiplier': 1},
    'HUI': {
-      'suptitle':   'Mean HUI accum',
+      'suptitle':   'Mean HUI at harvest',
       'time_dim':   'gs',
       'units':      'GDD',
+      'multiplier': 1},
+   'HUIFRAC': {
+      'suptitle':   'Mean HUI at harvest (fraction of required)',
+      'time_dim':   'gs',
+      'units':      'Fraction of required',
       'multiplier': 1},
    'SDATES': {
       'suptitle':   'Mean sowing date',
@@ -639,7 +644,7 @@ for (this_var, var_info) in varList.items():
    if var_info['time_dim'] == "time":
       yrange_str = f'{y1}-{yN}'
    else:
-      yrange_str = f'{y1}-{yN-1} gs'
+      yrange_str = f'{y1}-{yN-1} growing seasons'
    suptitle = var_info['suptitle'] + f' ({yrange_str})'
    
    print(f'Mapping {this_var}...')
@@ -656,6 +661,9 @@ for (this_var, var_info) in varList.items():
          fig_caselist += [casename]
       elif casename == ref_casename:
          raise RuntimeError(f'ref_case {ref_casename} is missing {this_var}')
+   if ny == 0:
+      print(f"No cases contain {this_var}; skipping.")
+      continue
    
    # Rearrange caselist for this figure so that reference case is first
    if ref_casename:
