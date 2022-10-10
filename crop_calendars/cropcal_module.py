@@ -913,6 +913,19 @@ def get_reason_freq_map(Ngs, thisCrop_gridded, reason):
     return map_yx
 
 
+def get_reason_list_text():
+    return [ \
+        "???",                   # 0; should never actually be saved
+        "Crop mature",           # 1
+        "Max CLM season length", # 2
+        "Bad Dec31 sowing",      # 3
+        "Sowing today",          # 4
+        "Sowing tomorrow",       # 5
+        "Sown a yr ago tmrw.",   # 6
+        "Sowing tmrw. (Jan 1)"   # 7
+        ]
+
+
 # Get yield dataset for top N countries (plus World)
 def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_all_ctry, earthstats):
 
@@ -1306,6 +1319,9 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
    this_ds["GRAINC_TO_FOOD_PERHARV"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_PERHARV"], this_ds.patches1d_itype_veg_str)
    this_ds_gs["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
    this_ds_gs["GRAIN_HARV_TOFOOD"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD"], this_ds.patches1d_itype_veg_str)
+   
+   # Get HUI accumulation as fraction of required
+   this_ds_gs["HUIFRAC"] = this_ds_gs["HUI"] / this_ds_gs["GDDHARV"]
    
    # Avoid tiny negative values
    varList_no_negative = ["GRAIN", "REASON", "GDD", "HUI", "YEAR", "DATE", "GSLEN"]

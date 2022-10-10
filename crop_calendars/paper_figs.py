@@ -50,14 +50,25 @@ warnings.filterwarnings("ignore", message="This figure includes Axes that are no
 
 cropList_combined_clm = ["Corn", "Rice", "Cotton", "Soybean", "Sugarcane", "Wheat", "Total"]
 
-def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False): 
-   im = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
-                       this_map, shading="auto",
-                       cmap=cmap)
-   if vrange:
-      im.set_clim(vrange[0], vrange[1])
+plt.rc('font',**{'family':'sans-serif','sans-serif':['Arial']})
+
+def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend='both'): 
+   
+   if bounds:
+      norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend)
+      im = ax.pcolormesh(this_map.lon.values, this_map.lat.values,
+                         this_map, shading="auto",
+                         norm=norm,
+                         cmap=cmap)
+   else:
+      im = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+                         this_map, shading="auto",
+                         cmap=cmap)
+      if vrange:
+         im.set_clim(vrange[0], vrange[1])
    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
-   ax.coastlines(linewidth=linewidth)
+   ax.coastlines(linewidth=linewidth, color="white")
+   ax.coastlines(linewidth=linewidth*0.6)
    if this_title:
       ax.set_title(this_title, fontsize=fontsize['titles'])
    if show_cbar:
@@ -104,6 +115,9 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
 
 y1 = 1961
 yN = 2010
+
+gs1 = y1
+gsN = yN - 1
 yearList = np.arange(y1,yN+1)
 Nyears = len(yearList)
 
@@ -200,6 +214,15 @@ for casename, case in cases.items():
    ivt_str_ever_active = np.unique(case_ds.isel(patch=ever_active)['patches1d_itype_veg_str'].values)
    clm_sim_veg_types += list(ivt_str_ever_active)
 clm_sim_veg_types = np.unique(clm_sim_veg_types)
+
+# Get all crops we care about
+clm_types_main = [x.lower().replace('wheat','spring_wheat') for x in cropList_combined_clm[:-1]]
+clm_types_rfir = []
+for x in clm_types_main:
+   for y in cases[list(cases.keys())[0]]['ds'].vegtype_str.values:
+      if x in y:
+         clm_types_rfir.append(y)
+clm_types = np.unique([x.replace('irrigated_', '') for x in clm_types_rfir])
 
 
 # %% Import LU data
@@ -704,15 +727,6 @@ for (this_var, var_info) in varList.items():
    else:
       raise ValueError(f"Set up for ny = {ny}")
 
-   # Get all crops we care about
-   clm_types_main = [x.lower().replace('wheat','spring_wheat') for x in cropList_combined_clm[:-1]]
-   clm_types_rfir = []
-   for x in clm_types_main:
-      for y in cases[list(cases.keys())[0]]['ds'].vegtype_str.values:
-         if x in y:
-            clm_types_rfir.append(y)
-   clm_types = np.unique([x.replace('irrigated_', '') for x in clm_types_rfir])
-
    for thisCrop_main in clm_types:
       
       # Get the name we'll use in output text/filenames
@@ -865,6 +879,129 @@ for (this_var, var_info) in varList.items():
    
 print('Done making maps.')
 
+
+# %% Make maps of harvest reasons
+importlib.reload(cc)
+
+thisVar = "HARVEST_REASON"
+reason_list_text_all = cc.get_reason_list_text()
+
+for i, (casename, case) in enumerate(cases.items()):
+   if i == 0:
+      reason_list = np.unique(case['ds'][thisVar].values)
+   else:
+      reason_list = np.unique(np.concatenate( \
+         (reason_list, \
+         np.unique(case['ds'][thisVar].values))))
+reason_list = [int(x) for x in reason_list if not np.isnan(x)]
+reason_list_text = [reason_list_text_all[x] for x in reason_list]
+
+ny = 2
+nx = len(reason_list)
+
+epsilon = np.nextafter(0, 1)
+# bounds = [epsilon] + list(np.arange(0.2, 1.001, 0.2))
+bounds = [epsilon] + list(np.arange(0.1, 1, 0.1)) + [1-epsilon]
+extend = 'both'
+
+figsize = (8, 4)
+cbar_adj_bottom = 0.15
+cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
+cmap = plt.cm.jet
+wspace = None
+hspace = None
+fontsize = {}
+fontsize['titles'] = 8
+fontsize['axislabels'] = 8
+fontsize['ticklabels'] = 8
+if nx == 3:
+   figsize = (8, 3)
+   cbar_adj_bottom = 0.1
+   cbar_ax_rect = [0.15, 0.05, 0.7, 0.035]
+   wspace = 0.1
+   hspace = -0.1
+elif nx != 2:
+   print(f"Since nx = {nx}, you may need to rework some parameters")
+
+for v, vegtype_str in enumerate(clm_types_rfir):
+   if 'winter' in vegtype_str or 'miscanthus' in vegtype_str:
+      continue
+   print(f"{thisVar}: {vegtype_str}...")
+   vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+   
+   # Get variations on vegtype string
+   vegtype_str_title = cc.get_vegtype_str_for_title_long(vegtype_str)
+   
+   # Set up figure
+   fig = plt.figure(figsize=figsize)
+   axes = []
+   
+   for i, (casename, case) in enumerate(cases.items()):
+      # Grid
+      thisCrop_gridded = utils.grid_one_variable(case['ds'], thisVar, \
+         vegtype=vegtype_int).squeeze(drop=True)
+      
+      # Map each reason's frequency
+      for f, reason in enumerate(reason_list):
+         reason_text = reason_list_text[f]
+         
+         map_yx = cc.get_reason_freq_map(Ngs, thisCrop_gridded, reason)
+         ax = cc.make_axis(fig, ny, nx, i*nx + f+1)
+         axes.append(ax)
+         im0 = make_map(ax, map_yx, fontsize, cmap=cmap, bounds=bounds, extend=extend, linewidth=0.3)
+            
+   # Add column labels
+   topmost = np.arange(0, nx)
+   for a, ax in enumerate(axes):
+      if a not in topmost:
+         nearest_topmost = a % nx
+         axes[a].sharex(axes[nearest_topmost])
+   for i, a in enumerate(topmost):
+      axes[a].set_title(f"{reason_list_text[i]}",
+                        fontsize=fontsize['titles'],
+                        y=1.05)
+
+   # Add row labels
+   leftmost = np.arange(0, ny*nx, nx)
+   for a, ax in enumerate(axes):
+      if a not in leftmost:
+         nearest_leftmost = a % ny
+         axes[a].sharey(axes[nearest_leftmost])
+      # I don't know why this is necessary, but otherwise the labels won't appear.
+      ax.set_yticks([])
+   for i, a in enumerate(leftmost):
+      axes[a].set_ylabel(caselist[i], fontsize=fontsize['titles'])
+      axes[a].yaxis.set_label_coords(-0.05, 0.5)
+
+   suptitle = f"Harvest reason: {vegtype_str_title} ({gs1}-{gsN} growing seasons)"
+   fig.suptitle(suptitle, fontsize=fontsize['titles']*1.2, fontweight="bold")
+   fig.subplots_adjust(bottom=cbar_adj_bottom)
+    
+   cbar_ax = fig.add_axes(cbar_ax_rect)
+   norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend)
+   cbar = fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap),
+                       orientation='horizontal',
+                       spacing='proportional',
+                       cax=cbar_ax)
+   cbar_ax.tick_params(labelsize=fontsize['titles'])
+   
+   plt.xlabel("Fraction of growing seasons", fontsize=fontsize['titles'])
+   if wspace != None:
+      plt.subplots_adjust(wspace=wspace)
+   if hspace != None:
+      plt.subplots_adjust(hspace=hspace)
+   
+   # plt.show()
+   # break
+   
+   # Save
+   filename = suptitle.replace(":", "").replace("growing seasons", "gs")
+   outfile = os.path.join(outDir_figs, f"{filename} {vegtype_str}.png")
+   plt.savefig(outfile, dpi=300, transparent=False, facecolor='white', \
+               bbox_inches='tight')
+   plt.close()
+   # break
+    
 
 # %% Make scatter plots, FAOSTAT vs. CLM, of top 10 countries for each crop
 

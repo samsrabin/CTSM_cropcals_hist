@@ -243,16 +243,7 @@ if "HARVEST_REASON_PERHARV" in "dates_ds0":
 else:
     thisVar = "HARVEST_REASON"
 
-reason_list_text_all = [ \
-    "???",                 # 0; should never actually be saved
-    "Crop mature",         # 1
-    "Max gs length",       # 2
-    "Bad Dec31 sowing",    # 3
-    "Sowing today",        # 4
-    "Sowing tomorrow",     # 5
-    "Sown a yr ago tmrw.", # 6
-    "Sowing tmrw. (Jan 1)" # 7
-    ]
+reason_list_text_all = cc.get_reason_list_text()
 
 reason_list = np.unique(np.concatenate( \
     (np.unique(dates_ds0[thisVar].values), \
