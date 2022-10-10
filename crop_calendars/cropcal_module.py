@@ -389,8 +389,9 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
                 if "GDDHARV" in output_var:
                     diffs_eg_txt += f"; harvest reasons: {unique_harvest_reasons} ({pct_harv_at_mature}% harvested at maturity)"
                 if "GDDHARV" in output_var and np.nanmax(abs(diff_array)) <= gdd_tolerance:
-                    all_ok = 1
-                    diff_str_list.append(f"   {diffs_eg_txt}")
+                    if all_ok > 0:
+                        all_ok = 1
+                        diff_str_list.append(f"   {diffs_eg_txt}")
                 else:
                     all_ok = 0
                     if verbose:
@@ -404,7 +405,7 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
         # print(f"🟨 {which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable:")
         # for x in diff_str_list: print(x)
         print(f"🟨 {which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable (diffs <= {gdd_tolerance})")
-    else:
+    elif not verbose:
         print(f"❌ {which_ds}: Prescribed {output_var} *not* always obeyed. E.g., {diffs_eg_txt}")
 
 
