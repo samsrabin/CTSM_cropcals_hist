@@ -50,12 +50,14 @@ indirs.append(dict(path="/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-
                    used_clm_mxmat = True,
                    used_rx_sdate = False,
                    used_rx_harvthresh = False,
-                   landuse_varies = True))
+                   landuse_varies = True,
+                   name = "Old baseline"))
 indirs.append(dict(path="/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3/",
                    used_clm_mxmat = False,
                    used_rx_sdate = True,
                    used_rx_harvthresh = True,
-                   landuse_varies = True))
+                   landuse_varies = True,
+                   name = "Prescribed calendars"))
 
 ggcmi_out_topdir = "/Users/Shared/GGCMI/AgMIP.output"
 ggcmi_cropcal_dir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar"
@@ -107,10 +109,10 @@ fontsize_axislabels = 8
 fontsize_ticklabels = 7
 bin_width = 30
 lat_bin_edges = np.arange(0, 91, bin_width)
-def make_map(ax, this_map, this_title, ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap, bounds=None): 
+def make_map(ax, this_map, this_title, ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap, bounds=None, extend='both'): 
     
     if bounds:
-        norm = mcolors.BoundaryNorm(bounds, cmap.N, extend='both')
+        norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend)
         im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
             this_map, shading="auto",
             norm=norm,
@@ -262,19 +264,23 @@ reason_list_text = [reason_list_text_all[x] for x in reason_list]
 ny = 2
 nx = len(reason_list)
 
+epsilon = np.nextafter(0, 1)
+# bounds = [epsilon] + list(np.arange(0.2, 1.001, 0.2))
+bounds = [epsilon] + list(np.arange(0.1, 1, 0.1)) + [1-epsilon]
+extend = 'both'
+
 figsize = (8, 4)
 cbar_adj_bottom = 0.15
 cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
-cmap = plt.cm.viridis
+cmap = plt.cm.jet
 wspace = None
 hspace = None
 if nx == 3:
     figsize = (8, 3)
-    cbar_adj_bottom = 0.15
-    cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
-    cmap = plt.cm.viridis
+    cbar_adj_bottom = 0.1
+    cbar_ax_rect = [0.15, 0.05, 0.7, 0.035]
     wspace = 0.1
-    hspace = 0
+    hspace = -0.1
 elif nx != 2:
     print(f"Since nx = {nx}, you may need to rework some parameters")
 
@@ -285,7 +291,7 @@ for v, vegtype_str in enumerate(vegtype_list):
     vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
     
     # Get variations on vegtype string
-    vegtype_str_title = cc.get_vegtype_str_for_title(vegtype_str)
+    vegtype_str_title = cc.get_vegtype_str_for_title_long(vegtype_str)
     vegtype_str_figfile = cc.get_vegtype_str_figfile(vegtype_str)
     
     # Grid
@@ -296,27 +302,58 @@ for v, vegtype_str in enumerate(vegtype_list):
     
     # Set up figure
     fig = plt.figure(figsize=figsize)
+    axes = []
     
     # Map each reason's frequency
     for f, reason in enumerate(reason_list):
         reason_text = reason_list_text[f]
         
-        ylabel = "CLM5-style" if f==0 else None
         map0_yx = cc.get_reason_freq_map(Ngs, thisCrop0_gridded, reason)
         ax = cc.make_axis(fig, ny, nx, f+1)
-        im0 = make_map(ax, map0_yx, f"v0: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
+        axes.append(ax)
+        im0 = make_map(ax, map0_yx, None, None, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap, bounds=bounds, extend=extend)
         
-        ylabel = "GGCMI-style" if f==0 else None
         ax = cc.make_axis(fig, ny, nx, f+nx+1)
+        axes.append(ax)
         map1_yx = cc.get_reason_freq_map(Ngs, thisCrop1_gridded, reason)
-        im1 = make_map(ax, map1_yx, f"v1: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
+        im1 = make_map(ax, map1_yx, None, None, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap, bounds=bounds, extend=extend)
+    
+    # Add column labels
+    topmost = np.arange(0, ny*nx, 2)
+    for a, ax in enumerate(axes):
+        if a not in topmost:
+            nearest_topmost = a % nx
+            axes[a].sharex(axes[nearest_topmost])
+    for i, a in enumerate(topmost):
+        axes[a].set_title(f"{reason_list_text[i]}",
+                        fontsize=fontsize_titles,
+                        y=1.05)
         
-    fig.suptitle(f"Harvest reason: {vegtype_str_title}")
+    # Add row labels
+    leftmost = np.arange(0, ny)
+    for a, ax in enumerate(axes):
+        if a not in leftmost:
+            nearest_leftmost = a % ny
+            axes[a].sharey(axes[nearest_leftmost])
+        # I don't know why this is necessary, but otherwise the labels won't appear.
+        ax.set_yticks([])
+    for i, a in enumerate(leftmost):
+        axes[a].set_ylabel(indirs[i]['name'], fontsize=fontsize_titles)
+        axes[a].yaxis.set_label_coords(-0.05, 0.5)
+    
+    fig.suptitle(f"Harvest reason: {vegtype_str_title}", fontsize=fontsize_titles*1.2, fontweight="bold")
     fig.subplots_adjust(bottom=cbar_adj_bottom)
+    
     cbar_ax = fig.add_axes(cbar_ax_rect)
-    cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
+    # cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
+    norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend)
+    cbar = fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap),
+            orientation='horizontal',
+            spacing='proportional',
+            cax=cbar_ax)
     cbar_ax.tick_params(labelsize=fontsize_ticklabels)
-    plt.xlabel("Frequency", fontsize=fontsize_titles)
+    
+    plt.xlabel("Fraction of growing seasons", fontsize=fontsize_titles)
     if wspace != None:
         plt.subplots_adjust(wspace=wspace)
     if hspace != None:
@@ -327,7 +364,7 @@ for v, vegtype_str in enumerate(vegtype_list):
     
     # Save
     outfile = os.path.join(outdir_figs, f"harvest_reason_0vs1_{vegtype_str_figfile}.png")
-    plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+    plt.savefig(outfile, dpi=300, transparent=False, facecolor='white', \
             bbox_inches='tight')
     plt.close()
     
