@@ -283,7 +283,7 @@ def main(argv):
             vmin = -vmax
             Ncolors = vmax/gdd_spacing
             if Ncolors % 2 == 0: Ncolors += 1
-            cmap = cm.get_cmap("RdYlBu", Ncolors)
+            cmap = cm.get_cmap("RdYlBu_r", Ncolors)
             
             if np.any(this_map.values > vmax) and np.any(this_map.values < vmin):
                 extend = 'both'
