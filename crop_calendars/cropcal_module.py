@@ -1216,7 +1216,7 @@ def import_rx_dates(var_prefix, date_inFile, dates_ds):
 
 
 def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mgdcrop_list(), 
-                  sdates_rx_ds=None, gdds_rx_ds=None, verbose=False):
+                  sdates_rx_ds=None, gdds_rx_ds=None, verbose=False, mxmats=None):
    
    # Minimum harvest threshold allowed in PlantCrop()
    gdd_min = 50
@@ -1319,7 +1319,45 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
    this_ds["GRAIN_TO_FOOD_PERHARV"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_PERHARV"], this_ds.patches1d_itype_veg_str)
    this_ds_gs["GRAIN_TO_FOOD_ANN"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
    this_ds_gs["GRAIN_TO_FOOD"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD"], this_ds.patches1d_itype_veg_str)
-   
+        
+   # Get GRAINC variants with values set to 0 if season was longer than CLM PFT parameter mxmat
+   if mxmats:
+       for v in this_ds:
+            if "FOOD" not in v or "ANN" in v:
+                continue
+            v2 = v + "_MXMAT"
+            print(f"Getting mxmat-limited {v} -> {v2}")
+            tmp_da = this_ds[v]
+            tmp_ra = tmp_da.copy().values
+            for veg_str in np.unique(this_ds.patches1d_itype_veg_str.values):
+                mxmat_veg_str = veg_str.replace("soybean", "temperate_soybean").replace("tropical_temperate", "tropical")
+                mxmat = mxmats[mxmat_veg_str]
+                tmp_ra[np.where((this_ds.patches1d_itype_veg_str.values == veg_str) & (this_ds["GSLEN_PERHARV"].values > mxmat))] = 0
+            this_ds[v2] = xr.DataArray(data = tmp_ra,
+                                                 coords = tmp_da.coords,
+                                                 attrs = tmp_da.attrs)
+       for v in this_ds:
+            if "FOOD" not in v or "ANN" not in v:
+                continue
+            ph = v.replace("ANN", "PERHARV_MXMAT")
+            v2 = v.replace("ANN", "ANN_MXMAT")
+            print(f"this_ds: Getting mxmat-limited {v}: {ph} -> {v2}")
+            this_ds[v2] = this_ds[ph].sum(dim="mxharvests")
+            this_ds_gs[v2] = this_ds[v2].copy()
+              
+       for v in this_ds_gs:
+            if "FOOD" not in v or "ANN" in v:
+                continue
+            tmp_da = this_ds_gs[v]
+            tmp_ra = tmp_da.copy().values
+            for veg_str in np.unique(this_ds_gs.patches1d_itype_veg_str.values):
+                mxmat_veg_str = veg_str.replace("soybean", "temperate_soybean").replace("tropical_temperate", "tropical")
+                mxmat = mxmats[mxmat_veg_str]
+                tmp_ra[np.where(np.expand_dims(this_ds_gs.patches1d_itype_veg_str.values == veg_str, 1) & (this_ds_gs["GSLEN"].values > mxmat))] = 0
+            this_ds_gs[v + "_MXMAT"] = xr.DataArray(data = tmp_ra,
+                                                    coords = tmp_da.coords,
+                                                    attrs = tmp_da.attrs)
+          
    # Get HUI accumulation as fraction of required
    this_ds_gs["HUIFRAC"] = this_ds_gs["HUI"] / this_ds_gs["GDDHARV"]
    

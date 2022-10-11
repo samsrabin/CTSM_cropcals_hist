@@ -131,6 +131,28 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
    else:
       return im, None
 
+# Add GRAINC variants with too-long seasons set to 0
+# CLM max growing season length, mxmat, is stored in the following files:
+#   * clm5_1: lnd/clm2/paramdata/ctsm51_params.c211112.nc
+#   * clm5_0: lnd/clm2/paramdata/clm50_params.c211112.nc
+#   * clm4_5: lnd/clm2/paramdata/clm45_params.c211112.nc
+paramfile_dir = "/Users/Shared/CESM_inputdata/lnd/clm2/paramdata/"
+my_clm_ver = 51
+my_clm_subver = "c211112"
+pattern = os.path.join(paramfile_dir, f"*{my_clm_ver}_params.{my_clm_subver}.nc")
+paramfile = glob.glob(pattern)
+if len(paramfile) != 1:
+   raise RuntimeError(f"Expected to find 1 match of {pattern}; found {len(paramfile)}")
+paramfile_ds = xr.open_dataset(paramfile[0])
+# Import max growing season length (stored in netCDF as nanoseconds!)
+paramfile_mxmats = paramfile_ds["mxmat"].values / np.timedelta64(1, 'D')
+# Import PFT name list
+paramfile_pftnames = [x.decode("UTF-8").replace(" ", "") for x in paramfile_ds["pftname"].values]
+# Save as dict
+mxmats = {}
+for i, mxmat in enumerate(paramfile_mxmats):
+   mxmats[paramfile_pftnames[i]] = mxmat
+
 
 # %% Import model output
 
@@ -213,8 +235,8 @@ for i, (casename, case) in enumerate(cases.items()):
 
    else:
       this_ds = cc.import_output(case['filepath'], myVars=myVars,
-                                 y1=y1, yN=yN, verbose=verbose_import)
-      
+                                 y1=y1, yN=yN, verbose=verbose_import,
+                                 mxmats=mxmats)
       bad_patches = cc.check_constant_vars(this_ds, case, ignore_nan=True, constantGSs=case['constantGSs'], verbose=True, throw_error=False)
       # for p in bad_patches:
       #    cc.print_gs_table(this_ds.isel(patch=p))
@@ -371,6 +393,15 @@ for i, (casename, case) in enumerate(cases.items()):
                                       "lat": lu_dsg.lat})
    case['ds']['GRAIN_TO_FOOD_ANN_GD'] = yield_gd
    case['ds']['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da(yield_gd, lu_dsg, yearList, cropList_combined_clm)
+   
+   # mxmat-limited yield
+   yield_gd = utils.grid_one_variable(case_ds.sel(time=case_ds.time.values), "GRAIN_TO_FOOD_ANN_MXMAT")
+   yield_gd = yield_gd.assign_coords({"lon": lu_dsg.lon,
+                                      "lat": lu_dsg.lat})
+   case['ds']['GRAIN_TO_FOOD_ANN_MXMAT_GD'] = yield_gd
+   case['ds']['ts_prod_mxmat_yc'] = cc.get_ts_prod_clm_yc_da(yield_gd, lu_dsg, yearList, cropList_combined_clm)
+   
+   
 print("Done gridding.")
 
 
@@ -485,6 +516,14 @@ for i, x in enumerate(np.unique(countries.gadm0.values)):
 
 # %% Compare area, production, and yield of individual crops
 
+# mxmat_limited = False
+mxmat_limited = True
+
+if mxmat_limited:
+   this_ts_prod_var = 'ts_prod_mxmat_yc'
+else:
+   this_ts_prod_var = 'ts_prod_yc'
+
 # Set up figure
 ny = 2
 nx = 4
@@ -515,10 +554,13 @@ def make_1crop_plot(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN):
    ax_this.set_ylabel(units)
    ax_this.get_legend().remove()
 
-def finishup_allcrops_plot(c, ny, nx, axes_this, f_this, suptitle, outDir_figs):
+def finishup_allcrops_plot(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, mxmat_limited):
    # Delete unused axes, if any
    for a in np.arange(c+1, ny*nx):
       f_this.delaxes(axes_this[a])
+      
+   if mxmat_limited:
+      suptitle += " (limited season length)"
       
    f_this.suptitle(suptitle,
                    x = 0.1, horizontalalignment = 'left',
@@ -597,9 +639,9 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
       
       # Production
       if thisCrop_clm == "Total (no sgc)":
-         ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Total']).ts_prod_yc.sum(dim="Crop").copy()
+         ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Total'])[this_ts_prod_var].sum(dim="Crop").copy()
       else:
-         ts_prod_y = case['ds'].ts_prod_yc.sel(Crop=thisCrop_clm).copy()
+         ts_prod_y = case['ds'][this_ts_prod_var].sel(Crop=thisCrop_clm).copy()
       ydata_prod = np.concatenate((ydata_prod,
                                  np.expand_dims(ts_prod_y.values, axis=0)),
                                  axis=0)
@@ -616,10 +658,10 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
    make_1crop_plot(ax_yield_dt, cc.detrend(ydata_yield), fig_caselist, thisCrop_clm, "t/ha", y1, yN)
    
 # Finish up and save
-finishup_allcrops_plot(c, ny, nx, axes_area, f_area, "Global crop area", outDir_figs)
-finishup_allcrops_plot(c, ny, nx, axes_prod, f_prod, "Global crop production", outDir_figs)
-finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outDir_figs)
-finishup_allcrops_plot(c, ny, nx, axes_yield_dt, f_yield_dt, "Global crop yield (detrended)", outDir_figs)
+finishup_allcrops_plot(c, ny, nx, axes_area, f_area, "Global crop area", outDir_figs, mxmat_limited)
+finishup_allcrops_plot(c, ny, nx, axes_prod, f_prod, "Global crop production", outDir_figs, mxmat_limited)
+finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outDir_figs, mxmat_limited)
+finishup_allcrops_plot(c, ny, nx, axes_yield_dt, f_yield_dt, "Global crop yield (detrended)", outDir_figs, mxmat_limited)
 
 
 # %% Make maps of individual crops (rainfed, irrigated)
