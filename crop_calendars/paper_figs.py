@@ -201,7 +201,7 @@ for i, (casename, case) in enumerate(cases.items()):
       this_ds = xr.open_dataset(case['filepath'])
 
       # Convert gC/m2 to g/m2 actually harvested
-      this_ds["GRAIN_HARV_TOFOOD_ANN"] = cc.adjust_grainC(this_ds.GRAINC_TO_FOOD, this_ds.patches1d_itype_veg)
+      this_ds["GRAIN_TO_FOOD_ANN"] = cc.adjust_grainC(this_ds.GRAINC_TO_FOOD, this_ds.patches1d_itype_veg)
 
       # Rework to match what we already have
       this_ds = this_ds.assign_coords({"ivt": np.arange(np.min(this_ds.patches1d_itype_veg.values),
@@ -363,13 +363,13 @@ fao_area, fao_area_nosgc = cc.fao_data_get(fao_all, 'Area harvested', y1, yN)
 for i, (casename, case) in enumerate(cases.items()):
    print(f"Gridding {casename}...")
    case_ds = case['ds']
-   yield_gd = utils.grid_one_variable(case_ds.sel(time=case_ds.time.values), "GRAIN_HARV_TOFOOD_ANN")
-   
    lu_dsg = reses[case['res']]['dsg']
+   
+   # Yield
+   yield_gd = utils.grid_one_variable(case_ds.sel(time=case_ds.time.values), "GRAIN_TO_FOOD_ANN")
    yield_gd = yield_gd.assign_coords({"lon": lu_dsg.lon,
                                       "lat": lu_dsg.lat})
-   case['ds']['GRAIN_HARV_TOFOOD_ANN_GD'] = yield_gd
-   
+   case['ds']['GRAIN_TO_FOOD_ANN_GD'] = yield_gd
    case['ds']['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da(yield_gd, lu_dsg, yearList, cropList_combined_clm)
 print("Done gridding.")
 
@@ -637,7 +637,7 @@ varList = {
       'time_dim':   'gs',
       'units':      'GDD',
       'multiplier': 1},
-   'GRAIN_HARV_TOFOOD_ANN_GD': {
+   'GRAIN_TO_FOOD_ANN_GD': {
       'suptitle':   'Mean annual yield',
       'time_dim':   'time',
       'units':      't/ha',

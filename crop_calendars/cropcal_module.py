@@ -980,7 +980,7 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
       for c, country in enumerate(topN_countries):
          
          # Yield...
-         yield_da = case_ds['GRAIN_HARV_TOFOOD_ANN_GD']\
+         yield_da = case_ds['GRAIN_TO_FOOD_ANN_GD']\
             .isel(ivt_str=i_thisCrop_case, time=i_theseYears_case)\
             .sum(dim='ivt_str')\
             * 1e-6 * 1e4 # g/m2 to tons/ha
@@ -1315,10 +1315,10 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
    this_ds_gs["GSLEN"] = get_gs_len_da(this_ds_gs["HDATES"] - this_ds_gs["SDATES"])
    
    # Get *biomass* *actually harvested*
-   this_ds["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
-   this_ds["GRAINC_TO_FOOD_PERHARV"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_PERHARV"], this_ds.patches1d_itype_veg_str)
-   this_ds_gs["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
-   this_ds_gs["GRAIN_HARV_TOFOOD"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD"], this_ds.patches1d_itype_veg_str)
+   this_ds["GRAIN_TO_FOOD_ANN"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
+   this_ds["GRAIN_TO_FOOD_PERHARV"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_PERHARV"], this_ds.patches1d_itype_veg_str)
+   this_ds_gs["GRAIN_TO_FOOD_ANN"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
+   this_ds_gs["GRAIN_TO_FOOD"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD"], this_ds.patches1d_itype_veg_str)
    
    # Get HUI accumulation as fraction of required
    this_ds_gs["HUIFRAC"] = this_ds_gs["HUI"] / this_ds_gs["GDDHARV"]
