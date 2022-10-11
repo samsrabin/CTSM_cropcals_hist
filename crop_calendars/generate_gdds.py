@@ -20,6 +20,7 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 import warnings
 import cartopy.crs as ccrs
 import datetime as dt
@@ -276,45 +277,71 @@ def main(argv):
     ### Save before/after map and boxplot figures ###
     #################################################
     
-    def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles):
-        if np.any(this_map.values < 0):
-            gdd_spacing = 500
-            vmax = np.floor(np.nanmax(this_map.values)/gdd_spacing)*gdd_spacing
-            vmin = -vmax
-            Ncolors = vmax/gdd_spacing
-            if Ncolors % 2 == 0: Ncolors += 1
-            cmap = cm.get_cmap("RdYlBu_r", Ncolors)
-            
-            if np.any(this_map.values > vmax) and np.any(this_map.values < vmin):
-                extend = 'both'
-            elif np.any(this_map.values > vmax):
-                extend = 'max'
-            elif np.any(this_map.values < vmin):
-                extend = 'min'
-            else:
-                extend = 'neither'
-            
+    def get_bounds_ncolors(gdd_spacing, diff_map_yx):
+        vmax = np.floor(np.nanmax(diff_map_yx.values)/gdd_spacing)*gdd_spacing
+        vmin = -vmax
+        epsilon = np.nextafter(0, 1)
+        bounds = list(np.arange(vmin, vmax, gdd_spacing)) + [vmax-epsilon]
+        if 0 in bounds:
+            bounds.remove(0)
+            bounds[bounds.index(-gdd_spacing)] /= 2
+            bounds[bounds.index(gdd_spacing)] /= 2
+        Ncolors = len(bounds) + 1
+        return vmax, bounds, Ncolors
+    
+    def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles, bounds=None, extend='both', cmap=None, cbar_ticks=None):
+        
+        if bounds:
+            if not cmap:
+                raise RuntimeError("Calling make_map() with bounds requires cmap to be specified")
+            norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend)
+            im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values,
+                                this_map, shading="auto",
+                                norm=norm,
+                                cmap=cmap)
         else:
-            vmin = 0
-            vmax = np.floor(vmax/500)*500
-            Ncolors = vmax/500
-            cmap=cm.get_cmap("jet", Ncolors)
-            extend = 'max'
-            
-        im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
-                this_map, shading="auto",
-                vmin=vmin, vmax=vmax,
-                cmap=cmap)
+            if np.any(this_map.values < 0):
+                gdd_spacing = 500
+                vmax = np.floor(np.nanmax(this_map.values)/gdd_spacing)*gdd_spacing
+                vmin = -vmax
+                Ncolors = vmax/gdd_spacing
+                if Ncolors % 2 == 0: Ncolors += 1
+                if not cmap:
+                    cmap = cm.get_cmap("RdYlBu_r", Ncolors)
+                
+                if np.any(this_map.values > vmax) and np.any(this_map.values < vmin):
+                    extend = 'both'
+                elif np.any(this_map.values > vmax):
+                    extend = 'max'
+                elif np.any(this_map.values < vmin):
+                    extend = 'min'
+                else:
+                    extend = 'neither'
+                
+            else:
+                vmin = 0
+                vmax = np.floor(vmax/500)*500
+                Ncolors = vmax/500
+                if not cmap:
+                    cmap=cm.get_cmap("jet", Ncolors)
+                extend = 'max'
+                
+            im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+                    this_map, shading="auto",
+                    vmin=vmin, vmax=vmax,
+                    cmap=cmap)
             
         ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
         ax.coastlines(linewidth=0.3)
         ax.set_title(this_title, fontsize=fontsize_titles, fontweight="bold", y=0.96)
         cbar = plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02,
-                            aspect=40, extend=extend)
+                            aspect=40, extend=extend, spacing='proportional')
         cbar.ax.tick_params(labelsize=fontsize_ticklabels)
         cbar.ax.set_xlabel(this_map.attrs['units'],
                            fontsize=fontsize_ticklabels)
         cbar.ax.xaxis.set_label_coords(x=0.115, y=2.6)
+        if cbar_ticks:
+            cbar.ax.set_xticks(cbar_ticks)
         
         ticks = np.arange(-60, 91, bin_width)
         ticklabels = [str(x) for x in ticks]
@@ -459,8 +486,33 @@ def main(argv):
                 thisTitle = "ISIMIP3 minus CLM"
                 diff_map_yx = gdd_map_yx - gddharv_map_yx
                 diff_map_yx.attrs['units'] = gdd_units
+                
+                gdd_spacing = 500
+                vmax, bounds, Ncolors = get_bounds_ncolors(gdd_spacing, diff_map_yx)
+                if Ncolors < 9:
+                    gdd_spacing = 250
+                    vmax, bounds, Ncolors = get_bounds_ncolors(gdd_spacing, diff_map_yx)
+                
+                cmap = cm.get_cmap("RdBu_r", Ncolors)
+                cbar_ticks = []
+                include_0bin_ticks = Ncolors <= 13
+                if vmax <= 3000:
+                    tick_spacing = gdd_spacing*2
+                elif vmax <= 5000:
+                    tick_spacing = 1500
+                else:
+                    tick_spacing = 2000
+                previous = -np.inf
+                for x in bounds:
+                    if (not include_0bin_ticks) and (x>0) and (previous<0):
+                        cbar_ticks.append(0)
+                    if x % tick_spacing == 0 or (include_0bin_ticks and abs(x)==gdd_spacing/2):
+                        cbar_ticks.append(x)
+                    previous = x
+                
                 make_map(ax, diff_map_yx, thisTitle, vmax, bin_width,
-                        fontsize_ticklabels, fontsize_titles)
+                        fontsize_ticklabels, fontsize_titles, bounds=bounds,
+                        extend='both', cmap=cmap, cbar_ticks=cbar_ticks)
             
             # Boxplots #####################
             
