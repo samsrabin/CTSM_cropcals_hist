@@ -52,6 +52,27 @@ cropList_combined_clm = ["Corn", "Rice", "Cotton", "Soybean", "Sugarcane", "Whea
 
 plt.rc('font',**{'family':'sans-serif','sans-serif':['Arial']})
 
+def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_types):
+   time_dim = var_info['time_dim']
+   case = cases[casename]
+   this_ds = case['ds']
+   if this_var not in case['ds']:
+      return xr.DataArray(), "continue"
+   elif ref_casename and ref_casename!="rx" and cases[ref_casename]['res'] != case['res']:
+      # Not bothering with regridding (for now?)
+      return xr.DataArray(), "continue"
+   this_map = this_ds[this_var]
+   
+   # Grid the included vegetation types, if needed
+   if "lon" not in this_map.dims:
+      this_map = utils.grid_one_variable(this_ds, this_var, vegtype=found_types)
+   # If not, select the included vegetation types
+   else:
+      this_map = this_map.sel(ivt_str=found_types)
+   
+   return this_map, time_dim
+
+
 def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend='both'): 
    
    if bounds:
@@ -606,6 +627,7 @@ finishup_allcrops_plot(c, ny, nx, axes_yield_dt, f_yield_dt, "Global crop yield 
 # Define reference case, if you want to plot differences
 ref_casename = None
 # ref_casename = 'New baseline'
+# ref_casename = 'rx'
 
 overwrite = True
 
@@ -662,6 +684,7 @@ else:
    fontsize['ticklabels'] = 15
    fontsize['suptitle'] = 24
 
+
 for (this_var, var_info) in varList.items():
    
    if var_info['time_dim'] == "time":
@@ -676,7 +699,7 @@ for (this_var, var_info) in varList.items():
    ny = 0
    fig_caselist = []
    for i, (casename, case) in enumerate(cases.items()):
-      if ref_casename and cases[ref_casename]['res'] != case['res']:
+      if ref_casename and ref_casename != "rx" and cases[ref_casename]['res'] != case['res']:
          # Not bothering with regridding (for now?)
          pass
       elif this_var in case['ds']:
@@ -687,6 +710,39 @@ for (this_var, var_info) in varList.items():
    if ny == 0:
       print(f"No cases contain {this_var}; skipping.")
       continue
+   
+   # Add "prescribed" "case," if relevant
+   if this_var in ["GDDHARV", "GSLEN", "HDATES", "SDATES"]:
+      if this_var == "GDDHARV":
+         rx_ds_key = "rx_gdds_ds"
+      elif this_var == "GSLEN":
+         rx_ds_key = "rx_gslen_ds"
+      elif this_var == "HDATES":
+         rx_ds_key = "rx_hdates_ds"
+      elif this_var == "SDATES":
+         rx_ds_key = "rx_sdates_ds"
+      else:
+         raise RuntimeError(f"What rx_ds_key should I use for {this_var}?")
+      if this_var in ["GSLEN", "HDATES", "SDATES"]:
+         rx_row_label = "ISIMIP3"
+      elif this_var == "GDDHARV":
+         rx_row_label = "ISIMIP3-derived"
+      else:
+         raise RuntimeError(f"What row label should be used instead of 'rx' for {this_var}?")
+      rx_parent_found = False
+      for i, (casename, case) in enumerate(cases.items()):
+         # For now, we're just assuming all runs with a given prescribed variable use the same input file
+         if rx_ds_key in case:
+            rx_parent_casename = casename
+            rx_ds = case[rx_ds_key]
+            fig_caselist += ["rx"]
+            ny += 1
+            rx_parent_found = True
+            break
+      if not rx_parent_found:
+         raise RuntimeError(f"No case found with {rx_ds_key}")
+   elif ref_casename == "rx":
+      print(f"Skipping {this_var} because it has no rx dataset against which to compare simulations")
    
    # Rearrange caselist for this figure so that reference case is first
    if ref_casename:
@@ -736,7 +792,9 @@ for (this_var, var_info) in varList.items():
       
       # Skip if file exists and we're not overwriting
       diff_txt = ""
-      if ref_casename:
+      if ref_casename == "rx":
+         diff_txt = f" Diff {rx_row_label}"
+      elif ref_casename:
          diff_txt = f" Diff {ref_casename}"
       fig_outfile = outDir_figs + "Map " + suptitle + diff_txt + f" {thisCrop_out}.png"
       if os.path.exists(fig_outfile) and not overwrite:
@@ -744,40 +802,45 @@ for (this_var, var_info) in varList.items():
          continue
       
       print(f'   {thisCrop_out}...')
+      found_types = [x for x in clm_types_rfir if thisCrop_main in x]
+      
       c = -1
       fig = plt.figure(figsize=figsize)
       ims = []
       axes = []
       cbs = []
       for i, casename in enumerate(fig_caselist):
-
-         case = cases[casename]
-         this_ds = case['ds']
-         if this_var not in case['ds']:
-            continue
-         elif ref_casename and cases[ref_casename]['res'] != case['res']:
-            # Not bothering with regridding (for now?)
-            continue
+         if casename == "rx":
+            time_dim = "time"
+            these_rx_vars = ["gs1_" + str(x) for x in utils.vegtype_str2int(found_types)]
+            this_map = xr.concat((rx_ds[x].assign_coords({'ivt_str': found_types[i]}) for i, x in enumerate(these_rx_vars)), dim="ivt_str")
+            this_map = this_map.squeeze(drop=True)
+            if "lon" not in this_map.dims:
+               this_ds = xr.Dataset(data_vars={'tmp': this_map})
+               this_map = utils.grid_one_variable(this_ds, 'tmp')
+            
+            # Apply LU mask
+            parent_map, parent_time_dim = get_non_rx_map(var_info, cases, rx_parent_casename, this_var, thisCrop_main, found_types)
+            if parent_time_dim == "continue":
+               raise RuntimeError("What should I do here?")
+            this_map = this_map.where(~np.isnan(parent_map.mean(dim=parent_time_dim)))
+         else:
+            this_map, time_dim = get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_types)
+            if time_dim == "continue":
+               continue
          c += 1
          
          plotting_diffs = ref_casename and casename != ref_casename
          
-         this_map = this_ds[this_var]
-         
-         found_types = [x for x in this_ds.vegtype_str.values if thisCrop_main in x]
-
-         # Grid the included vegetation types, if needed
-         if "lon" not in this_map.dims:
-            this_map = utils.grid_one_variable(this_ds, this_var, vegtype=found_types)
-         # If not, select the included vegetation types
-         else:
-            this_map = this_map.sel(ivt_str=found_types)
-            
          # Get mean, set colormap
          units = var_info['units']
          if units == "day of year":
-            ar = stats.circmean(this_map, high=365, low=1, axis=this_map.dims.index(var_info['time_dim']), nan_policy='omit')
-            dummy_map = this_map.isel({var_info['time_dim']: 0}, drop=True)
+            if time_dim in this_map.dims:
+               ar = stats.circmean(this_map, high=365, low=1, axis=this_map.dims.index(time_dim), nan_policy='omit')
+               dummy_map = this_map.isel({time_dim: 0}, drop=True)
+            else:
+               ar = this_map.copy()
+               dummy_map = this_map.copy()
             this_map = xr.DataArray(data = ar,
                                     coords = dummy_map.coords,
                                     attrs = dummy_map.attrs)
@@ -795,7 +858,8 @@ for (this_var, var_info) in varList.items():
                cmap = 'twilight'
                vrange = [1, 365]
          else:
-            this_map = this_map.mean(dim=var_info['time_dim'])
+            if time_dim in this_map.dims:
+               this_map = this_map.mean(dim=time_dim)
             this_map *= var_info['multiplier']
             if plotting_diffs:
                this_map = this_map - refcase_map
@@ -810,7 +874,10 @@ for (this_var, var_info) in varList.items():
             
          cbar_units = units
          if plotting_diffs:
-            cbar_units = f"Diff. from {ref_casename} ({units})"
+            if ref_casename == "rx":
+               cbar_units = f"Diff. from {rx_row_label} ({units})"
+            else:
+               cbar_units = f"Diff. from {ref_casename} ({units})"
             if not np.any(np.abs(this_map) > 0):
                print(f'      {casename} identical to {ref_casename}!')
                cbar_units += ": None!"
@@ -849,7 +916,13 @@ for (this_var, var_info) in varList.items():
             nearest_leftmost = np.max(leftmost[leftmost < a])
             axes[a].sharey(axes[nearest_leftmost])
       for i, a in enumerate(leftmost):
-         axes[a].set_ylabel(fig_caselist[i], fontsize=fontsize['titles'])
+         
+         if fig_caselist[i] == "rx":
+            row_label = rx_row_label
+         else:
+            row_label = fig_caselist[i]
+         
+         axes[a].set_ylabel(row_label, fontsize=fontsize['titles'])
          axes[a].yaxis.set_label_coords(-0.05, 0.5)
 
       # Add column labels
@@ -872,6 +945,9 @@ for (this_var, var_info) in varList.items():
          cb.set_label(units, fontsize=fontsize['titles'])
       
       plt.subplots_adjust(bottom=new_sp_bottom, left=new_sp_left)
+      
+      # plt.show()
+      # break
       
       fig.savefig(fig_outfile,
                   bbox_inches='tight', facecolor='white', dpi=dpi)
