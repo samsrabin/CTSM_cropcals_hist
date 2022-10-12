@@ -13,6 +13,14 @@ else:
     # Only possible because I have export PYTHONPATH=$HOME in my .bash_profile
     from ctsm_python_gallery_myfork.ctsm_py import utils
     from CTSM_cropcals_hist.crop_calendars import generate_gdds_functions as gddfn
+    
+# Import other shared functions
+import os
+import inspect
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0, parentdir) 
+import cropcal_module as cc
 
 # Import everything else
 import os
@@ -38,7 +46,7 @@ warnings.filterwarnings("ignore", message="Iteration over multi-part geometries 
 
 def main(argv):
 
-    help_string = "generate_gdds.py -r <run-dir> -s <sdates-file> -h <hdates-file> -1 <first-season> -N <last-season> [--no-save-figs --args.only_make_figs]"
+    help_string = "generate_gdds.py -r <run-dir> -s <sdates-file> -h <hdates-file> -1 <first-season> -N <last-season> [--no-save-figs --args.only_make_figs -lu/--land-use-file /path/to/lu/file --first-land-use-year 1961 --last-land-use-year 2010]"
 
     ###############################
     ### Process input arguments ###
@@ -74,6 +82,15 @@ def main(argv):
     parser.add_argument("--run2-name", 
                         help="Name of new values to show in figures",
                         default="New")
+    parser.add_argument("-lu", "--land-use-file",
+                        help="Path to CLM land use timeseries file, for masking figures",
+                        default=None)
+    parser.add_argument("--first-land-use-year",
+                        help="First year in land use file to use for masking. Default --first-season.",
+                        default=None)
+    parser.add_argument("--last-land-use-year",
+                        help="Last year in land use file to use for masking. Default --last-season.",
+                        default=None)
     
     # Get arguments
     args = parser.parse_args()
@@ -390,6 +407,16 @@ def main(argv):
             outdir_figs = gdd_maps_ds.attrs['outdir_figs']
         y1 = gdd_maps_ds.attrs['y1']
         yN = gdd_maps_ds.attrs['yN']
+        
+        # Import LU data, if doing so
+        if args.land_use_file:
+            y1_lu = y1 if args.first_land_use_year == None else args.first_land_use_year
+            yN_lu = yN if args.last_land_use_year == None else args.last_land_use_year
+            lu_ds = cc.open_lu_ds(args.land_use_file, y1_lu, yN_lu, gdd_maps_ds)
+            lu_years_text = f" (masked by {y1_lu}-{yN_lu} area)"
+            lu_years_file = f"_mask{y1_lu}-{yN_lu}"
+        else:
+            lu_ds = None
     
         # layout = "3x1"
         # layout = "2x2"
@@ -425,8 +452,14 @@ def main(argv):
                 vegtype_str_title = "rainfed " + vegtype_str_title
             vegtype_str_title = vegtype_str_title.capitalize()
             
-            print(f"   {vegtype_str_title} ({vegtype_int})...")
+            # Crop area map (for masking)
+            if lu_ds:
+                crop_area_yx = (lu_ds.AREA * lu_ds.LANDFRAC_PFT * lu_ds.PCT_CROP * lu_ds.PCT_CFT.sel(cft=vegtype_int)).sum(dim="time")
+                if np.nansum(crop_area_yx.values) == 0:
+                    print(f"   No area of {vegtype_str}; skipping.")
+                    continue
             
+            print(f"   {vegtype_str_title} ({vegtype_int})...")
             
             # Maps #####################
             
@@ -436,6 +469,10 @@ def main(argv):
             if "time" in gddharv_map.dims:
                 gddharv_map = gddharv_map.isel(time=0, drop=True)
             gddharv_map_yx = gddharv_map.where(gddharv_map != dummy_fill)
+            
+            if lu_ds:
+                gdd_map_yx = gdd_map_yx.where(crop_area_yx > 0)
+                gddharv_map_yx = gddharv_map_yx.where(crop_area_yx > 0)
             
             gdd_map_yx.attrs['units'] = gdd_units
             gddharv_map_yx.attrs['units'] = gdd_units
@@ -515,9 +552,9 @@ def main(argv):
                         extend='both', cmap=cmap, cbar_ticks=cbar_ticks)
             
             # Boxplots #####################
-            
-            gdd_vector = get_non_nans(gdd_map, dummy_fill)
-            gddharv_vector = get_non_nans(gddharv_map, dummy_fill)
+
+            gdd_vector = get_non_nans(gdd_map_yx, dummy_fill)
+            gddharv_vector = get_non_nans(gddharv_map_yx, dummy_fill)
             
             lat_abs = np.abs(gdd_map.lat.values)
             gdd_bybin_old = [gddharv_vector]
@@ -526,8 +563,8 @@ def main(argv):
                 lower = lat_bin_edges[b]
                 upper = lat_bin_edges[b+1]
                 lat_inds = np.where((lat_abs>=lower) & (lat_abs<upper))[0]
-                gdd_vector_thisBin = get_non_nans(gdd_map[lat_inds,:], dummy_fill)
-                gddharv_vector_thisBin = get_non_nans(gddharv_map[lat_inds,:], dummy_fill)
+                gdd_vector_thisBin = get_non_nans(gdd_map_yx[lat_inds,:], dummy_fill)
+                gddharv_vector_thisBin = get_non_nans(gddharv_map_yx[lat_inds,:], dummy_fill)
                 gdd_bybin_old.append(gddharv_vector_thisBin)
                 gdd_bybin_new.append(gdd_vector_thisBin)
                     
@@ -559,12 +596,12 @@ def main(argv):
             ax.yaxis.set_label_coords(-0.11, 0.5)
             plt.title(f"Zonal changes", fontsize=fontsize_titles, fontweight="bold")
             
-            plt.suptitle(f"Maturity requirements: {vegtype_str_title}",
+            plt.suptitle(f"Maturity requirements: {vegtype_str_title}" + lu_years_text,
                          fontsize=fontsize_titles*1.2,
                          fontweight="bold",
                          y=0.95)
             
-            outfile = os.path.join(outdir_figs, f"{thisVar}_{vegtype_str}_gs{y1}-{yN}.png")
+            outfile = os.path.join(outdir_figs, f"{thisVar}_{vegtype_str}_gs{y1}-{yN}{lu_years_file}.png")
             plt.savefig(outfile, dpi=300, transparent=False, facecolor='white',
                         bbox_inches='tight')
             plt.close()
