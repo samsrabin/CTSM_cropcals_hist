@@ -523,6 +523,9 @@ for i, x in enumerate(np.unique(countries.gadm0.values)):
 # mxmat_limited = False
 mxmat_limited = True
 
+# extra = "Total (no sgc)"
+extra = "Total (grains only)"
+
 if mxmat_limited:
    this_ts_prod_var = 'ts_prod_mxmat_yc'
 else:
@@ -600,14 +603,14 @@ def finishup_allcrops_plot(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, 
                   bbox_inches='tight')
    plt.close(f_this)
 
-for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
+for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
    ax_area = axes_area[c]
    ax_prod = axes_prod[c]
    ax_yield = axes_yield[c]
    ax_yield_dt = axes_yield_dt[c]
    
    # FAOSTAT
-   if thisCrop_clm == "Total (no sgc)":
+   if thisCrop_clm not in cropList_combined_clm:
       thisCrop_fao = fao_area_nosgc.columns[-1]
       ydata_area = np.array(fao_area_nosgc[thisCrop_fao])
       ydata_prod = np.array(fao_prod_nosgc[thisCrop_fao])
@@ -623,6 +626,9 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
    elif thisCrop_clm == "Total (no sgc)":
       area_tyx = earthstats[this_earthstat_res].drop_sel(crop=['Sugarcane']).HarvestArea.sum(dim="crop").copy()
       prod_tyx = earthstats[this_earthstat_res].drop_sel(crop=['Sugarcane']).Production.sum(dim="crop").copy()
+   elif thisCrop_clm == "Total (grains only)":
+      area_tyx = earthstats[this_earthstat_res].drop_sel(crop=['Sugarcane', 'Cotton']).HarvestArea.sum(dim="crop").copy()
+      prod_tyx = earthstats[this_earthstat_res].drop_sel(crop=['Sugarcane', 'Cotton']).Production.sum(dim="crop").copy()
    else:
       area_tyx = earthstats[this_earthstat_res].HarvestArea.sel(crop=thisCrop_clm).copy()
       prod_tyx = earthstats[this_earthstat_res].Production.sel(crop=thisCrop_clm).copy()
@@ -644,6 +650,8 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
          incl_crops = [x for x in case['ds'].ivt_str.values if x.replace('irrigated_','').replace('temperate_','').replace('tropical_','') in [y.lower() for y in cropList_combined_clm]]
          if thisCrop_clm == "Total (no sgc)":
             incl_crops = [x for x in incl_crops if "sugarcane" not in x]
+         elif thisCrop_clm == "Total (grains only)":
+            incl_crops = [x for x in incl_crops if "sugarcane" not in x and "cotton" not in x]
          elif thisCrop_clm == "Total":
             pass
          else:
@@ -665,6 +673,8 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + ["Total (no sgc)"]):
       # Production
       if thisCrop_clm == "Total (no sgc)":
          ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Total'])[this_ts_prod_var].sum(dim="Crop").copy()
+      elif thisCrop_clm == "Total (grains only)":
+         ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Cotton', 'Total'])[this_ts_prod_var].sum(dim="Crop").copy()
       else:
          ts_prod_y = case['ds'][this_ts_prod_var].sel(Crop=thisCrop_clm).copy()
       ydata_prod = np.concatenate((ydata_prod,
