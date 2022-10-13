@@ -224,6 +224,10 @@ for i, (casename, case) in enumerate(cases.items()):
 
       # Convert gC/m2 to g/m2 actually harvested
       this_ds["GRAIN_TO_FOOD_ANN"] = cc.adjust_grainC(this_ds.GRAINC_TO_FOOD, this_ds.patches1d_itype_veg)
+      
+      for v in this_ds:
+         if "GRAIN" in v:
+            this_ds[v + "_MXMAT"] = this_ds[v]
 
       # Rework to match what we already have
       this_ds = this_ds.assign_coords({"ivt": np.arange(np.min(this_ds.patches1d_itype_veg.values),
