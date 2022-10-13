@@ -1326,7 +1326,6 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
             if "FOOD" not in v or "ANN" in v:
                 continue
             v2 = v + "_MXMAT"
-            print(f"Getting mxmat-limited {v} -> {v2}")
             tmp_da = this_ds[v]
             tmp_ra = tmp_da.copy().values
             for veg_str in np.unique(this_ds.patches1d_itype_veg_str.values):
@@ -1341,7 +1340,6 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
                 continue
             ph = v.replace("ANN", "PERHARV_MXMAT")
             v2 = v.replace("ANN", "ANN_MXMAT")
-            print(f"this_ds: Getting mxmat-limited {v}: {ph} -> {v2}")
             this_ds[v2] = this_ds[ph].sum(dim="mxharvests")
             this_ds_gs[v2] = this_ds[v2].copy()
               
