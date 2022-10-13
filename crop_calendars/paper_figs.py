@@ -552,11 +552,32 @@ def make_1crop_plot(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN):
    da = xr.DataArray(data = ydata_this,
                      coords = {'Case': caselist,
                                'Year': np.arange(y1,yN+1)})
-   da.plot.line(x="Year", ax=ax_this)
+   
+   light_gray = [x/255 for x in [148, 148, 148]]
+   dark_gray = [x/255 for x in [64, 64, 74]]
+   grays = [light_gray, dark_gray]
+   
+   for i, casename in enumerate(caselist):
+      if i <= 1:
+         color = grays[i]
+      elif i==4:
+         # Purple more distinct from my light gray
+         color = [x/255 for x in [133, 92, 255]]
+      else:
+         color = cm.Dark2(i-2)
+      if casename == "New baseline" and "Original baseline" in caselist:
+         linestyle = ":"
+      else:
+         linestyle = "-"
+      da.isel(Case=i).plot.line(x="Year", ax=ax_this, 
+                                color=color, linestyle=linestyle,
+                                linewidth=2)
+   
    ax_this.title.set_text(thisCrop_clm)
    ax_this.set_xlabel("")
    ax_this.set_ylabel(units)
-   ax_this.get_legend().remove()
+   if ax_this.get_legend():
+      ax_this.get_legend().remove()
 
 def finishup_allcrops_plot(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, mxmat_limited):
    # Delete unused axes, if any
