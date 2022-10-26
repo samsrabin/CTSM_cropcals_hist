@@ -159,19 +159,8 @@ Ngs = dates_ds1_orig.dims['time'] - 1
 # What vegetation types are included?
 vegtype_list = [x for x in dates_ds0_orig.vegtype_str.values if x in dates_ds0_orig.patches1d_itype_veg_str.values]
 
-# CLM max growing season length, mxmat, is stored in the following files:
-#   * clm5_1: lnd/clm2/paramdata/ctsm51_params.c211112.nc
-#   * clm5_0: lnd/clm2/paramdata/clm50_params.c211112.nc
-#   * clm4_5: lnd/clm2/paramdata/clm45_params.c211112.nc
-pattern = os.path.join(paramfile_dir,f"*{my_clm_ver}_params.{my_clm_subver}.nc")
-paramfile = glob.glob(pattern)
-if len(paramfile) != 1:
-    raise RuntimeError(f"Expected to find 1 match of {pattern}; found {len(paramfile)}")
-paramfile_ds = xr.open_dataset(paramfile[0])
-# Import max growing season length (stored in netCDF as nanoseconds!)
-paramfile_mxmats = paramfile_ds["mxmat"].values / np.timedelta64(1, 'D')
-# Import PFT name list
-paramfile_pftnames = [x.decode("UTF-8").replace(" ", "") for x in paramfile_ds["pftname"].values]
+# Import PFT info
+paramfile_mxmats, paramfile_pftnames = cc.import_pft_params(paramfile_dir, my_clm_ver, my_clm_subver)
 
 print("Done.")
 

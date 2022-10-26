@@ -10,6 +10,8 @@ from scipy import stats, signal
 import warnings
 import cftime
 import pandas as pd
+import os
+import glob
 
 
 def adjust_grainC(da_in, patches1d_itype_veg_str):
@@ -1188,6 +1190,20 @@ def get_vegtype_str_paramfile(vegtype_str_in):
         vegtype_str_out = vegtype_str_in
     return vegtype_str_out
 
+def import_pft_params(paramfile_dir, my_clm_ver, my_clm_subver):
+    # Get parameter file
+    pattern = os.path.join(paramfile_dir, f"*{my_clm_ver}_params.{my_clm_subver}.nc")
+    paramfile = glob.glob(pattern)
+    if len(paramfile) != 1:
+        raise RuntimeError(f"Expected to find 1 match of {pattern}; found {len(paramfile)}")
+    paramfile_ds = xr.open_dataset(paramfile[0])
+    
+    # Import max growing season length (stored in netCDF as nanoseconds!)
+    paramfile_mxmats = paramfile_ds["mxmat"].values / np.timedelta64(1, 'D')
+    
+    # Import PFT name list
+    paramfile_pftnames = [x.decode("UTF-8").replace(" ", "") for x in paramfile_ds["pftname"].values]
+    return paramfile_mxmats, paramfile_pftnames
 
 # E.g. import_rx_dates("sdate", sdates_rx_file, dates_ds0_orig)
 def import_rx_dates(var_prefix, date_inFile, dates_ds):
