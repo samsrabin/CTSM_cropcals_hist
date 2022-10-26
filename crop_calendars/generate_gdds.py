@@ -71,6 +71,8 @@ def main(argv):
                         help="Last growing season to include in calculation of mean",
                         required=True,
                         type=int)
+    parser.add_argument("-o", "--output-dir",
+                        help="Output directory. Default is auto-generated subdir of -r/--run-dir.")
     parser.add_argument("-sd", "--sdates-file", 
                         help="File of prescribed sowing dates",
                         required=True)
@@ -112,23 +114,24 @@ def main(argv):
     save_figs = not args.dont_save_figs
 
     # Directories to save output files and figures
-    outdir = os.path.join(args.run_dir, "generate_gdds")
-    if not args.unlimited_season_length:
-        outdir += ".mxmat"
-    outdir += "." + dt.datetime.now().strftime('%Y-%m-%d-%H%M%S')
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
-    outdir_figs = os.path.join(outdir, "figs")
+    if not args.output_dir:
+        args.output_dir = os.path.join(args.run_dir, "generate_gdds")
+        if not args.unlimited_season_length:
+            args.output_dir += ".mxmat"
+        args.output_dir += "." + dt.datetime.now().strftime('%Y-%m-%d-%H%M%S')
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+    outdir_figs = os.path.join(args.output_dir, "figs")
 
     # Set up log file and function
     logging.basicConfig(level=logging.DEBUG,
                         format="",
-                        filename=os.path.join(outdir, 'generate_gdds.log'),
+                        filename=os.path.join(args.output_dir, 'generate_gdds.log'),
                         filemode='a')
     logger = logging.getLogger('')
 
     # Print some info
-    gddfn.log(logger, f"Saving to {outdir}")
+    gddfn.log(logger, f"Saving to {args.output_dir}")
     
     
     ##########################
@@ -143,8 +146,8 @@ def main(argv):
 
         gddfn.log(logger, f"Importing netCDF time steps {y1_import_str} through {yN_import_str} (years are +1 because of CTSM output naming)")
 
-        pickle_file = os.path.join(outdir, f'{args.first_season}-{args.last_season}.pickle')
-        h1_ds_file = os.path.join(outdir, f'{args.first_season}-{args.last_season}.h1_ds.nc')
+        pickle_file = os.path.join(args.output_dir, f'{args.first_season}-{args.last_season}.pickle')
+        h1_ds_file = os.path.join(args.output_dir, f'{args.first_season}-{args.last_season}.h1_ds.nc')
         if os.path.exists(pickle_file):
             with open(pickle_file, 'rb') as f:
                 args.first_season, args.last_season, pickle_year, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = pickle.load(f)
@@ -269,8 +272,8 @@ def main(argv):
         
         # Get output file path
         datestr = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-        outfile = os.path.join(outdir, "gdds_" + datestr + ".nc")
-        outfile_fill0 = os.path.join(outdir, "gdds_fill0_" + datestr + ".nc")
+        outfile = os.path.join(args.output_dir, "gdds_" + datestr + ".nc")
+        outfile_fill0 = os.path.join(args.output_dir, "gdds_fill0_" + datestr + ".nc")
         
         def save_gdds(args, outfile, gdd_maps_ds, sdates_rx):
             # Set up output file from template (i.e., prescribed sowing dates).
