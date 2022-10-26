@@ -65,10 +65,12 @@ def main(argv):
                         required=True)
     parser.add_argument("-1", "--first-season", 
                         help="First growing season to include in calculation of mean",
-                        required=True)
+                        required=True,
+                        type=int)
     parser.add_argument("-n", "-N", "--last-season", 
                         help="Last growing season to include in calculation of mean",
-                        required=True)
+                        required=True,
+                        type=int)
     parser.add_argument("-sd", "--sdates-file", 
                         help="File of prescribed sowing dates",
                         required=True)
@@ -93,10 +95,12 @@ def main(argv):
                         default=None)
     parser.add_argument("--first-land-use-year",
                         help="First year in land use file to use for masking. Default --first-season.",
-                        default=None)
+                        default=None,
+                        type=int)
     parser.add_argument("--last-land-use-year",
                         help="Last year in land use file to use for masking. Default --last-season.",
-                        default=None)
+                        default=None,
+                        type=int)
     parser.add_argument("--unlimited-season-length", 
                         help="Limit mean growing season length based on CLM CFT parameter mxmat.",
                         action="store_true", default=False)
@@ -109,7 +113,7 @@ def main(argv):
 
     # Directories to save output files and figures
     outdir = os.path.join(args.run_dir, "generate_gdds")
-    if not unlimited_season_length:
+    if not args.unlimited_season_length:
         outdir += ".mxmat"
     outdir += "." + dt.datetime.now().strftime('%Y-%m-%d-%H%M%S')
     if not os.path.exists(outdir):
@@ -158,7 +162,7 @@ def main(argv):
         sdates_rx = args.sdates_file
         hdates_rx = args.hdates_file
         
-        if not unlimited_season_length:
+        if not args.unlimited_season_length:
             mxmats = cc.import_max_gs_length(paramfile_dir, my_clm_ver, my_clm_subver)
         else:
             mxmats = None
