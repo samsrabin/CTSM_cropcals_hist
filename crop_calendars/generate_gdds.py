@@ -9,10 +9,12 @@ if hostname == "Sams-2021-MacBook-Pro.local":
     import utils
     sys.path.append("/Users/sam/Documents/git_repos/CTSM_cropcals_hist/crop_calendars")
     import generate_gdds_functions as gddfn
+    paramfile_dir = "/Users/Shared/CESM_inputdata/lnd/clm2/paramdata/"
 else:
     # Only possible because I have export PYTHONPATH=$HOME in my .bash_profile
     from ctsm_python_gallery_myfork.ctsm_py import utils
     from CTSM_cropcals_hist.crop_calendars import generate_gdds_functions as gddfn
+    paramfile_dir = "/glade/p/cesmdata/cseg/inputdata/lnd/clm2/paramdata"
     
 # Import other shared functions
 import os
@@ -35,8 +37,12 @@ import datetime as dt
 import pickle
 import argparse
 
+# Figure settings
 plt.rc('font',**{'family':'sans-serif','sans-serif':['Arial']})
 
+# Info re: PFT parameter set
+my_clm_ver = 51
+my_clm_subver = "c211112"
 
 # Suppress some warnings
 import warnings
@@ -91,6 +97,9 @@ def main(argv):
     parser.add_argument("--last-land-use-year",
                         help="Last year in land use file to use for masking. Default --last-season.",
                         default=None)
+    parser.add_argument("--unlimited-season-length", 
+                        help="Limit mean growing season length based on CLM CFT parameter mxmat.",
+                        action="store_true", default=False)
     
     # Get arguments
     args = parser.parse_args()
@@ -100,6 +109,8 @@ def main(argv):
         
     # Directories to save output files and figures
     outdir = os.path.join(args.run_dir, "generate_gdds")
+    if not unlimited_season_length:
+        outdir += ".mxmat"
     outdir_figs = os.path.join(outdir, "figs")
     
     
@@ -134,12 +145,17 @@ def main(argv):
         sdates_rx = args.sdates_file
         hdates_rx = args.hdates_file
         
+        if not unlimited_season_length:
+            mxmats = cc.import_max_gs_length(paramfile_dir, my_clm_ver, my_clm_subver)
+        else:
+            mxmats = None
+        
         for y, thisYear in enumerate(np.arange(args.first_season+1,args.last_season+3)):
             
             if thisYear <= pickle_year:
                 continue
             
-            h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = gddfn.import_and_process_1yr(args.first_season, args.last_season, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, args.run_dir, incl_vegtypes_str, h1_ds_file)
+            h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = gddfn.import_and_process_1yr(args.first_season, args.last_season, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, args.run_dir, incl_vegtypes_str, h1_ds_file, mxmats, cc.get_gs_len_da)
             
             print(f'   Saving pickle file ({pickle_file})...')
             with open(pickle_file, 'wb') as f:

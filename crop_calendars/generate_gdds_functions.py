@@ -150,7 +150,7 @@ def yp_list_to_ds(yp_list, daily_ds, incl_vegtypes_str, dates_rx, longname_prefi
 
 
 
-def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str_in, h1_ds_file):
+def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str_in, h1_ds_file, mxmats, get_gs_len_da):
     print(f'netCDF year {thisYear}...')
     print(dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     
@@ -289,11 +289,40 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
         
     # Import expected sowing dates. This will also be used as our template output file.
     sdates_rx = import_rx_dates("s", sdates_rx, incl_patches1d_itype_veg, mxsowings)
-        
     check_sdates(dates_incl_ds, sdates_rx)
     
     # Import hdates, if needed
-    hdates_rx = import_rx_dates("h", hdates_rx, incl_patches1d_itype_veg, mxsowings) # Yes, mxsowings even when importing harvests
+    hdates_rx_orig = import_rx_dates("h", hdates_rx, incl_patches1d_itype_veg, mxsowings) # Yes, mxsowings even when importing harvests
+    
+    # Limit growing season to CLM max growing season length, if needed
+    if mxmats:
+        hdates_rx = hdates_rx_orig.copy()
+        for v in hdates_rx_orig:
+            if v == "time_bounds":
+                continue
+            
+            # Get max growing season length
+            vegtype_int = int(v.split('_')[1]) # netCDF variable name v should be something like gs1_17
+            vegtype_str = utils.ivt_int2str(vegtype_int)
+            mxmat = mxmats[vegtype_str]
+            if np.isinf(mxmat):
+                continue
+            
+            # Get "prescribed" growing season length
+            gs_len_rx_da = get_gs_len_da(hdates_rx_orig[v] - sdates_rx[v])
+            not_ok = gs_len_rx_da.values > mxmat
+            if not np.any(not_ok):
+                continue
+            
+            hdates_limited = hdates_rx_orig[v].copy().values
+            hdates_limited[np.where(not_ok)] = sdates_rx[v].values[np.where(not_ok)] + mxmat
+            hdates_limited[np.where(hdates_limited > 365)] -= 365
+            hdates_rx[v] = xr.DataArray(data = hdates_limited,
+                                        coords = hdates_rx_orig[v].coords,
+                                        attrs = hdates_rx_orig[v].attrs)
+    else:
+        hdates_rx = hdates_rx_orig
+    
     # Determine cells where growing season crosses new year
     grows_across_newyear = hdates_rx < sdates_rx
         
