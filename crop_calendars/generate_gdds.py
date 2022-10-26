@@ -54,8 +54,6 @@ warnings.filterwarnings("ignore", message="Iteration over multi-part geometries 
 
 def main(argv):
 
-    help_string = "generate_gdds.py -r <run-dir> -s <sdates-file> -h <hdates-file> -1 <first-season> -N <last-season> [--no-save-figs --only-make-figs -lu/--land-use-file /path/to/lu/file --first-land-use-year 1961 --last-land-use-year 2010]"
-
     ###############################
     ### Process input arguments ###
     ###############################
