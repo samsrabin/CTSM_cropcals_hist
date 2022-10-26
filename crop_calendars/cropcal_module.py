@@ -212,12 +212,34 @@ def check_constant_vars(this_ds, case, ignore_nan, constantGSs=None, verbose=Tru
                     bad_patches = np.concatenate((bad_patches, np.array(thesePatches)[bad_patches_thisT]))
                     if rx_ds:
                         found_in_rx = np.array([False for x in bad_patches])
+                    varyPatches = list(np.array(thesePatches)[bad_patches_thisT])
+                    varyLons = this_ds.patches1d_lon.values[bad_patches_thisT]
+                    varyLats = this_ds.patches1d_lat.values[bad_patches_thisT]
+                    varyCrops = this_ds.patches1d_itype_veg_str.values[bad_patches_thisT]
+                    varyCrops_int = this_ds.patches1d_itype_veg.values[bad_patches_thisT]
+                    
+                    any_bad_anyCrop = False
+                    for c in np.unique(varyCrops_int):
+                        rx_var = f'gs1_{c}'
+                        varyLons_thisCrop = varyLons[np.where(varyCrops_int==c)]
+                        varyLats_thisCrop = varyLats[np.where(varyCrops_int==c)]
+                        theseRxVals = np.diag(rx_ds[rx_var].sel(lon=varyLons_thisCrop, lat=varyLats_thisCrop).values)
+                        if len(theseRxVals) != len(varyLats_thisCrop):
+                            raise RuntimeError(f"Expected {len(varyLats_thisCrop)} rx values; got {len(theseRxVals)}")
+                        if not np.any(theseRxVals != -1):
+                            continue
+                        any_bad_anyCrop = True
+                        break
+                    if not any_bad_anyCrop:
+                        continue
+                    
+                    # This bit is pretty inefficient, but I'm not going to optimize it until I actually need to use it.
                     for i, p in enumerate(bad_patches_thisT):
-                        thisPatch = thesePatches[p]
-                        thisLon = this_ds.patches1d_lon.values[p]
-                        thisLat = this_ds.patches1d_lat.values[p]
-                        thisCrop = this_ds.patches1d_itype_veg_str.values[p]
-                        thisCrop_int = this_ds.patches1d_itype_veg.values[p]
+                        thisPatch = varyPatches[i]
+                        thisLon = varyLons[i]
+                        thisLat = varyLats[i]
+                        thisCrop = varyCrops[i]
+                        thisCrop_int = varyCrops_int[i]
                         
                         # If prescribed input had missing value (-1), it's fine for it to vary.
                         if rx_ds:
@@ -231,6 +253,8 @@ def check_constant_vars(this_ds, case, ignore_nan, constantGSs=None, verbose=Tru
                                         continue
                                 elif Nunique > 1:
                                     raise RuntimeError(f'How does lon {thisLon} lat {thisLat} {thisCrop} have time-varying {v}?')
+                            else:
+                                raise RuntimeError('lon {thisLon} lat {thisLat} {thisCrop} not in rx dataset?')
                         
                         # Print info (or save to print later)
                         any_bad = True
@@ -293,10 +317,17 @@ def check_constant_vars(this_ds, case, ignore_nan, constantGSs=None, verbose=Tru
     return [int(p) for p in bad_patches]
 
 
-def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min=None):
+def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min=None, verbose=False):
     all_ok = 2
     diff_str_list = []
-    gdd_tolerance = 0
+    gdd_tolerance = 1
+    
+    if "GDDHARV" in output_var and verbose:
+        harvest_reason_da = dates_ds['HARVEST_REASON']
+        unique_harvest_reasons = np.unique(harvest_reason_da.values[np.where(~np.isnan(harvest_reason_da.values))])
+        pct_harv_at_mature = get_pct_harv_at_mature(harvest_reason_da)
+        print(f"{which_ds} harvest reasons: {unique_harvest_reasons} ({pct_harv_at_mature}% harv at maturity)")
+    
     for vegtype_str in vegtype_list:
         thisVeg_patches = np.where(dates_ds.patches1d_itype_veg_str == vegtype_str)[0]
         if thisVeg_patches.size == 0:
@@ -314,11 +345,28 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
         sim_array = ds_thisVeg[output_var].values
         sim_array_dims = ds_thisVeg[output_var].dims
         
-        # Account for GDD harvest threshold minimum set in PlantCrop()
-        if output_var=="GDDHARV_PERHARV":
+        # Ignore patches without prescribed value
+        rx_array[np.where(rx_array < 0)] = np.nan
+        
+        # Account for...
+        if "GDDHARV" in output_var:
+            # ...GDD harvest threshold minimum set in PlantCrop()
             if gdd_min == None:
-                raise RuntimeError(f"gdd_min must be provided when doing check_rx_obeyed() for GDDHARV_PERHARV")
-            rx_array[rx_array < gdd_min] = gdd_min
+                raise RuntimeError(f"gdd_min must be provided when doing check_rx_obeyed() for {output_var}")
+            rx_array[(rx_array >= 0) & (rx_array < gdd_min)] = gdd_min
+            
+            # ...harvest reason
+            # 0: Should never happen in any simulation
+            # 1: Harvesting at maturity
+            # 2: Harvesting at max season length (mxmat)
+            # 3: Crop was incorrectly planted in last time step of Dec. 31
+            # 4: Today was supposed to be the planting day, but the previous crop still hasn't been harvested.
+            # 5: Harvest the day before the next sowing date this year.
+            # 6: Same as #5.
+            # 7: Harvest the day before the next sowing date (today is Dec. 31 and the sowing date is Jan. 1)
+            harvest_reason_da = ds_thisVeg['HARVEST_REASON']
+            unique_harvest_reasons = np.unique(harvest_reason_da.values[np.where(~np.isnan(harvest_reason_da.values))])
+            pct_harv_at_mature = get_pct_harv_at_mature(harvest_reason_da)
         
         if np.any(sim_array != rx_array):
             diff_array = sim_array - rx_array
@@ -328,18 +376,28 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
                 diff_array = np.ma.masked_array(diff_array, mask= \
                     (diff_array < 0) & 
                     (ds_thisVeg["HARVEST_REASON_PERHARV"].values==5))
-    
+            elif output_var=="GDDHARV":
+                diff_array = np.ma.masked_array(diff_array, mask= \
+                    (diff_array < 0) & 
+                    (ds_thisVeg["HARVEST_REASON"].values==5))
+
             if np.any(np.abs(diff_array[abs(diff_array) > 0]) > 0):
                 min_diff, minLon, minLat, minGS, minRx = get_extreme_info(diff_array, rx_array, np.nanmin, sim_array_dims, dates_ds.gs, patch_lons_thisVeg, patch_lats_thisVeg)
                 max_diff, maxLon, maxLat, maxGS, maxRx = get_extreme_info(diff_array, rx_array, np.nanmax, sim_array_dims, dates_ds.gs, patch_lons_thisVeg, patch_lats_thisVeg)
                 
                 diffs_eg_txt = f"{vegtype_str} ({vegtype_int}): diffs range {min_diff} (lon {minLon}, lat {minLat}, gs {minGS}, rx ~{minRx}) to {max_diff} (lon {maxLon}, lat {maxLat}, gs {maxGS}, rx ~{maxRx})"
-                if output_var=="GDDHARV_PERHARV" and np.max(abs(diff_array)) <= gdd_tolerance:
-                    all_ok = 1
-                    diff_str_list.append(f"   {diffs_eg_txt}")
+                if "GDDHARV" in output_var:
+                    diffs_eg_txt += f"; harvest reasons: {unique_harvest_reasons} ({pct_harv_at_mature}% harvested at maturity)"
+                if "GDDHARV" in output_var and np.nanmax(abs(diff_array)) <= gdd_tolerance:
+                    if all_ok > 0:
+                        all_ok = 1
+                        diff_str_list.append(f"   {diffs_eg_txt}")
                 else:
                     all_ok = 0
-                    break
+                    if verbose:
+                        print(f"❌ {which_ds}: Prescribed {output_var} *not* always obeyed. E.g., {diffs_eg_txt}")
+                    else:
+                        break
     
     if all_ok == 2:
         print(f"✅ {which_ds}: Prescribed {output_var} always obeyed")
@@ -347,7 +405,7 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
         # print(f"🟨 {which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable:")
         # for x in diff_str_list: print(x)
         print(f"🟨 {which_ds}: Prescribed {output_var} *not* always obeyed, but acceptable (diffs <= {gdd_tolerance})")
-    else:
+    elif not verbose:
         print(f"❌ {which_ds}: Prescribed {output_var} *not* always obeyed. E.g., {diffs_eg_txt}")
 
 
@@ -838,11 +896,34 @@ def get_Nharv(array_in, these_dims):
     return Nevents_eachPatch
 
 
+def get_pct_harv_at_mature(harvest_reason_da):
+    Nharv_at_mature = len(np.where(harvest_reason_da.values==1)[0])
+    Nharv = len(np.where(harvest_reason_da.values>0)[0])
+    if Nharv == 0:
+        return np.nan
+    pct_harv_at_mature = Nharv_at_mature / Nharv * 100
+    pct_harv_at_mature = np.format_float_positional(pct_harv_at_mature, precision=2, unique=False, fractional=False, trim='k') # Round to 2 significant digits
+    return pct_harv_at_mature
+
+
 def get_reason_freq_map(Ngs, thisCrop_gridded, reason):
     map_yx = np.sum(thisCrop_gridded==reason, axis=0, keepdims=False) / Ngs
     notnan_yx = np.bitwise_not(np.isnan(thisCrop_gridded.isel(gs=0, drop=True)))
     map_yx = map_yx.where(notnan_yx)
     return map_yx
+
+
+def get_reason_list_text():
+    return [ \
+        "???",                   # 0; should never actually be saved
+        "Crop mature",           # 1
+        "Max CLM season length", # 2
+        "Bad Dec31 sowing",      # 3
+        "Sowing today",          # 4
+        "Sowing tomorrow",       # 5
+        "Sown a yr ago tmrw.",   # 6
+        "Sowing tmrw. (Jan 1)"   # 7
+        ]
 
 
 # Get yield dataset for top N countries (plus World)
@@ -899,7 +980,7 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
       for c, country in enumerate(topN_countries):
          
          # Yield...
-         yield_da = case_ds['GRAIN_HARV_TOFOOD_ANN_GD']\
+         yield_da = case_ds['GRAIN_TO_FOOD_ANN_GD']\
             .isel(ivt_str=i_thisCrop_case, time=i_theseYears_case)\
             .sum(dim='ivt_str')\
             * 1e-6 * 1e4 # g/m2 to tons/ha
@@ -1084,6 +1165,19 @@ def get_vegtype_str_for_title(vegtype_str_in):
     return vegtype_str_out
 
 
+# Get vegtype str for figure titles
+def get_vegtype_str_for_title_long(vegtype_str_in):
+    vegtype_str_out = vegtype_str_in
+    if "irrigated" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("irrigated_", "Irrigated ")
+    else:
+        vegtype_str_out = "Rainfed " + vegtype_str_out
+    vegtype_str_out = vegtype_str_out.replace("_", " ")
+    if "soybean" in vegtype_str_in:
+        vegtype_str_out = vegtype_str_out.replace("soybean", "soy")
+    return vegtype_str_out
+
+
 def get_vegtype_str_paramfile(vegtype_str_in):
     # Get vegtype str used in parameter file
     if vegtype_str_in == "soybean":
@@ -1122,7 +1216,7 @@ def import_rx_dates(var_prefix, date_inFile, dates_ds):
 
 
 def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mgdcrop_list(), 
-                  sdates_rx_ds=None, gdds_rx_ds=None, verbose=False):
+                  sdates_rx_ds=None, gdds_rx_ds=None, verbose=False, mxmats=None):
    
    # Minimum harvest threshold allowed in PlantCrop()
    gdd_min = 50
@@ -1221,10 +1315,49 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
    this_ds_gs["GSLEN"] = get_gs_len_da(this_ds_gs["HDATES"] - this_ds_gs["SDATES"])
    
    # Get *biomass* *actually harvested*
-   this_ds["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
-   this_ds["GRAINC_TO_FOOD_PERHARV"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_PERHARV"], this_ds.patches1d_itype_veg_str)
-   this_ds_gs["GRAIN_HARV_TOFOOD_ANN"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
-   this_ds_gs["GRAIN_HARV_TOFOOD"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD"], this_ds.patches1d_itype_veg_str)
+   this_ds["GRAIN_TO_FOOD_ANN"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
+   this_ds["GRAIN_TO_FOOD_PERHARV"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_PERHARV"], this_ds.patches1d_itype_veg_str)
+   this_ds_gs["GRAIN_TO_FOOD_ANN"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
+   this_ds_gs["GRAIN_TO_FOOD"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD"], this_ds.patches1d_itype_veg_str)
+        
+   # Get GRAINC variants with values set to 0 if season was longer than CLM PFT parameter mxmat
+   if mxmats:
+       for v in this_ds:
+            if "FOOD" not in v or "ANN" in v:
+                continue
+            v2 = v + "_MXMAT"
+            tmp_da = this_ds[v]
+            tmp_ra = tmp_da.copy().values
+            for veg_str in np.unique(this_ds.patches1d_itype_veg_str.values):
+                mxmat_veg_str = veg_str.replace("soybean", "temperate_soybean").replace("tropical_temperate", "tropical")
+                mxmat = mxmats[mxmat_veg_str]
+                tmp_ra[np.where((this_ds.patches1d_itype_veg_str.values == veg_str) & (this_ds["GSLEN_PERHARV"].values > mxmat))] = 0
+            this_ds[v2] = xr.DataArray(data = tmp_ra,
+                                                 coords = tmp_da.coords,
+                                                 attrs = tmp_da.attrs)
+       for v in this_ds:
+            if "FOOD" not in v or "ANN" not in v:
+                continue
+            ph = v.replace("ANN", "PERHARV_MXMAT")
+            v2 = v.replace("ANN", "ANN_MXMAT")
+            this_ds[v2] = this_ds[ph].sum(dim="mxharvests")
+            this_ds_gs[v2] = this_ds[v2].copy()
+              
+       for v in this_ds_gs:
+            if "FOOD" not in v or "ANN" in v:
+                continue
+            tmp_da = this_ds_gs[v]
+            tmp_ra = tmp_da.copy().values
+            for veg_str in np.unique(this_ds_gs.patches1d_itype_veg_str.values):
+                mxmat_veg_str = veg_str.replace("soybean", "temperate_soybean").replace("tropical_temperate", "tropical")
+                mxmat = mxmats[mxmat_veg_str]
+                tmp_ra[np.where(np.expand_dims(this_ds_gs.patches1d_itype_veg_str.values == veg_str, 1) & (this_ds_gs["GSLEN"].values > mxmat))] = 0
+            this_ds_gs[v + "_MXMAT"] = xr.DataArray(data = tmp_ra,
+                                                    coords = tmp_da.coords,
+                                                    attrs = tmp_da.attrs)
+          
+   # Get HUI accumulation as fraction of required
+   this_ds_gs["HUIFRAC"] = this_ds_gs["HUI"] / this_ds_gs["GDDHARV"]
    
    # Avoid tiny negative values
    varList_no_negative = ["GRAIN", "REASON", "GDD", "HUI", "YEAR", "DATE", "GSLEN"]

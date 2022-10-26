@@ -27,7 +27,7 @@ my_clm_subver = "c211112"
 sdates_rx_file = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
 hdates_rx_file = "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc"
 # gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/gdds_20220820_163845.nc"
-gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/gdds_20220927_174954.nc"
+gdds_rx_file = "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc"
 
 # Directory where model output file(s) can be found (figure files will be saved in subdir here)
 indirs = list()
@@ -50,12 +50,14 @@ indirs.append(dict(path="/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-
                    used_clm_mxmat = True,
                    used_rx_sdate = False,
                    used_rx_harvthresh = False,
-                   landuse_varies = True))
+                   landuse_varies = True,
+                   name = "Old baseline"))
 indirs.append(dict(path="/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3/",
                    used_clm_mxmat = False,
                    used_rx_sdate = True,
                    used_rx_harvthresh = True,
-                   landuse_varies = True))
+                   landuse_varies = True,
+                   name = "Prescribed calendars"))
 
 ggcmi_out_topdir = "/Users/Shared/GGCMI/AgMIP.output"
 ggcmi_cropcal_dir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar"
@@ -101,16 +103,27 @@ outdir_figs = os.path.join(indirs[1]["path"], f"figs_comp_{os.path.basename(os.p
 if not os.path.exists(outdir_figs):
     os.makedirs(outdir_figs)
 
-
+plt.rc('font',**{'family':'sans-serif','sans-serif':['Arial']})
 fontsize_titles = 8
 fontsize_axislabels = 8
 fontsize_ticklabels = 7
 bin_width = 30
 lat_bin_edges = np.arange(0, 91, bin_width)
-def make_map(ax, this_map, this_title, ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap): 
-    im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+def make_map(ax, this_map, this_title, ylabel, vmin, vmax, bin_width, fontsize_ticklabels, fontsize_titles, cmap, bounds=None, extend='both'): 
+    
+    if bounds:
+        norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend)
+        im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
             this_map, shading="auto",
-            vmin=vmin, vmax=vmax, cmap=cmap)
+            norm=norm,
+            cmap=cmap)
+    else:
+        im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+            this_map, shading="auto",
+            vmin=vmin, vmax=vmax,
+            cmap=cmap)
+    
+    
     ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
     ax.coastlines(linewidth=0.5, color="white")
     ax.coastlines(linewidth=0.3)
@@ -118,19 +131,7 @@ def make_map(ax, this_map, this_title, ylabel, vmin, vmax, bin_width, fontsize_t
         ax.set_title(this_title, fontsize=fontsize_titles)
     if ylabel:
         ax.set_ylabel(ylabel)
-    # cbar = plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02)
-    # cbar.ax.tick_params(labelsize=fontsize_ticklabels)
-    
-    # ax.yaxis.set_tick_params(width=0.2)
-    # ticks = np.arange(-90, 91, bin_width)
-    # ticklabels = [str(x) for x in ticks]
-    # for i,x in enumerate(ticks):
-    #     if x%2:
-    #         ticklabels[i] = ''
-    # # ticklabels = []
-    # plt.yticks(np.arange(-90,91,bin_width), labels=ticklabels,
-    #            fontsize=fontsize_ticklabels,
-    #            fontweight=0.1)
+
     return im1
 
 
@@ -224,7 +225,7 @@ if "time" in sdates_rx_ds.dims:
     hdates_rx_ds = hdates_rx_ds.isel(time=0, drop=True)
     gdds_rx_ds = gdds_rx_ds.isel(time=0, drop=True)
     
-
+importlib.reload(cc)
 if indirs[0]["used_rx_sdate"]:
     cc.check_rx_obeyed(vegtype_list, sdates_rx_ds, dates_ds0, "dates_ds0", "SDATES")
 if indirs[1]["used_rx_sdate"]:
@@ -242,16 +243,7 @@ if "HARVEST_REASON_PERHARV" in "dates_ds0":
 else:
     thisVar = "HARVEST_REASON"
 
-reason_list_text_all = [ \
-    "???",                 # 0; should never actually be saved
-    "Crop mature",         # 1
-    "Max gs length",       # 2
-    "Bad Dec31 sowing",    # 3
-    "Sowing today",        # 4
-    "Sowing tomorrow",     # 5
-    "Sown a yr ago tmrw.", # 6
-    "Sowing tmrw. (Jan 1)" # 7
-    ]
+reason_list_text_all = cc.get_reason_list_text()
 
 reason_list = np.unique(np.concatenate( \
     (np.unique(dates_ds0[thisVar].values), \
@@ -263,19 +255,23 @@ reason_list_text = [reason_list_text_all[x] for x in reason_list]
 ny = 2
 nx = len(reason_list)
 
+epsilon = np.nextafter(0, 1)
+# bounds = [epsilon] + list(np.arange(0.2, 1.001, 0.2))
+bounds = [epsilon] + list(np.arange(0.1, 1, 0.1)) + [1-epsilon]
+extend = 'both'
+
 figsize = (8, 4)
 cbar_adj_bottom = 0.15
 cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
-cmap = plt.cm.viridis
+cmap = plt.cm.jet
 wspace = None
 hspace = None
 if nx == 3:
     figsize = (8, 3)
-    cbar_adj_bottom = 0.15
-    cbar_ax_rect = [0.15, 0.05, 0.7, 0.05]
-    cmap = plt.cm.viridis
+    cbar_adj_bottom = 0.1
+    cbar_ax_rect = [0.15, 0.05, 0.7, 0.035]
     wspace = 0.1
-    hspace = 0
+    hspace = -0.1
 elif nx != 2:
     print(f"Since nx = {nx}, you may need to rework some parameters")
 
@@ -286,7 +282,7 @@ for v, vegtype_str in enumerate(vegtype_list):
     vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
     
     # Get variations on vegtype string
-    vegtype_str_title = cc.get_vegtype_str_for_title(vegtype_str)
+    vegtype_str_title = cc.get_vegtype_str_for_title_long(vegtype_str)
     vegtype_str_figfile = cc.get_vegtype_str_figfile(vegtype_str)
     
     # Grid
@@ -297,27 +293,58 @@ for v, vegtype_str in enumerate(vegtype_list):
     
     # Set up figure
     fig = plt.figure(figsize=figsize)
+    axes = []
     
     # Map each reason's frequency
     for f, reason in enumerate(reason_list):
         reason_text = reason_list_text[f]
         
-        ylabel = "CLM5-style" if f==0 else None
         map0_yx = cc.get_reason_freq_map(Ngs, thisCrop0_gridded, reason)
         ax = cc.make_axis(fig, ny, nx, f+1)
-        im0 = make_map(ax, map0_yx, f"v0: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
+        axes.append(ax)
+        im0 = make_map(ax, map0_yx, None, None, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap, bounds=bounds, extend=extend)
         
-        ylabel = "GGCMI-style" if f==0 else None
         ax = cc.make_axis(fig, ny, nx, f+nx+1)
+        axes.append(ax)
         map1_yx = cc.get_reason_freq_map(Ngs, thisCrop1_gridded, reason)
-        im1 = make_map(ax, map1_yx, f"v1: {reason_text}", ylabel, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap)
+        im1 = make_map(ax, map1_yx, None, None, 0.0, 1.0, bin_width, fontsize_ticklabels, fontsize_titles, cmap, bounds=bounds, extend=extend)
+    
+    # Add column labels
+    topmost = np.arange(0, ny*nx, 2)
+    for a, ax in enumerate(axes):
+        if a not in topmost:
+            nearest_topmost = a % nx
+            axes[a].sharex(axes[nearest_topmost])
+    for i, a in enumerate(topmost):
+        axes[a].set_title(f"{reason_list_text[i]}",
+                        fontsize=fontsize_titles,
+                        y=1.05)
         
-    fig.suptitle(f"Harvest reason: {vegtype_str_title}")
+    # Add row labels
+    leftmost = np.arange(0, ny)
+    for a, ax in enumerate(axes):
+        if a not in leftmost:
+            nearest_leftmost = a % ny
+            axes[a].sharey(axes[nearest_leftmost])
+        # I don't know why this is necessary, but otherwise the labels won't appear.
+        ax.set_yticks([])
+    for i, a in enumerate(leftmost):
+        axes[a].set_ylabel(indirs[i]['name'], fontsize=fontsize_titles)
+        axes[a].yaxis.set_label_coords(-0.05, 0.5)
+    
+    fig.suptitle(f"Harvest reason: {vegtype_str_title}", fontsize=fontsize_titles*1.2, fontweight="bold")
     fig.subplots_adjust(bottom=cbar_adj_bottom)
+    
     cbar_ax = fig.add_axes(cbar_ax_rect)
-    cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
+    # cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
+    norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend)
+    cbar = fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap),
+            orientation='horizontal',
+            spacing='proportional',
+            cax=cbar_ax)
     cbar_ax.tick_params(labelsize=fontsize_ticklabels)
-    plt.xlabel("Frequency", fontsize=fontsize_titles)
+    
+    plt.xlabel("Fraction of growing seasons", fontsize=fontsize_titles)
     if wspace != None:
         plt.subplots_adjust(wspace=wspace)
     if hspace != None:
@@ -328,7 +355,7 @@ for v, vegtype_str in enumerate(vegtype_list):
     
     # Save
     outfile = os.path.join(outdir_figs, f"harvest_reason_0vs1_{vegtype_str_figfile}.png")
-    plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+    plt.savefig(outfile, dpi=300, transparent=False, facecolor='white', \
             bbox_inches='tight')
     plt.close()
     
@@ -592,9 +619,9 @@ for thisVar in varList:
 # varList = ["GSLEN", "GSLEN.onlyMature", "GSLEN.onlyMature.noOutliers", "GSLEN.onlyMature.useMedian"]
 # varList = ["GSLEN"]
 # varList = ["GSLEN.onlyMature"]
-# varList = ["GSLEN.onlyMature.diffExpected"]
+varList = ["GSLEN.onlyMature.diffExpected"]
 # varList = ["GSLEN.onlyMature.diffExpected.noOutliers"]
-varList = ["GSLEN.onlyMature.diffExpected.useMedian"]
+# varList = ["GSLEN.onlyMature.diffExpected.useMedian"]
 # varList = ["GSLEN", "GSLEN.onlyMature"]
 # varList = ["GSLEN.onlyMature.noOutliers"]
 # varList = ["GSLEN.onlyMature.useMedian"]
@@ -625,6 +652,10 @@ def trim_years(y1, yN, Ngs, ds_in):
 
 ggcmiDS_started = False
 
+fontsize_titles = 6
+fontsize_axislabels = 6
+fontsize_ticklabels = 6
+
 for thisVar_orig in varList:
     thisVar = thisVar_orig
     
@@ -634,8 +665,8 @@ for thisVar_orig in varList:
     onlyMature = "onlyMature" in thisVar
     if onlyMature:
         thisVar = thisVar.replace(".onlyMature", "")
-        title_prefix = title_prefix + " (if mat.)"
-        filename_prefix = filename_prefix + "_ifmature"
+        title_prefix = title_prefix + " (when mature)"
+        filename_prefix = filename_prefix + "_whenmature"
     noOutliers = "noOutliers" in thisVar
     if noOutliers:
         thisVar = thisVar.replace(".noOutliers", "")
@@ -644,34 +675,54 @@ for thisVar_orig in varList:
     useMedian = "useMedian" in thisVar
     if useMedian:
         thisVar = thisVar.replace(".useMedian", "")
-        title_prefix = title_prefix + " (median)"
         filename_prefix = filename_prefix + "_median"
+    else:
+        filename_prefix = filename_prefix + "_mean"
     diffExpected = "diffExpected" in thisVar
+    bounds = None
     if diffExpected:
         thisVar = thisVar.replace(".diffExpected", "")
         filename_prefix = filename_prefix + "_diffExpected"
+        bounds = [-120, -90, -60, -30, -7, 7, 30, 60, 90, 120]
 
-    ny = 4
-    nx = 4
-    if Nggcmi_models_orig > ny*nx + 3:
-        raise RuntimeError(f"{Nggcmi_models_orig} GGCMI models + 3 other maps > ny*nx ({ny*nx})")
+    Nplots = Nggcmi_models_orig + 1
+    if not diffExpected:
+        Nplots += 2
+    if Nplots == 16:
+        ny = 4
+        nx = 4
+    else:
+        ny = 5
+        nx = 3
+    if Nplots > ny*nx + 3:
+        raise RuntimeError(f"{Nplots} plots > ny*nx ({ny*nx})")
     vmin = 0.0
-    title_prefix = "Seas. length" + title_prefix
+    title_prefix = "season length" + title_prefix
+    if useMedian:
+        title_prefix = "Median " + title_prefix
+    else:
+        title_prefix = "Mean " + title_prefix
     filename_prefix = "seas_length_compGGCMI" + filename_prefix
     if diffExpected:
-        units = "Season length minus expected"
+        units = "Simulated season length minus ISIMIP3 (days)"
         cmap = plt.cm.RdBu
     else:
         units = "Days"
         cmap = plt.cm.viridis
     vmin = None
     
-    figsize = (16, 8)
-    # figsize = (40, 20)
-    cbar_adj_bottom = 0.15
-    cbar_ax_rect = [0.15, 0.05, 0.7, 0.025]
-    if nx != 4 or ny != 4:
-        print(f"Since (nx,ny) = ({nx},{ny}), you may need to rework some parameters")
+    if ny == 5 and nx == 3:
+        figsize = (10, 8)
+        # figsize = (40, 20)
+        cbar_adj_bottom = 0.09
+        cbar_ax_rect = [0.15, 0.05, 0.7, 0.015]
+    else:
+        figsize = (16, 8)
+        # figsize = (40, 20)
+        cbar_adj_bottom = 0.15
+        cbar_ax_rect = [0.15, 0.05, 0.7, 0.025]
+        if nx != 4 or ny != 4:
+            print(f"Since (nx,ny) = ({nx},{ny}), you may need to rework some parameters")
 
     for v, vegtype_str in enumerate(vegtype_list):
         
@@ -692,12 +743,15 @@ for thisVar_orig in varList:
             irrtype_str_ggcmi = "firr"
         else:
             irrtype_str_ggcmi = "noirr"
-        ncvar = f"matyday-{vegtype_str_ggcmi}-{irrtype_str_ggcmi}"
+        if thisVar == "GSLEN":
+            ncvar = f"matyday-{vegtype_str_ggcmi}-{irrtype_str_ggcmi}"
+        else:
+            raise RuntimeError(f"What GGCMI variable should I use for {thisVar}?")
         vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
         
         # Get variations on vegtype string
         vegtype_str_paramfile = cc.get_vegtype_str_paramfile(vegtype_str)
-        vegtype_str_title = cc.get_vegtype_str_for_title(vegtype_str)
+        vegtype_str_title = cc.get_vegtype_str_for_title_long(vegtype_str)
         vegtype_str_figfile = cc.get_vegtype_str_figfile(vegtype_str)
         
         # Import GGCMI outputs
@@ -880,38 +934,49 @@ for thisVar_orig in varList:
             vmax = max(max1, max2, max3, np.nanmax(ggcmiDA_mn.values))
         
         ax = cc.make_axis(fig, ny, nx, 1)
-        im1 = make_map(ax, map1_yx, "CLM", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
+        im1 = make_map(ax, map1_yx, "CLM", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap, bounds=bounds)
         
         if not diffExpected:
             ax = cc.make_axis(fig, ny, nx, 2)
-            im1 = make_map(ax, map2_yx, "CLM expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
+            im1 = make_map(ax, map2_yx, "CLM expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap, bounds=bounds)
             
             ax = cc.make_axis(fig, ny, nx, 3)
-            im1 = make_map(ax, map3_yx, "GGCMI expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
+            im1 = make_map(ax, map3_yx, "GGCMI expected", "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap, bounds=bounds)
         
         for g in np.arange(Nggcmi_models):
             ggcmi_yx = ggcmiDA_mn.isel(model=g, drop=True)
-            ax = cc.make_axis(fig, ny, nx, 3+g+1)
-            im1 = make_map(ax, ggcmi_yx, ggcmi_models[g], "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap)
+            ax = cc.make_axis(fig, ny, nx, 3+g + (ny*nx - Nggcmi_models - 2))
+            im1 = make_map(ax, ggcmi_yx, ggcmi_models[g], "", vmin, vmax, bin_width, fontsize_ticklabels*2, fontsize_titles*2, cmap, bounds=bounds)
             
-        fig.suptitle(f"{title_prefix}: {vegtype_str_title}", y=0.95, fontsize=fontsize_titles*2.2)
+        fig.suptitle(f"{title_prefix}: {vegtype_str_title}", y=0.95, fontsize=fontsize_titles*2, fontweight="bold")
         fig.subplots_adjust(bottom=cbar_adj_bottom)
         cbar_ax = fig.add_axes(cbar_ax_rect)
-        cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
+        
+        if diffExpected:
+            norm = mcolors.BoundaryNorm(bounds, cmap.N, extend='both')
+            cbar = fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap),
+                    orientation='horizontal',
+                    spacing='proportional',
+                    cax=cbar_ax)
+        else:
+            cbar = fig.colorbar(im1, cax=cbar_ax, orientation="horizontal")
+        
+        
         cbar_ax.tick_params(labelsize=fontsize_ticklabels*2)
         plt.xlabel(units, fontsize=fontsize_titles*2)
         
         plt.subplots_adjust(wspace=0, hspace=0.3)
         
-        # plt.show()
-        # break
+        plt.show()
+        break
         
         # Save
         outfile = os.path.join(outdir_figs, f"{filename_prefix}_{vegtype_str_figfile}.png")
-        plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+        plt.savefig(outfile, dpi=300, transparent=False, facecolor='white', \
                 bbox_inches='tight')
         plt.close()
-
+    #     break
+    break
 
 # # %% Grid a variable and save to netCDF
 
