@@ -160,7 +160,7 @@ Ngs = dates_ds1_orig.dims['time'] - 1
 vegtype_list = [x for x in dates_ds0_orig.vegtype_str.values if x in dates_ds0_orig.patches1d_itype_veg_str.values]
 
 # Import PFT info
-paramfile_mxmats, paramfile_pftnames = cc.import_pft_params(paramfile_dir, my_clm_ver, my_clm_subver)
+mxmats = cc.import_max_gs_length(paramfile_dir, my_clm_ver, my_clm_subver)
 
 print("Done.")
 
@@ -512,7 +512,7 @@ for thisVar in varList:
             vmin = int(np.floor(min(np.nanmin(map0_yx), np.nanmin(map1_yx))))
         if nplots == 3:
             if thisVar == "GSLEN":
-                mxmat = int(paramfile_mxmats[paramfile_pftnames.index(vegtype_str_paramfile)])
+                mxmat = mxmats[vegtype_str_paramfile]
                 units = f"Days (mxmat: {mxmat})"
                 if not mxmat > 0:
                     raise RuntimeError(f"Error getting mxmat: {mxmat}")
