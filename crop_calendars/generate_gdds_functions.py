@@ -296,14 +296,17 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
         error(logger, f"Not all sdates-hdates are 1: {np.unique(diffdates_clm)}")
         
     # Import expected sowing dates. This will also be used as our template output file.
+    imported_sdates = isinstance(sdates_rx, str)
     sdates_rx = import_rx_dates("s", sdates_rx, incl_patches1d_itype_veg, mxsowings, logger)
     check_sdates(dates_incl_ds, sdates_rx, logger)
     
     # Import hdates, if needed
+    imported_hdates = isinstance(hdates_rx, str)
     hdates_rx_orig = import_rx_dates("h", hdates_rx, incl_patches1d_itype_veg, mxsowings, logger) # Yes, mxsowings even when importing harvests
     
     # Limit growing season to CLM max growing season length, if needed
-    if mxmats:
+    if mxmats and (imported_sdates or imported_hdates):
+        print("   Limiting growing season length...")
         hdates_rx = hdates_rx_orig.copy()
         for v in hdates_rx_orig:
             if v == "time_bounds":
@@ -312,22 +315,34 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
             # Get max growing season length
             vegtype_int = int(v.split('_')[1]) # netCDF variable name v should be something like gs1_17
             vegtype_str = utils.ivt_int2str(vegtype_int)
+            if vegtype_str == "soybean":
+                vegtype_str = "temperate_soybean"
+            elif vegtype_str == "irrigated_soybean":
+                vegtype_str = "irrigated_temperate_soybean"
+
             mxmat = mxmats[vegtype_str]
             if np.isinf(mxmat):
+                print(f"      Not limiting {vegtype_str}: No mxmat value")
                 continue
             
             # Get "prescribed" growing season length
             gs_len_rx_da = get_gs_len_da(hdates_rx_orig[v] - sdates_rx[v])
             not_ok = gs_len_rx_da.values > mxmat
             if not np.any(not_ok):
+                print(f"      Not limiting {vegtype_str}: No rx season > {mxmat} days")
                 continue
             
             hdates_limited = hdates_rx_orig[v].copy().values
             hdates_limited[np.where(not_ok)] = sdates_rx[v].values[np.where(not_ok)] + mxmat
             hdates_limited[np.where(hdates_limited > 365)] -= 365
+            if np.any(hdates_limited < 1):
+                raise RuntimeError("Limited hdates < 1")
+            elif np.any(hdates_limited > 365):
+                raise RuntimeError("Limited hdates > 365")
             hdates_rx[v] = xr.DataArray(data = hdates_limited,
                                         coords = hdates_rx_orig[v].coords,
                                         attrs = hdates_rx_orig[v].attrs)
+            print(f"      Limited {vegtype_str} growing season length to {mxmat}. Longest was {int(np.max(gs_len_rx_da.values))}, now {int(np.max(get_gs_len_da(hdates_rx[v] - sdates_rx[v]).values))}.")
     else:
         hdates_rx = hdates_rx_orig
     
