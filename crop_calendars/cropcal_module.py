@@ -1,7 +1,15 @@
+# What system is the script running on?
+import socket
+hostname = socket.gethostname()
+
+# Import the CTSM Python utilities
 import sys
-my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
-sys.path.append(my_ctsm_python_gallery)
-import utils
+if hostname == "Sams-2021-MacBook-Pro.local":
+    sys.path.append("/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/")
+    import utils
+else:
+    # Only possible because I have export PYTHONPATH=$HOME in my .bash_profile
+    from ctsm_python_gallery_myfork.ctsm_py import utils
 
 import numpy as np
 import xarray as xr
