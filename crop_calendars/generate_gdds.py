@@ -9,10 +9,12 @@ if hostname == "Sams-2021-MacBook-Pro.local":
     import utils
     sys.path.append("/Users/sam/Documents/git_repos/CTSM_cropcals_hist/crop_calendars")
     import generate_gdds_functions as gddfn
+    paramfile_dir = "/Users/Shared/CESM_inputdata/lnd/clm2/paramdata/"
 else:
     # Only possible because I have export PYTHONPATH=$HOME in my .bash_profile
     from ctsm_python_gallery_myfork.ctsm_py import utils
     from CTSM_cropcals_hist.crop_calendars import generate_gdds_functions as gddfn
+    paramfile_dir = "/glade/p/cesmdata/cseg/inputdata/lnd/clm2/paramdata"
     
 # Import other shared functions
 import os
@@ -33,10 +35,16 @@ import warnings
 import cartopy.crs as ccrs
 import datetime as dt
 import pickle
+import datetime as dt
 import argparse
+import logging
 
+# Figure settings
 plt.rc('font',**{'family':'sans-serif','sans-serif':['Arial']})
 
+# Info re: PFT parameter set
+my_clm_ver = 51
+my_clm_subver = "c211112"
 
 # Suppress some warnings
 import warnings
@@ -45,8 +53,6 @@ warnings.filterwarnings("ignore", message="Iteration over multi-part geometries 
 
 
 def main(argv):
-
-    help_string = "generate_gdds.py -r <run-dir> -s <sdates-file> -h <hdates-file> -1 <first-season> -N <last-season> [--no-save-figs --args.only_make_figs -lu/--land-use-file /path/to/lu/file --first-land-use-year 1961 --last-land-use-year 2010]"
 
     ###############################
     ### Process input arguments ###
@@ -59,10 +65,14 @@ def main(argv):
                         required=True)
     parser.add_argument("-1", "--first-season", 
                         help="First growing season to include in calculation of mean",
-                        required=True)
+                        required=True,
+                        type=int)
     parser.add_argument("-n", "-N", "--last-season", 
                         help="Last growing season to include in calculation of mean",
-                        required=True)
+                        required=True,
+                        type=int)
+    parser.add_argument("-o", "--output-dir",
+                        help="Output directory. Default is auto-generated subdir of -r/--run-dir.")
     parser.add_argument("-sd", "--sdates-file", 
                         help="File of prescribed sowing dates",
                         required=True)
@@ -87,20 +97,41 @@ def main(argv):
                         default=None)
     parser.add_argument("--first-land-use-year",
                         help="First year in land use file to use for masking. Default --first-season.",
-                        default=None)
+                        default=None,
+                        type=int)
     parser.add_argument("--last-land-use-year",
                         help="Last year in land use file to use for masking. Default --last-season.",
-                        default=None)
+                        default=None,
+                        type=int)
+    parser.add_argument("--unlimited-season-length", 
+                        help="Limit mean growing season length based on CLM CFT parameter mxmat.",
+                        action="store_true", default=False)
     
     # Get arguments
     args = parser.parse_args()
     for k, v in sorted(vars(args).items()):
         print(f"{k}: {v}")
     save_figs = not args.dont_save_figs
-        
+
     # Directories to save output files and figures
-    outdir = os.path.join(args.run_dir, "generate_gdds")
-    outdir_figs = os.path.join(outdir, "figs")
+    if not args.output_dir:
+        args.output_dir = os.path.join(args.run_dir, "generate_gdds")
+        if not args.unlimited_season_length:
+            args.output_dir += ".mxmat"
+        args.output_dir += "." + dt.datetime.now().strftime('%Y-%m-%d-%H%M%S')
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+    outdir_figs = os.path.join(args.output_dir, "figs")
+
+    # Set up log file and function
+    logging.basicConfig(level=logging.DEBUG,
+                        format="",
+                        filename=os.path.join(args.output_dir, 'generate_gdds.log'),
+                        filemode='a')
+    logger = logging.getLogger('')
+
+    # Print some info
+    gddfn.log(logger, f"Saving to {args.output_dir}")
     
     
     ##########################
@@ -112,11 +143,11 @@ def main(argv):
         # Keep 1 extra year to avoid incomplete final growing season for crops harvested after Dec. 31.
         y1_import_str = f"{args.first_season+1}-01-01"
         yN_import_str = f"{args.last_season+2}-01-01"
-        
-        print(f"Importing netCDF time steps {y1_import_str} through {yN_import_str} (years are +1 because of CTSM output naming)")
-        
-        pickle_file = os.path.join(outdir, f'{args.first_season}-{args.last_season}.pickle')
-        h1_ds_file = os.path.join(outdir, f'{args.first_season}-{args.last_season}.h1_ds.nc')
+
+        gddfn.log(logger, f"Importing netCDF time steps {y1_import_str} through {yN_import_str} (years are +1 because of CTSM output naming)")
+
+        pickle_file = os.path.join(args.output_dir, f'{args.first_season}-{args.last_season}.pickle')
+        h1_ds_file = os.path.join(args.output_dir, f'{args.first_season}-{args.last_season}.h1_ds.nc')
         if os.path.exists(pickle_file):
             with open(pickle_file, 'rb') as f:
                 args.first_season, args.last_season, pickle_year, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = pickle.load(f)
@@ -134,14 +165,19 @@ def main(argv):
         sdates_rx = args.sdates_file
         hdates_rx = args.hdates_file
         
+        if not args.unlimited_season_length:
+            mxmats = cc.import_max_gs_length(paramfile_dir, my_clm_ver, my_clm_subver)
+        else:
+            mxmats = None
+        
         for y, thisYear in enumerate(np.arange(args.first_season+1,args.last_season+3)):
             
             if thisYear <= pickle_year:
                 continue
             
-            h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = gddfn.import_and_process_1yr(args.first_season, args.last_season, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, args.run_dir, incl_vegtypes_str, h1_ds_file)
+            h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = gddfn.import_and_process_1yr(args.first_season, args.last_season, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, args.run_dir, incl_vegtypes_str, h1_ds_file, mxmats, cc.get_gs_len_da, logger)
             
-            print(f'   Saving pickle file ({pickle_file})...')
+            gddfn.log(logger, f'   Saving pickle file ({pickle_file})...')
             with open(pickle_file, 'wb') as f:
                 pickle.dump([args.first_season, args.last_season, thisYear, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings], f, protocol=-1)
                 
@@ -150,7 +186,7 @@ def main(argv):
             incl_vegtypes_str = np.array(incl_vegtypes_str)
         plot_vegtypes_str = incl_vegtypes_str[[i for i,c in enumerate(gddaccum_yp_list) if not isinstance(c,type(None))]]
         
-        print("Done")
+        gddfn.log(logger, "Done")
         
         if not h1_ds:
             h1_ds = xr.open_dataset(h1_ds_file)
@@ -165,20 +201,20 @@ def main(argv):
         longname_prefix = "GDD harvest target for "
         
         # Could skip this by saving sdates_rx['time_bounds']
-        sdates_rx = gddfn.import_rx_dates("s", sdates_rx, incl_patches1d_itype_veg, mxsowings)
+        sdates_rx = gddfn.import_rx_dates("s", sdates_rx, incl_patches1d_itype_veg, mxsowings, logger)
         
-        print('Getting and gridding mean GDDs...')
-        gdd_maps_ds = gddfn.yp_list_to_ds(gddaccum_yp_list, h1_ds, incl_vegtypes_str, sdates_rx, longname_prefix)
-        if save_figs:gddharv_maps_ds = gddfn.yp_list_to_ds(gddharv_yp_list, h1_ds, incl_vegtypes_str, sdates_rx, longname_prefix)
+        gddfn.log(logger, 'Getting and gridding mean GDDs...')
+        gdd_maps_ds = gddfn.yp_list_to_ds(gddaccum_yp_list, h1_ds, incl_vegtypes_str, sdates_rx, longname_prefix, logger)
+        if save_figs: gddharv_maps_ds = gddfn.yp_list_to_ds(gddharv_yp_list, h1_ds, incl_vegtypes_str, sdates_rx, longname_prefix, logger)
         
         # Fill NAs with dummy values
         dummy_fill = -1
         gdd_fill0_maps_ds = gdd_maps_ds.fillna(0)
         gdd_maps_ds = gdd_maps_ds.fillna(dummy_fill)
-        print('Done getting and gridding means.')
+        gddfn.log(logger, 'Done getting and gridding means.')
         
         # Add dummy variables for crops not actually simulated
-        print("Adding dummy variables...")
+        gddfn.log(logger, "Adding dummy variables...")
         # Unnecessary?
         template_ds = xr.open_dataset(args.sdates_file, decode_times=True)
         all_vars = [v.replace("sdate","gdd") for v in template_ds if "sdate" in v]
@@ -203,7 +239,7 @@ def main(argv):
         
         for v, thisVar in enumerate(dummy_vars):
             if thisVar in gdd_maps_ds:
-                raise RuntimeError(f'{thisVar} is already in gdd_maps_ds. Why overwrite it with dummy?')
+                error(logger, f'{thisVar} is already in gdd_maps_ds. Why overwrite it with dummy?')
             dummy_gridded.name = thisVar
             dummy_gridded.attrs["long_name"] = dummy_longnames[v]
             gdd_maps_ds[thisVar] = dummy_gridded
@@ -224,7 +260,7 @@ def main(argv):
         gdd_fill0_maps_ds = add_lonlat_attrs(gdd_fill0_maps_ds)
         if save_figs: gddharv_maps_ds = add_lonlat_attrs(gddharv_maps_ds)
         
-        print("Done.")
+        gddfn.log(logger, "Done.")
     
     
     ######################
@@ -232,12 +268,12 @@ def main(argv):
     ######################
     
     if not args.only_make_figs:
-        print("Saving...")
+        gddfn.log(logger, "Saving...")
         
         # Get output file path
         datestr = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-        outfile = os.path.join(outdir, "gdds_" + datestr + ".nc")
-        outfile_fill0 = os.path.join(outdir, "gdds_fill0_" + datestr + ".nc")
+        outfile = os.path.join(args.output_dir, "gdds_" + datestr + ".nc")
+        outfile_fill0 = os.path.join(args.output_dir, "gdds_fill0_" + datestr + ".nc")
         
         def save_gdds(args, outfile, gdd_maps_ds, sdates_rx):
             # Set up output file from template (i.e., prescribed sowing dates).
@@ -265,7 +301,7 @@ def main(argv):
         save_gdds(args, outfile, gdd_maps_ds, sdates_rx)
         save_gdds(args, outfile_fill0, gdd_fill0_maps_ds, sdates_rx)
         
-        print("Done saving.")
+        gddfn.log(logger, "Done saving.")
     
     
     ########################################
@@ -393,11 +429,11 @@ def main(argv):
     def make_figures(args, thisDir=None, gdd_maps_ds=None, gddharv_maps_ds=None, outdir_figs=None, linewidth=1.5):
         if not gdd_maps_ds:
             if not thisDir:
-                raise RuntimeError('If not providing gdd_maps_ds, you must provide thisDir (location of gdd_maps.nc)')
+                error(logger, 'If not providing gdd_maps_ds, you must provide thisDir (location of gdd_maps.nc)')
             gdd_maps_ds = xr.open_dataset(thisDir + 'gdd_maps.nc')
         if not gddharv_maps_ds:
             if not thisDir:
-                raise RuntimeError('If not providing gddharv_maps_ds, you must provide thisDir (location of gddharv_maps.nc)')
+                error(logger, 'If not providing gddharv_maps_ds, you must provide thisDir (location of gddharv_maps.nc)')
             gddharv_maps_ds = xr.open_dataset(thisDir + 'gdd_maps.nc')
     
         # Get info
@@ -442,10 +478,11 @@ def main(argv):
         # Maps
         ny = 3
         nx = 1
-        print("Making before/after maps...")
+        gddfn.log(logger, "Making before/after maps...")
         for v, vegtype_str in enumerate(incl_vegtypes_str):
             vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
             thisVar = f"gdd1_{vegtype_int}"
+            gddfn.log(logger, f"   {vegtype_str} ({vegtype_int})...")
             
             vegtype_str_title = vegtype_str.replace("_", " ")
             if "irrigated" not in vegtype_str:
@@ -495,7 +532,7 @@ def main(argv):
                                         wspace=0.2)
                 ax = fig.add_subplot(spec[0,0],projection=ccrs.PlateCarree())
             else:
-                raise RuntimeError(f"layout {layout} not recognized")
+                error(logger, f"layout {layout} not recognized")
             
             thisMin = int(np.round(np.nanmin(gddharv_map_yx)))
             thisMax = int(np.round(np.nanmax(gddharv_map_yx)))
@@ -508,7 +545,7 @@ def main(argv):
             elif layout in ["2x2", "3x2"]:
                 ax = fig.add_subplot(spec[1,0],projection=ccrs.PlateCarree())
             else:
-                raise RuntimeError(f"layout {layout} not recognized")
+                error(logger, f"layout {layout} not recognized")
             thisMin = int(np.round(np.nanmin(gdd_map_yx)))
             thisMax = int(np.round(np.nanmax(gdd_map_yx)))
             thisTitle = f"{args.run2_name} (range {thisMin}–{thisMax})"
@@ -573,7 +610,7 @@ def main(argv):
             elif layout in ["2x2", "3x2"]:
                 ax = fig.add_subplot(spec[:,1])
             else:
-                raise RuntimeError(f"layout {layout} not recognized")
+                error(logger, f"layout {layout} not recognized")
     
             bpl = make_plot(gdd_bybin_old, -1, linewidth)
             bpr = make_plot(gdd_bybin_new, 1, linewidth)
@@ -606,7 +643,7 @@ def main(argv):
                         bbox_inches='tight')
             plt.close()
     
-        print("Done.")
+        gddfn.log(logger, "Done.")
     
     if save_figs: 
         if args.only_make_figs:
