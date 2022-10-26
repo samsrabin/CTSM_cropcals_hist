@@ -1,7 +1,15 @@
+# What system is the script running on?
+import socket
+hostname = socket.gethostname()
+
+# Import the CTSM Python utilities
 import sys
-my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
-sys.path.append(my_ctsm_python_gallery)
-import utils
+if hostname == "Sams-2021-MacBook-Pro.local":
+    sys.path.append("/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/")
+    import utils
+else:
+    # Only possible because I have export PYTHONPATH=$HOME in my .bash_profile
+    from ctsm_python_gallery_myfork.ctsm_py import utils
 
 import numpy as np
 import xarray as xr
@@ -10,6 +18,8 @@ from scipy import stats, signal
 import warnings
 import cftime
 import pandas as pd
+import os
+import glob
 
 
 def adjust_grainC(da_in, patches1d_itype_veg_str):
@@ -1188,6 +1198,30 @@ def get_vegtype_str_paramfile(vegtype_str_in):
         vegtype_str_out = vegtype_str_in
     return vegtype_str_out
 
+def import_max_gs_length(paramfile_dir, my_clm_ver, my_clm_subver):
+    # Get parameter file
+    pattern = os.path.join(paramfile_dir, f"*{my_clm_ver}_params.{my_clm_subver}.nc")
+    paramfile = glob.glob(pattern)
+    if len(paramfile) != 1:
+        raise RuntimeError(f"Expected to find 1 match of {pattern}; found {len(paramfile)}")
+    paramfile_ds = xr.open_dataset(paramfile[0])
+    
+    # Import max growing season length (stored in netCDF as nanoseconds!)
+    paramfile_mxmats = paramfile_ds["mxmat"].values / np.timedelta64(1, 'D')
+    
+    # Import PFT name list
+    paramfile_pftnames = [x.decode("UTF-8").replace(" ", "") for x in paramfile_ds["pftname"].values]
+    
+    # Build dict
+    mxmat_dict = {}
+    for i, pftname in enumerate(paramfile_pftnames):
+        mxmat = paramfile_mxmats[i]
+        if not np.isnan(mxmat):
+            mxmat_dict[pftname] = int(mxmat)
+        else:
+            mxmat_dict[pftname] = np.inf
+    
+    return mxmat_dict
 
 # E.g. import_rx_dates("sdate", sdates_rx_file, dates_ds0_orig)
 def import_rx_dates(var_prefix, date_inFile, dates_ds):
