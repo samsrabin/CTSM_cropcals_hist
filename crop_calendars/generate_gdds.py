@@ -13,6 +13,14 @@ else:
     # Only possible because I have export PYTHONPATH=$HOME in my .bash_profile
     from ctsm_python_gallery_myfork.ctsm_py import utils
     from CTSM_cropcals_hist.crop_calendars import generate_gdds_functions as gddfn
+    
+# Import other shared functions
+import os
+import inspect
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0, parentdir) 
+import cropcal_module as cc
 
 # Import everything else
 import os
@@ -20,6 +28,7 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 import warnings
 import cartopy.crs as ccrs
 import datetime as dt
@@ -37,7 +46,7 @@ warnings.filterwarnings("ignore", message="Iteration over multi-part geometries 
 
 def main(argv):
 
-    help_string = "generate_gdds.py -r <run-dir> -s <sdates-file> -h <hdates-file> -1 <first-season> -N <last-season> [--no-save-figs --args.only_make_figs]"
+    help_string = "generate_gdds.py -r <run-dir> -s <sdates-file> -h <hdates-file> -1 <first-season> -N <last-season> [--no-save-figs --args.only_make_figs -lu/--land-use-file /path/to/lu/file --first-land-use-year 1961 --last-land-use-year 2010]"
 
     ###############################
     ### Process input arguments ###
@@ -73,6 +82,15 @@ def main(argv):
     parser.add_argument("--run2-name", 
                         help="Name of new values to show in figures",
                         default="New")
+    parser.add_argument("-lu", "--land-use-file",
+                        help="Path to CLM land use timeseries file, for masking figures",
+                        default=None)
+    parser.add_argument("--first-land-use-year",
+                        help="First year in land use file to use for masking. Default --first-season.",
+                        default=None)
+    parser.add_argument("--last-land-use-year",
+                        help="Last year in land use file to use for masking. Default --last-season.",
+                        default=None)
     
     # Get arguments
     args = parser.parse_args()
@@ -276,45 +294,71 @@ def main(argv):
     ### Save before/after map and boxplot figures ###
     #################################################
     
-    def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles):
-        if np.any(this_map.values < 0):
-            gdd_spacing = 500
-            vmax = np.floor(np.nanmax(this_map.values)/gdd_spacing)*gdd_spacing
-            vmin = -vmax
-            Ncolors = vmax/gdd_spacing
-            if Ncolors % 2 == 0: Ncolors += 1
-            cmap = cm.get_cmap("RdYlBu", Ncolors)
-            
-            if np.any(this_map.values > vmax) and np.any(this_map.values < vmin):
-                extend = 'both'
-            elif np.any(this_map.values > vmax):
-                extend = 'max'
-            elif np.any(this_map.values < vmin):
-                extend = 'min'
-            else:
-                extend = 'neither'
-            
+    def get_bounds_ncolors(gdd_spacing, diff_map_yx):
+        vmax = np.floor(np.nanmax(diff_map_yx.values)/gdd_spacing)*gdd_spacing
+        vmin = -vmax
+        epsilon = np.nextafter(0, 1)
+        bounds = list(np.arange(vmin, vmax, gdd_spacing)) + [vmax-epsilon]
+        if 0 in bounds:
+            bounds.remove(0)
+            bounds[bounds.index(-gdd_spacing)] /= 2
+            bounds[bounds.index(gdd_spacing)] /= 2
+        Ncolors = len(bounds) + 1
+        return vmax, bounds, Ncolors
+    
+    def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles, bounds=None, extend='both', cmap=None, cbar_ticks=None):
+        
+        if bounds:
+            if not cmap:
+                raise RuntimeError("Calling make_map() with bounds requires cmap to be specified")
+            norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend)
+            im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values,
+                                this_map, shading="auto",
+                                norm=norm,
+                                cmap=cmap)
         else:
-            vmin = 0
-            vmax = np.floor(vmax/500)*500
-            Ncolors = vmax/500
-            cmap=cm.get_cmap("jet", Ncolors)
-            extend = 'max'
-            
-        im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
-                this_map, shading="auto",
-                vmin=vmin, vmax=vmax,
-                cmap=cmap)
+            if np.any(this_map.values < 0):
+                gdd_spacing = 500
+                vmax = np.floor(np.nanmax(this_map.values)/gdd_spacing)*gdd_spacing
+                vmin = -vmax
+                Ncolors = vmax/gdd_spacing
+                if Ncolors % 2 == 0: Ncolors += 1
+                if not cmap:
+                    cmap = cm.get_cmap("RdYlBu_r", Ncolors)
+                
+                if np.any(this_map.values > vmax) and np.any(this_map.values < vmin):
+                    extend = 'both'
+                elif np.any(this_map.values > vmax):
+                    extend = 'max'
+                elif np.any(this_map.values < vmin):
+                    extend = 'min'
+                else:
+                    extend = 'neither'
+                
+            else:
+                vmin = 0
+                vmax = np.floor(vmax/500)*500
+                Ncolors = vmax/500
+                if not cmap:
+                    cmap=cm.get_cmap("jet", Ncolors)
+                extend = 'max'
+                
+            im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
+                    this_map, shading="auto",
+                    vmin=vmin, vmax=vmax,
+                    cmap=cmap)
             
         ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
         ax.coastlines(linewidth=0.3)
         ax.set_title(this_title, fontsize=fontsize_titles, fontweight="bold", y=0.96)
         cbar = plt.colorbar(im1, orientation="horizontal", fraction=0.1, pad=0.02,
-                            aspect=40, extend=extend)
+                            aspect=40, extend=extend, spacing='proportional')
         cbar.ax.tick_params(labelsize=fontsize_ticklabels)
         cbar.ax.set_xlabel(this_map.attrs['units'],
                            fontsize=fontsize_ticklabels)
         cbar.ax.xaxis.set_label_coords(x=0.115, y=2.6)
+        if cbar_ticks:
+            cbar.ax.set_xticks(cbar_ticks)
         
         ticks = np.arange(-60, 91, bin_width)
         ticklabels = [str(x) for x in ticks]
@@ -363,6 +407,16 @@ def main(argv):
             outdir_figs = gdd_maps_ds.attrs['outdir_figs']
         y1 = gdd_maps_ds.attrs['y1']
         yN = gdd_maps_ds.attrs['yN']
+        
+        # Import LU data, if doing so
+        if args.land_use_file:
+            y1_lu = y1 if args.first_land_use_year == None else args.first_land_use_year
+            yN_lu = yN if args.last_land_use_year == None else args.last_land_use_year
+            lu_ds = cc.open_lu_ds(args.land_use_file, y1_lu, yN_lu, gdd_maps_ds)
+            lu_years_text = f" (masked by {y1_lu}-{yN_lu} area)"
+            lu_years_file = f"_mask{y1_lu}-{yN_lu}"
+        else:
+            lu_ds = None
     
         # layout = "3x1"
         # layout = "2x2"
@@ -398,8 +452,14 @@ def main(argv):
                 vegtype_str_title = "rainfed " + vegtype_str_title
             vegtype_str_title = vegtype_str_title.capitalize()
             
-            print(f"   {vegtype_str_title} ({vegtype_int})...")
+            # Crop area map (for masking)
+            if lu_ds:
+                crop_area_yx = (lu_ds.AREA * lu_ds.LANDFRAC_PFT * lu_ds.PCT_CROP * lu_ds.PCT_CFT.sel(cft=vegtype_int)).sum(dim="time")
+                if np.nansum(crop_area_yx.values) == 0:
+                    print(f"   No area of {vegtype_str}; skipping.")
+                    continue
             
+            print(f"   {vegtype_str_title} ({vegtype_int})...")
             
             # Maps #####################
             
@@ -409,6 +469,10 @@ def main(argv):
             if "time" in gddharv_map.dims:
                 gddharv_map = gddharv_map.isel(time=0, drop=True)
             gddharv_map_yx = gddharv_map.where(gddharv_map != dummy_fill)
+            
+            if lu_ds:
+                gdd_map_yx = gdd_map_yx.where(crop_area_yx > 0)
+                gddharv_map_yx = gddharv_map_yx.where(crop_area_yx > 0)
             
             gdd_map_yx.attrs['units'] = gdd_units
             gddharv_map_yx.attrs['units'] = gdd_units
@@ -459,13 +523,38 @@ def main(argv):
                 thisTitle = "ISIMIP3 minus CLM"
                 diff_map_yx = gdd_map_yx - gddharv_map_yx
                 diff_map_yx.attrs['units'] = gdd_units
+                
+                gdd_spacing = 500
+                vmax, bounds, Ncolors = get_bounds_ncolors(gdd_spacing, diff_map_yx)
+                if Ncolors < 9:
+                    gdd_spacing = 250
+                    vmax, bounds, Ncolors = get_bounds_ncolors(gdd_spacing, diff_map_yx)
+                
+                cmap = cm.get_cmap("RdBu_r", Ncolors)
+                cbar_ticks = []
+                include_0bin_ticks = Ncolors <= 13
+                if vmax <= 3000:
+                    tick_spacing = gdd_spacing*2
+                elif vmax <= 5000:
+                    tick_spacing = 1500
+                else:
+                    tick_spacing = 2000
+                previous = -np.inf
+                for x in bounds:
+                    if (not include_0bin_ticks) and (x>0) and (previous<0):
+                        cbar_ticks.append(0)
+                    if x % tick_spacing == 0 or (include_0bin_ticks and abs(x)==gdd_spacing/2):
+                        cbar_ticks.append(x)
+                    previous = x
+                
                 make_map(ax, diff_map_yx, thisTitle, vmax, bin_width,
-                        fontsize_ticklabels, fontsize_titles)
+                        fontsize_ticklabels, fontsize_titles, bounds=bounds,
+                        extend='both', cmap=cmap, cbar_ticks=cbar_ticks)
             
             # Boxplots #####################
-            
-            gdd_vector = get_non_nans(gdd_map, dummy_fill)
-            gddharv_vector = get_non_nans(gddharv_map, dummy_fill)
+
+            gdd_vector = get_non_nans(gdd_map_yx, dummy_fill)
+            gddharv_vector = get_non_nans(gddharv_map_yx, dummy_fill)
             
             lat_abs = np.abs(gdd_map.lat.values)
             gdd_bybin_old = [gddharv_vector]
@@ -474,8 +563,8 @@ def main(argv):
                 lower = lat_bin_edges[b]
                 upper = lat_bin_edges[b+1]
                 lat_inds = np.where((lat_abs>=lower) & (lat_abs<upper))[0]
-                gdd_vector_thisBin = get_non_nans(gdd_map[lat_inds,:], dummy_fill)
-                gddharv_vector_thisBin = get_non_nans(gddharv_map[lat_inds,:], dummy_fill)
+                gdd_vector_thisBin = get_non_nans(gdd_map_yx[lat_inds,:], dummy_fill)
+                gddharv_vector_thisBin = get_non_nans(gddharv_map_yx[lat_inds,:], dummy_fill)
                 gdd_bybin_old.append(gddharv_vector_thisBin)
                 gdd_bybin_new.append(gdd_vector_thisBin)
                     
@@ -507,12 +596,12 @@ def main(argv):
             ax.yaxis.set_label_coords(-0.11, 0.5)
             plt.title(f"Zonal changes", fontsize=fontsize_titles, fontweight="bold")
             
-            plt.suptitle(f"Maturity requirements: {vegtype_str_title}",
+            plt.suptitle(f"Maturity requirements: {vegtype_str_title}" + lu_years_text,
                          fontsize=fontsize_titles*1.2,
                          fontweight="bold",
                          y=0.95)
             
-            outfile = os.path.join(outdir_figs, f"{thisVar}_{vegtype_str}_gs{y1}-{yN}.png")
+            outfile = os.path.join(outdir_figs, f"{thisVar}_{vegtype_str}_gs{y1}-{yN}{lu_years_file}.png")
             plt.savefig(outfile, dpi=300, transparent=False, facecolor='white',
                         bbox_inches='tight')
             plt.close()
