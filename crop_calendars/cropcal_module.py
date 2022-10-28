@@ -1138,6 +1138,27 @@ def get_ts_prod_clm_yc_da(yield_gd, lu_ds, yearList, cropList_combined_clm):
                                           "Crop": cropList_combined_clm})
    return ts_prod_clm_yc_da
 
+def get_ts_prod_clm_yc_da2(case_ds, lu_ds, yieldVar, yearList, cropList_combined_clm):
+   
+   prod_da = case_ds[yieldVar] * lu_ds['AREA_CFT']
+   
+   ts_prod_clm_yc_da = prod_da.groupby(case_ds['patches1d_itype_combinedCropCLM_str'])\
+                              .apply(xr.DataArray.sum, dim='patch', skipna=True)\
+                              .rename({'time': 'Year',
+                                       'patches1d_itype_combinedCropCLM_str': 'Crop'})\
+                              .isel(Crop=slice(1,len(cropList_combined_clm)))\
+                               * 1e-12
+   ts_prod_clm_ySUM = ts_prod_clm_yc_da.sum(dim="Crop")\
+                                       .expand_dims(dim='Crop',
+                                                    axis=list(ts_prod_clm_yc_da.dims).index('Crop'))
+   ts_prod_clm_yc_da = xr.concat((ts_prod_clm_yc_da,
+                                  ts_prod_clm_ySUM),
+                                  dim="Crop")\
+                       .assign_coords({'Crop': cropList_combined_clm,
+                                       'Year': yearList})
+   
+   return ts_prod_clm_yc_da
+   
 
 def get_vegtype_str_figfile(vegtype_str_in):
     vegtype_str_out = vegtype_str_in
@@ -1459,13 +1480,45 @@ def mask_immature(this_ds, this_vegtype, gridded_da):
 
 def open_lu_ds(filename, y1, yN, existing_ds):
    # Open and trim to years of interest
-   ds = xr.open_dataset(filename).sel(time=slice(y1,yN))
+   dsg = xr.open_dataset(filename).sel(time=slice(y1,yN))
 
    # Assign actual lon/lat coordinates
-   ds = ds.assign_coords(lon=("lsmlon", existing_ds.lon.values),
-                              lat=("lsmlat", existing_ds.lat.values))
-   ds = ds.swap_dims({"lsmlon": "lon",
-                           "lsmlat": "lat"})
+   dsg = dsg.assign_coords(lon=("lsmlon", existing_ds.lon.values),
+                           lat=("lsmlat", existing_ds.lat.values))
+   dsg = dsg.swap_dims({"lsmlon": "lon",
+                        "lsmlat": "lat"})
+   
+   dsg['AREA_CFT'] = dsg.AREA*1e6 * dsg.LANDFRAC_PFT * dsg.PCT_CROP/100 * dsg.PCT_CFT/100
+   dsg['AREA_CFT'].attrs = {'units': 'm2'}
+   dsg['AREA_CFT'].load()
+   
+   # Un-grid
+   query_ilons = [int(x)-1 for x in existing_ds['patches1d_ixy'].values]
+   query_ilats = [int(x)-1 for x in existing_ds['patches1d_jxy'].values]
+   query_ivts = [list(dsg.cft.values).index(x) for x in existing_ds['patches1d_itype_veg'].values]
+
+   ds = xr.Dataset(attrs=dsg.attrs)
+   for v in ["AREA", "LANDFRAC_PFT", "PCT_CFT", "PCT_CROP", "AREA_CFT"]:
+       if 'time' in dsg[v].dims:
+           new_coords = existing_ds['GRAINC_TO_FOOD_ANN'].coords
+       else:
+           new_coords = existing_ds['patches1d_lon'].coords
+       if 'cft' in dsg[v].dims:
+           ds[v] = dsg[v].isel(lon=xr.DataArray(query_ilons, dims='patch'),
+                               lat=xr.DataArray(query_ilats, dims='patch'),
+                               cft=xr.DataArray(query_ivts, dims='patch'),
+                               drop=True)\
+                         .assign_coords(new_coords)
+       else:
+           ds[v] = dsg[v].isel(lon=xr.DataArray(query_ilons, dims='patch'),
+                               lat=xr.DataArray(query_ilats, dims='patch'),
+                               drop=True)\
+                         .assign_coords(new_coords)
+   for v in existing_ds:
+       if "patches1d_" in v:
+           ds[v] = existing_ds[v]
+   ds['lon'] = dsg['lon']
+   ds['lat'] = dsg['lat']
    return ds
 
 
@@ -1709,6 +1762,17 @@ def set_up_ds_with_gs_axis(ds_in):
     return ds_out
 
 
+def strip_cropname(x):
+    for y in ['irrigated', 'temperate', 'tropical', 'spring', 'winter']:
+        x = x.replace(y+"_", "")
+    return x
+
+def fullname_to_combinedCrop(fullnames, cropList_combined_clm):
+    x = [strip_cropname(y).capitalize() for y in fullnames]
+    z = [y if y in cropList_combined_clm else '' for y in x]
+    return z
+
+
 def subtract_mean(in_ps):
    warnings.filterwarnings("ignore", message="Mean of empty slice") # Happens when you do np.nanmean() of an all-NaN 
    mean_p = np.nanmean(in_ps, axis=1)
@@ -1735,6 +1799,34 @@ def time_units_and_trim(ds, y1, yN, dt_type):
       
    return ds
 
+# kwargs like gridded_ds_dim='ungridded_target_ds_dim'
+def ungrid(gridded_xr, ungridded_target_ds, coords_var, **kwargs):
+    
+    # Remove any empties from ungridded_target_ds
+    for key, selection in kwargs.items():
+        if isinstance(ungridded_target_ds[selection].values[0], str):
+            # print(f"Removing ungridded_target_ds patches where {selection} is empty")
+            isel_list = [i for i, x in enumerate(ungridded_target_ds[selection]) if x != ""]
+            ungridded_target_ds = ungridded_target_ds.copy().isel({'patch': isel_list})
+            
+            ### I don't think this is necessary
+            # unique_ungridded_selection = ungridded_target_ds[selection].values
+            # isel_list = [i for i, x in enumerate(gridded_xr[key].values) if x in unique_ungridded_selection]
+            # gridded_xr = gridded_xr.isel({key: isel_list})
+    
+    new_coords = ungridded_target_ds[coords_var].coords
+        
+    isel_dict = {}
+    for key, selection in kwargs.items():
+        if key in ['lon', 'lat']:
+            isel_dict[key] = xr.DataArray([int(x)-1 for x in ungridded_target_ds[selection].values],
+                                          dims = 'patch')
+        else:
+            values_list = list(gridded_xr[key].values)
+            isel_dict[key] = xr.DataArray([values_list.index(x) for x in ungridded_target_ds[selection].values],
+                                          dims = 'patch')
+    ungridded_da = gridded_xr.isel(isel_dict, drop=True).assign_coords(new_coords)
+    return ungridded_da
 
 def yield_anomalies(ps_in):
    if isinstance(ps_in, xr.DataArray):
