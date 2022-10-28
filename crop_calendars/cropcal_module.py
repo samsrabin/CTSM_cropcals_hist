@@ -59,7 +59,7 @@ def adjust_grainC(da_in, patches1d_itype_veg_str):
       
       tmp = da_in.isel(patch=i_thisCrop).values
       if dm_frac != None:
-         tmp /= dm_frac
+         tmp[np.where(~np.isnan(tmp))] /= dm_frac
       elif np.any(tmp > 0):
          raise RuntimeError(f"You need to get a real dry-matter fraction for {thisCrop}")
       
@@ -1250,7 +1250,7 @@ def import_rx_dates(var_prefix, date_inFile, dates_ds):
 
 
 def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mgdcrop_list(), 
-                  sdates_rx_ds=None, gdds_rx_ds=None, verbose=False, mxmats=None):
+                  sdates_rx_ds=None, gdds_rx_ds=None, verbose=False, mxmats=None, min_viable_hui=-np.inf):
    
    # Minimum harvest threshold allowed in PlantCrop()
    gdd_min = 50
@@ -1340,6 +1340,26 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
    # Check for no zero values where there shouldn't be
    varList_no_zero = ["DATE", "YEAR"]
    check_no_zeros(this_ds, varList_no_zero, "original file")
+   
+   # Set yield to zero where minimum viable HUI wasn't reached
+   if min_viable_hui >= 0:
+       huifrac = (this_ds['HUI_PERHARV'] / this_ds['GDDHARV_PERHARV']).values
+       huifrac[np.where(this_ds['GDDHARV_PERHARV'].values==0)] = 1
+       if np.any(huifrac < min_viable_hui):
+           print(f"Setting yield to zero where minimum viable HUI ({min_viable_hui}) wasn't reached")
+           tmp_da = this_ds["GRAINC_TO_FOOD_PERHARV"]
+           tmp = tmp_da.copy().values
+           tmp[np.where((huifrac < min_viable_hui) & (tmp > 0))] = 0
+           this_ds["GRAINC_TO_FOOD_PERHARV"] = xr.DataArray(data = tmp,
+                                                            attrs = tmp_da.attrs,
+                                                            coords = tmp_da.coords)
+           tmp = this_ds["GRAINC_TO_FOOD_PERHARV"].sum(dim='mxharvests', skipna=True
+                                                       ).values
+           grainc_to_food_ann_orig = this_ds["GRAINC_TO_FOOD_ANN"]
+           this_ds["GRAINC_TO_FOOD_ANN"] = xr.DataArray(data = tmp,
+                                                        attrs = grainc_to_food_ann_orig.attrs,
+                                                        coords = grainc_to_food_ann_orig.coords
+                                                        ).where(~np.isnan(grainc_to_food_ann_orig))
    
    # Convert time*mxharvests axes to growingseason axis
    this_ds_gs = convert_axis_time2gs(this_ds, verbose=verbose, incl_orig=False)
