@@ -8,6 +8,9 @@ which_cases = "main2"
 # Yields will be set to zero unless HUI at harvest is ≥ min_viable_hui
 min_viable_hui = 1
 
+# Include diagnostic info in figures?
+diagnostics = True
+
 # Import shared functions
 import os
 import sys
@@ -174,18 +177,21 @@ if which_cases == "originalCLM":
    cases['cmip6'] = {'filepath': '/Users/Shared/CESM_work/CropEvalData_ssr/danica_timeseries-cmip6_i.e21.IHIST.f09_g17/month_1/ssr_trimmed_annual.nc',
                      'constantVars': None,
                      'constantGSs': None,
-                     'res': 'f09_g17'}
+                     'res': 'f09_g17',
+                     'verbosename': 'cmip6: Old CESM run'}
 if "original" in which_cases:
    # My run with normal CLM code + my outputs
    cases['Original baseline'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1958-2014/cropcals3.f19-g17.yield_perharv2.IHistClm50BgcCrop.1958-2014.clm2.h1.1958-01-01-00000.nc',
                                  'constantVars': None,
                                  'constantGSs': None,
-                                 'res': 'f19_g17'}
+                                 'res': 'f19_g17',
+                                 'verbosename': 'Original baseline: ctsm5.1.dev092 + my outvars'}
 # My run with rx_crop_calendars2 code but CLM calendars
 cases['New baseline'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1958-2014/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1958-2014.clm2.h1.1958-01-01-00000.nc',
                          'constantVars': None,
                          'constantGSs': None,
-                         'res': 'f19_g17'}
+                         'res': 'f19_g17',
+                         'verbosename': 'New baseline: my cropcal code, no Rx'}
 # My run with rx_crop_calendars2 code and GGCMI calendars
 cases['Prescribed calendars'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3.clm2.h1.1958-01-01-00000.nc',
                              'constantVars': ["SDATES", "GDDHARV"],
@@ -193,7 +199,8 @@ cases['Prescribed calendars'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2
                              'res': 'f19_g17',
                              'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
                              'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
-                             'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc"}
+                             'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc",
+                             'verbosename': 'Prescribed calendars: Rx sdates+GDDs, unlim-gs sim and GDDgen'}
 if which_cases == "diagnose":
    # My run with rx_crop_calendars2 code and GGCMI sowing dates but CLM maturity reqts
    cases['Prescribed sowing'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.sdateforced_not_gdd/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.sdateforced_not_gdd.clm2.h1.1958-01-01-00000.nc',
@@ -202,7 +209,8 @@ if which_cases == "diagnose":
                               'res': 'f19_g17',
                               'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
                               'rx_hdates_file': None,
-                              'rx_gdds_file': None}
+                              'rx_gdds_file': None,
+                              'verbosename': 'Prescribed sowing: unlim-gs sim'}
    # My run with rx_crop_calendars2 code and CLM sowing dates but GGCMI maturity reqts
    cases['Prescribed maturity reqts.'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced_not_sdate/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced_not_sdate.clm2.h1.1958-01-01-00000.nc',
                               'constantVars': ["GDDHARV"],
@@ -210,7 +218,8 @@ if which_cases == "diagnose":
                               'res': 'f19_g17',
                               'rx_sdates_file': None,
                               'rx_hdates_file': None,
-                              'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc"}
+                              'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc",
+                              'verbosename': 'Prescribed maturity reqts.: unlim-gs sim and GDDs'}
 
 
 # Note that _PERHARV will be stripped off upon import
