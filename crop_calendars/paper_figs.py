@@ -25,11 +25,6 @@ my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myf
 sys.path.append(my_ctsm_python_gallery)
 import utils
 
-outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures_" \
-   + which_cases + "/"
-if not os.path.exists(outDir_figs):
-   os.mkdir(outDir_figs)
-
 import numpy as np
 from scipy import stats, signal
 import xarray as xr
@@ -221,6 +216,12 @@ if which_cases == "diagnose":
                               'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc",
                               'verbosename': 'Prescribed maturity reqts.: unlim-gs sim and GDDs'}
 
+outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures/"
+for i, (casename, case) in enumerate(cases.items()):
+   outDir_figs += case['verbosename'].replace(": ", " | ") + "/"
+outDir_figs += "figs/"
+if not os.path.exists(outDir_figs):
+   os.makedirs(outDir_figs)
 
 # Note that _PERHARV will be stripped off upon import
 myVars = ['GRAINC_TO_FOOD_PERHARV', 'GRAINC_TO_FOOD_ANN', 'SDATES', 'SDATES_PERHARV', 'SYEARS_PERHARV', 'HDATES', 'HYEARS', 'GDDHARV_PERHARV', 'GDDACCUM_PERHARV', 'HUI_PERHARV', 'SOWING_REASON_PERHARV', 'HARVEST_REASON_PERHARV']
