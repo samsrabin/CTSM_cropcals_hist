@@ -1800,6 +1800,7 @@ def time_units_and_trim(ds, y1, yN, dt_type):
    return ds
 
 # kwargs like gridded_ds_dim='ungridded_target_ds_dim'
+# e.g.: lon='patches1d_ixy', lat='patches1d_jxy'
 def ungrid(gridded_xr, ungridded_target_ds, coords_var, **kwargs):
     
     # Remove any empties from ungridded_target_ds
