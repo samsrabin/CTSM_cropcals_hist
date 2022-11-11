@@ -488,17 +488,16 @@ for v in earthstats_gd['f19_g17']:
    discrep_sum_rel = 100*(np.mean(earthstats_gd['f19_g17'][v].values) - np.mean(earthstats_gd['f09_g17'][v].values)) / np.mean(earthstats_gd['f09_g17'][v].values)
    print(f"Discrepancy in {v} f19_g17 rel to f09_g17: {discrep_sum_rel}%")
 
-# # Ungrid
-# earthstats={}
-# earthstats['f19_g17'] = cc.ungrid(earthstats_gd['f19_g17'],
-#                                   cases['New baseline']['ds'], 'GRAIN_TO_FOOD_ANN',
-#                                   lon='patches1d_ixy',
-#                                   lat='patches1d_jxy',
-#                                   crop='patches1d_itype_combinedCropCLM_str')
+# Ungrid
+earthstats={}
+earthstats['f19_g17'] = cc.ungrid(earthstats_gd['f19_g17'],
+                                  cases['New baseline']['ds'], 'GRAIN_TO_FOOD_ANN',
+                                  lon='patches1d_ixy',
+                                  lat='patches1d_jxy',
+                                  crop='patches1d_itype_combinedCropCLM_str')
 
 
 print("Done importing FAO EarthStat.")
-
 
 # %% Import country map and key
 
@@ -1181,6 +1180,7 @@ for v, vegtype_str in enumerate(clm_types_rfir):
     
 
 # %% Make scatter plots, FAOSTAT vs. CLM, of top 10 countries for each crop
+importlib.reload(cc)
 
 Ntop = 10
 # top_y1 = 1961 # First year of FAO data
@@ -1210,7 +1210,8 @@ NtopYears = len(topYears)
 
 fao_crops = np.unique(fao_all_ctry.Crop.values)
 for c, thisCrop in enumerate(fao_crops):
-      
+   print(f"{thisCrop}...")
+   
    thisCrop_clm = cc.cropnames_fao2clm(thisCrop)
    
    suptitle = f"{thisCrop}, FAOSTAT vs CLM ({top_y1}-{top_yN})"
@@ -1221,9 +1222,11 @@ for c, thisCrop in enumerate(fao_crops):
       continue
    
    # Get yield datasets
-   topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats_gd)
+   print("   Analyzing...")
+   topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats)
    Ntop_global = Ntop + 1
    
+   print("   Plotting...")
    if which_to_plot == "Yield":
       plot_ds = topN_ds
    elif which_to_plot == "Detrended yield":
@@ -1335,7 +1338,9 @@ for c, thisCrop in enumerate(fao_crops):
    f.savefig(fig_outfile,
              bbox_inches='tight', facecolor='white')
    plt.close()
-   
+ 
+print("Done.")
+ 
    
 # %% Make line plots, FAOSTAT vs. CLM, of top 10 countries for each crop
 
@@ -1368,6 +1373,7 @@ legend_members = caselist + ['FAOSTAT']
 
 fao_crops = np.unique(fao_all_ctry.Crop.values)
 for c, thisCrop in enumerate(fao_crops):
+   print(f"{thisCrop}...")
       
    thisCrop_clm = cc.cropnames_fao2clm(thisCrop)
    
@@ -1379,9 +1385,11 @@ for c, thisCrop in enumerate(fao_crops):
       continue
    
    # Get yield datasets
-   topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats_gd)
+   print("   Analyzing...")
+   topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats)
    Ntop_global = Ntop + 1
    
+   print("   Plotting...")
    if which_to_plot == "Yield":
       plot_ds = topN_ds
    elif which_to_plot == "Detrended yield":
@@ -1459,7 +1467,9 @@ for c, thisCrop in enumerate(fao_crops):
    f.savefig(fig_outfile,
              bbox_inches='tight', facecolor='white')
    plt.close()
-   
+
+print("Done.")
+
    
 # %% Compare mean growing season length to GGCMI models
 

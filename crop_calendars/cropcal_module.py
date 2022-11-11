@@ -960,7 +960,7 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
    NtopYears = len(topYears)
    
    thisCrop_clm = cropnames_fao2clm(thisCrop_fao)
-   i_theseYears_earthstat = [i for i, x in enumerate(earthstats['f09_g17'].time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
+   i_theseYears_earthstat = [i for i, x in enumerate(earthstats['f19_g17'].time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
    caselist = [k for k,v in cases.items()]
    
    prod_ar = np.full((len(cases), NtopYears, Ntop), np.nan)
@@ -972,48 +972,59 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
    
    for i_case, (casename, case) in enumerate(cases.items()):
       case_ds = case['ds']
-      lu_ds = reses[case['res']]['dsg']
-      countries_map = lu_ds['countries'].load()
+      lu_ds = reses[case['res']]['ds']
+      countries = lu_ds['countries'].load()
+      countries_map = reses[case['res']]['dsg']['countries'].load()
 
       i_theseYears_case = [i for i, x in enumerate(case_ds.time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
       i_theseYears_lu = [i for i, x in enumerate(lu_ds.time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
       
       # Find this crop in production and area data
-      i_thisCrop_case = [i for i, x in enumerate(case_ds.vegtype_str.values) if thisCrop_clm in x]
+      i_thisCrop_case = [i for i, x in enumerate(case_ds.patches1d_itype_veg_str.values) if thisCrop_clm in x]
       if len(i_thisCrop_case) == 0:
          raise RuntimeError(f'No matches found for {thisCrop_fao} in case_ds.vegtype_str')
-      i_thisCrop_lu = [i for i, x in enumerate(lu_ds.cft.values) if thisCrop_clm in utils.ivt_int2str(x)]
+      i_thisCrop_lu = [i for i, x in enumerate(lu_ds.patches1d_itype_veg.values) if thisCrop_clm in utils.ivt_int2str(x)]
       if len(i_thisCrop_lu) == 0:
-         raise RuntimeError(f'No matches found for {thisCrop_fao} in lu_ds.cft')
+         raise RuntimeError(f'No matches found for {thisCrop_fao} in lu_ds.patches1d_itype_veg')
+     
+      # Yield...
+      tmp_ds = case_ds.isel(patch=i_thisCrop_case, time=i_theseYears_case)
+      yield_da = tmp_ds['GRAIN_TO_FOOD_ANN']\
+        .groupby(tmp_ds['patches1d_gi'])\
+        .apply(xr.DataArray.sum, dim='patch', skipna=True)\
+        .rename({'time': 'Year'})\
+        * 1e-6 * 1e4 # g/m2 to tons/ha
+      
+      # Area...
+      tmp_ds = lu_ds.isel(patch=i_thisCrop_lu, time=i_theseYears_lu)
+      area_da = tmp_ds['AREA_CFT']\
+        .groupby(tmp_ds['patches1d_gi'])\
+        .apply(xr.DataArray.sum, dim='patch', skipna=True)\
+        .rename({'time': 'Year'})\
+        * 1e-4 # m2 to ha
+      
+      # Countries
+      countries_da = countries.isel(patch=i_thisCrop_lu)\
+        .groupby(tmp_ds['patches1d_gi'])\
+        .apply(xr.DataArray.mean, dim='patch', skipna=True)
       
       # Get each top-N country's time series for this crop
-      for c, country in enumerate(topN_countries):
-         
-         # Yield...
-         yield_da = case_ds['GRAIN_TO_FOOD_ANN_GD']\
-            .isel(ivt_str=i_thisCrop_case, time=i_theseYears_case)\
-            .sum(dim='ivt_str')\
-            * 1e-6 * 1e4 # g/m2 to tons/ha
-                     
-         # Area...
-         area_da = lu_ds['AREA_CFT']\
-            .isel(cft=i_thisCrop_lu, time=i_theseYears_lu)\
-            .sum(dim='cft')\
-            * 1e-4 # m2 to ha
-        
+      for c, country in enumerate(topN_countries):         
          if country == "World":
             country_id = None
+            yield_thisCountry_da = yield_da
+            area_thisCountry_da = area_da
          else:
             country_id = countries_key.query(f'name == "{country}"')['num'].values
             if len(country_id) != 1:
                 raise RuntimeError(f'Expected 1 match of {country} in countries_key; got {len(country_id)}')
-            yield_da = yield_da.where(countries_map == country_id)
-            area_da = area_da.where(countries_map == country_id)
+            yield_thisCountry_da = yield_da.where(countries_da == country_id)
+            area_thisCountry_da = area_da.where(countries_da == country_id)
             
-         area_ar[i_case,:,c] = area_da.sum(dim=['lon', 'lat']).values 
+         area_ar[i_case,:,c] = area_thisCountry_da.sum(dim='patches1d_gi').values 
          
          # Production (tons)
-         prod_ar[i_case,:,c] = (yield_da * area_da).sum(dim=['lon', 'lat'])
+         prod_ar[i_case,:,c] = (yield_thisCountry_da * area_thisCountry_da).sum(dim='patches1d_gi')
             
          # FAOSTAT production (tons) and area (ha)
          if i_case == 0:
@@ -1024,7 +1035,14 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
          if np.all(np.isnan(prod_earthstat_yc[:,c])) and case['res']=='f09_g17':
             prod_earthstat_yc[:,c] = get_earthstat_country_ts(earthstats, case, 'Production', countries_map, thisCrop_clm, i_theseYears_earthstat, country_id)
             area_earthstat_yc[:,c] = get_earthstat_country_ts(earthstats, case, 'HarvestArea', countries_map, thisCrop_clm, i_theseYears_earthstat, country_id)
-
+   
+   if np.any(np.isnan(prod_ar)):
+       raise RuntimeError("NaN in prod_ar")
+   if np.any(np.isnan(area_ar)):
+       raise RuntimeError("NaN in area_ar")
+   if np.any(area_ar==0):
+       raise RuntimeError("0 in area_ar")
+   
    new_coords = {'Case': caselist,
                  'Year': topYears,
                  'Country': topN_countries}
