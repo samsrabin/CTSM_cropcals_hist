@@ -311,6 +311,7 @@ for i, (resname, res) in enumerate(reses.items()):
    
    res['ds'] = cc.open_lu_ds(res['lu_path'], y1, yN, case['ds'].sel(time=slice(y1,yN)))
    res['ds'] = res['ds'].assign_coords({"time": [cftime.DatetimeNoLeap(y, 1, 1, 0, 0, 0, 0, has_year_zero=True) for y in res['ds'].time.values]})
+   res['dsg'] = xr.Dataset(data_vars={'AREA': utils.grid_one_variable(res['ds'], 'AREA')})
       
 print("Done importing land use.")
 
@@ -509,6 +510,7 @@ for resname, res in reses.items():
    if 'dsg' not in res:
       continue
    res['dsg']['countries'] = utils.lon_idl2pm(countries).interp_like(res['dsg']['AREA'], method='nearest')['gadm0']
+   res['ds']['countries'] = cc.ungrid(res['dsg']['countries'], res['ds'], 'AREA', lon='patches1d_ixy', lat='patches1d_jxy')
    
 countries_key = pd.read_csv('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_brendan/Nation_ID.csv',
                                header=None,
