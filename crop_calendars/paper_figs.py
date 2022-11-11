@@ -156,6 +156,7 @@ for i, mxmat in enumerate(paramfile_mxmats):
 
 
 # %% Import model output
+importlib.reload(cc)
 
 y1 = 1961
 yN = 2010
@@ -198,6 +199,14 @@ cases['Prescribed calendars'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2
                              'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
                              'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc",
                              'verbosename': 'Prescribed calendars: Rx sdates+GDDs, unlim-gs sim and GDDgen'}
+# cases['Prescribed calendars'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars3.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3.mxmat/cropcals3.f19-g17.rx_crop_calendars3.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3.mxmat.clm2.h1.1958-01-01-00000.nc',
+#                              'constantVars': ["SDATES", "GDDHARV"],
+#                              'constantGSs': None, # 'None' with constantVars specified means all should be constant
+#                              'res': 'f19_g17',
+#                              'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
+#                              'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
+#                              'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds.mxmat.2022-10-26-171107/gdds_20221026_180012.nc",
+#                              'verbosename': 'Prescribed calendars: limited-gs sim, unlimited-gs GDDgen'}
 if which_cases == "diagnose":
    # My run with rx_crop_calendars2 code and GGCMI sowing dates but CLM maturity reqts
    cases['Prescribed sowing'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.sdateforced_not_gdd/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.sdateforced_not_gdd.clm2.h1.1958-01-01-00000.nc',
@@ -288,6 +297,7 @@ clm_types = np.unique([x.replace('irrigated_', '') for x in clm_types_rfir])
 
 
 # %% Import LU data
+importlib.reload(cc)
 
 # Define resolutions
 reses = {}
@@ -307,11 +317,9 @@ for i, (resname, res) in enumerate(reses.items()):
       continue
    print(f"Importing {resname}...")
    
-   res['dsg'] = cc.open_lu_ds(res['lu_path'], y1, yN, case['ds'])
-   res['dsg'] = res['dsg'].assign_coords({"time": [cftime.DatetimeNoLeap(y, 1, 1, 0, 0, 0, 0, has_year_zero=True) for y in res['dsg'].time.values]})
-   
-   res['dsg']['AREA_CFT'] = res['dsg'].AREA*1e6 * res['dsg'].LANDFRAC_PFT * res['dsg'].PCT_CROP/100 * res['dsg'].PCT_CFT/100
-   res['dsg']['AREA_CFT'].attrs = {'units': 'm2'}
+   res['ds'] = cc.open_lu_ds(res['lu_path'], y1, yN, case['ds'].sel(time=slice(y1,yN)))
+   res['ds'] = res['ds'].assign_coords({"time": [cftime.DatetimeNoLeap(y, 1, 1, 0, 0, 0, 0, has_year_zero=True) for y in res['ds'].time.values]})
+   res['dsg'] = xr.Dataset(data_vars={'AREA': utils.grid_one_variable(res['ds'], 'AREA')})
       
 print("Done importing land use.")
 
@@ -330,18 +338,18 @@ for i, (casename, case) in enumerate(cases.items()):
       
    # Harmonize lon/lat (round to a high precision but one where float weirdness won't be an issue)
    initial_tolerance = 1e-6
-   lu_dsg = reses[case['res']]['dsg'].copy()
-   case_ds, lu_dsg, lon_tolerance = cc.round_lonlats_to_match_ds(case_ds, lu_dsg, "lon", initial_tolerance)
-   case_ds, lu_dsg, lat_tolerance = cc.round_lonlats_to_match_ds(case_ds, lu_dsg, "lat", initial_tolerance)
+   lu_ds = reses[case['res']]['ds'].copy()
+   case_ds, lu_ds, lon_tolerance = cc.round_lonlats_to_match_ds(case_ds, lu_ds, "lon", initial_tolerance)
+   case_ds, lu_ds, lat_tolerance = cc.round_lonlats_to_match_ds(case_ds, lu_ds, "lat", initial_tolerance)
       
    # Ensure that time axes are formatted the same
    case_ds = cc.time_units_and_trim(case_ds, y1, yN, cftime.DatetimeNoLeap)
-   lu_dsg = cc.time_units_and_trim(lu_dsg, y1, yN, cftime.DatetimeNoLeap)
+   lu_ds = cc.time_units_and_trim(lu_ds, y1, yN, cftime.DatetimeNoLeap)
 
    # Save
    case['ds'] = case_ds
    case['ds'].load()
-   reses[case['res']]['dsg'] = lu_dsg
+   reses[case['res']]['ds'] = lu_ds
    
 
 print("Done.")
@@ -400,62 +408,60 @@ fao_area, fao_area_nosgc = cc.fao_data_get(fao_all, 'Area harvested', y1, yN)
 
 
 # %% Get CLM crop production
+importlib.reload(cc)
 
 for i, (casename, case) in enumerate(cases.items()):
-   print(f"Gridding {casename}...")
+   print(f"Getting production for {casename}...")
    case_ds = case['ds']
-   lu_dsg = reses[case['res']]['dsg']
+   lu_ds = reses[case['res']]['ds']
+   
+   # Figure-ready names
+   case_ds['patches1d_itype_combinedCropCLM_str'] = \
+      xr.DataArray(cc.fullname_to_combinedCrop(case_ds['patches1d_itype_veg_str'].values, cropList_combined_clm), 
+                   coords = case_ds['patches1d_itype_veg_str'].coords)
    
    # Yield
-   yield_gd = utils.grid_one_variable(case_ds.sel(time=case_ds.time.values), "GRAIN_TO_FOOD_ANN")
-   yield_gd = yield_gd.assign_coords({"lon": lu_dsg.lon,
-                                      "lat": lu_dsg.lat})
-   case['ds']['GRAIN_TO_FOOD_ANN_GD'] = yield_gd
-   case['ds']['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da(yield_gd, lu_dsg, yearList, cropList_combined_clm)
+   case['ds']['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da2(case_ds, lu_ds, 'GRAIN_TO_FOOD_ANN', yearList, cropList_combined_clm)
    
    # mxmat-limited yield
-   yield_gd = utils.grid_one_variable(case_ds.sel(time=case_ds.time.values), "GRAIN_TO_FOOD_ANN_MXMAT")
-   yield_gd = yield_gd.assign_coords({"lon": lu_dsg.lon,
-                                      "lat": lu_dsg.lat})
-   case['ds']['GRAIN_TO_FOOD_ANN_MXMAT_GD'] = yield_gd
-   case['ds']['ts_prod_mxmat_yc'] = cc.get_ts_prod_clm_yc_da(yield_gd, lu_dsg, yearList, cropList_combined_clm)
+   case['ds']['ts_prod_mxmat_yc'] = cc.get_ts_prod_clm_yc_da2(case_ds, lu_ds, 'GRAIN_TO_FOOD_ANN_MXMAT', yearList, cropList_combined_clm)
    
-   
-print("Done gridding.")
+print("Done getting production.")
 
 
 # %% Import FAO Earthstat (gridded FAO data)
 
 print("Importing FAO EarthStat...")
-earthstats = {}
+earthstats_gd = {}
+earthstats_gd = {}
 
 # Import high res
-earthstats['f09_g17'] = xr.open_dataset('/Users/Shared/CESM_work/CropEvalData_ssr/FAO-EarthStatYields/EARTHSTATMIRCAUNFAOCropDataDeg09.nc')
+earthstats_gd['f09_g17'] = xr.open_dataset('/Users/Shared/CESM_work/CropEvalData_ssr/FAO-EarthStatYields/EARTHSTATMIRCAUNFAOCropDataDeg09.nc')
 
 # Include just crops we care about
 cropList_fao_gd_all = ['Wheat', 'Maize', 'Rice', 'Barley', 'Rye', 'Millet', 'Sorghum', 'Soybeans', 'Sunflower', 'Potatoes', 'Cassava', 'Sugar cane', 'Sugar beet', 'Oil palm', 'Rape seed / Canola', 'Groundnuts / Peanuts', 'Pulses', 'Citrus', 'Date palm', 'Grapes / Vine', 'Cotton', 'Cocoa', 'Coffee', 'Others perennial', 'Fodder grasses', 'Others annual', 'Fibre crops', 'All crops']
 cropList_fao_gd = ["Maize", "Rice", "Cotton", "Soybeans", "Sugar cane", "Wheat"]
-earthstats['f09_g17'] = earthstats['f09_g17'].isel(crop=[cropList_fao_gd_all.index(x) for x in cropList_fao_gd]).assign_coords({'crop': cropList_combined_clm[:-1]})
+earthstats_gd['f09_g17'] = earthstats_gd['f09_g17'].isel(crop=[cropList_fao_gd_all.index(x) for x in cropList_fao_gd]).assign_coords({'crop': cropList_combined_clm[:-1]})
 
 # Include just years we care about
-earthstats['f09_g17'] = earthstats['f09_g17'].isel(time=[i for i,x in enumerate(earthstats['f09_g17'].time.values) if x.year in np.arange(y1,yN+1)])
+earthstats_gd['f09_g17'] = earthstats_gd['f09_g17'].isel(time=[i for i,x in enumerate(earthstats_gd['f09_g17'].time.values) if x.year in np.arange(y1,yN+1)])
 
 # Interpolate to lower res, starting with just variables that won't get messed up by the interpolation
 print("Interpolating to f19_g17...")
-interp_lons = reses['f19_g17']['dsg'].lon.values
-interp_lats = reses['f19_g17']['dsg'].lat.values
+interp_lons = reses['f19_g17']['ds']['lon']
+interp_lats = reses['f19_g17']['ds']['lat']
 drop_vars = ['Area', 'HarvestArea', 'IrrigatedArea', 'PhysicalArea', 'RainfedArea', 'Production']
-earthstats['f19_g17'] = earthstats['f09_g17']\
+earthstats_gd['f19_g17'] = earthstats_gd['f09_g17']\
    .drop(labels=drop_vars)\
    .interp(lon=interp_lons, lat=interp_lats)
-   
+
 # Disallow negative interpolated values
-for v in earthstats['f19_g17']:
-   vals = earthstats['f19_g17'][v].values
+for v in earthstats_gd['f19_g17']:
+   vals = earthstats_gd['f19_g17'][v].values
    vals[vals < 0] = 0
-   earthstats['f19_g17'][v] = xr.DataArray(data = vals,
-                                           coords = earthstats['f19_g17'][v].coords,
-                                           attrs = earthstats['f19_g17'][v].attrs)
+   earthstats_gd['f19_g17'][v] = xr.DataArray(data = vals,
+                                           coords = earthstats_gd['f19_g17'][v].coords,
+                                           attrs = earthstats_gd['f19_g17'][v].attrs)
    
 # These are not exact, but it seems like:
 #    PhysicalArea = RainfedArea + IrrigatedArea (max diff ~51 ha, max rel diff ~0.01%)
@@ -465,34 +471,41 @@ for v in earthstats['f19_g17']:
 #    PhysicalArea ≠ Area * LandFraction * PhysicalFraction (max rel diff 100%)
 
 # Re-calculate variables that were dropped
-f19_g17_cellarea = reses['f19_g17']['dsg']['AREA']
-f19_g17_landarea = f19_g17_cellarea * earthstats['f19_g17']['LandFraction']
-f19_g17_croparea_ha = f19_g17_landarea * earthstats['f19_g17']['PhysicalFraction']*100
+f19_g17_cellarea = utils.grid_one_variable(reses['f19_g17']['ds'], 'AREA', fillValue=0)
+f19_g17_landarea = f19_g17_cellarea * earthstats_gd['f19_g17']['LandFraction']
+f19_g17_croparea_ha = f19_g17_landarea * earthstats_gd['f19_g17']['PhysicalFraction']*100
 recalc_ds = xr.Dataset(data_vars = \
    {'Area': f19_g17_cellarea,
     'PhysicalArea': f19_g17_croparea_ha,
-    'HarvestArea': f19_g17_croparea_ha * earthstats['f19_g17']['HarvestFraction'],
-    'IrrigatedArea': f19_g17_croparea_ha * earthstats['f19_g17']['IrrigatedFraction'],
-    'RainfedArea': f19_g17_croparea_ha * earthstats['f19_g17']['RainfedFraction'],
-    'Production': f19_g17_croparea_ha * earthstats['f19_g17']['HarvestFraction']*earthstats['f19_g17']['Yield']})
+    'HarvestArea': f19_g17_croparea_ha * earthstats_gd['f19_g17']['HarvestFraction'],
+    'IrrigatedArea': f19_g17_croparea_ha * earthstats_gd['f19_g17']['IrrigatedFraction'],
+    'RainfedArea': f19_g17_croparea_ha * earthstats_gd['f19_g17']['RainfedFraction'],
+    'Production': f19_g17_croparea_ha * earthstats_gd['f19_g17']['HarvestFraction']*earthstats_gd['f19_g17']['Yield']})
 for v in recalc_ds:
-   recalc_ds[v].attrs = earthstats['f09_g17'].attrs
+   recalc_ds[v].attrs = earthstats_gd['f09_g17'].attrs
    if recalc_ds[v].dims == ('lat', 'lon', 'crop', 'time'):
       recalc_ds[v] = recalc_ds[v].transpose('crop', 'time', 'lat', 'lon')
-   discrep_sum_rel = 100*(np.sum(recalc_ds[v].values) - np.sum(earthstats['f09_g17'][v].values)) / np.sum(earthstats['f09_g17'][v].values)
+   discrep_sum_rel = 100*(np.nansum(recalc_ds[v].values) - np.sum(earthstats_gd['f09_g17'][v].values)) / np.sum(earthstats_gd['f09_g17'][v].values)
    print(f"Discrepancy in {v} f19_g17 rel to f09_g17: {discrep_sum_rel}%")
-earthstats['f19_g17'] = earthstats['f19_g17'].merge(recalc_ds)
+earthstats_gd['f19_g17'] = earthstats_gd['f19_g17'].merge(recalc_ds)
 
 # Check consistency of non-dropped variables
-for v in earthstats['f19_g17']:
+for v in earthstats_gd['f19_g17']:
    if "Area" in v or v == "Production":
       continue
-   discrep_sum_rel = 100*(np.mean(earthstats['f19_g17'][v].values) - np.mean(earthstats['f09_g17'][v].values)) / np.mean(earthstats['f09_g17'][v].values)
+   discrep_sum_rel = 100*(np.mean(earthstats_gd['f19_g17'][v].values) - np.mean(earthstats_gd['f09_g17'][v].values)) / np.mean(earthstats_gd['f09_g17'][v].values)
    print(f"Discrepancy in {v} f19_g17 rel to f09_g17: {discrep_sum_rel}%")
+
+# Ungrid
+earthstats={}
+earthstats['f19_g17'] = cc.ungrid(earthstats_gd['f19_g17'],
+                                  cases['New baseline']['ds'], 'GRAIN_TO_FOOD_ANN',
+                                  lon='patches1d_ixy',
+                                  lat='patches1d_jxy',
+                                  crop='patches1d_itype_combinedCropCLM_str')
 
 
 print("Done importing FAO EarthStat.")
-
 
 # %% Import country map and key
 
@@ -504,6 +517,7 @@ for resname, res in reses.items():
    if 'dsg' not in res:
       continue
    res['dsg']['countries'] = utils.lon_idl2pm(countries).interp_like(res['dsg']['AREA'], method='nearest')['gadm0']
+   res['ds']['countries'] = cc.ungrid(res['dsg']['countries'], res['ds'], 'AREA', lon='patches1d_ixy', lat='patches1d_jxy')
    
 countries_key = pd.read_csv('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_brendan/Nation_ID.csv',
                                header=None,
@@ -636,17 +650,17 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
    
    # FAO EarthStat
    if thisCrop_clm == "Total":
-      area_tyx = earthstats[this_earthstat_res].HarvestArea.sum(dim="crop").copy()
-      prod_tyx = earthstats[this_earthstat_res].Production.sum(dim="crop").copy()
+      area_tyx = earthstats_gd[this_earthstat_res].HarvestArea.sum(dim="crop").copy()
+      prod_tyx = earthstats_gd[this_earthstat_res].Production.sum(dim="crop").copy()
    elif thisCrop_clm == "Total (no sgc)":
-      area_tyx = earthstats[this_earthstat_res].drop_sel(crop=['Sugarcane']).HarvestArea.sum(dim="crop").copy()
-      prod_tyx = earthstats[this_earthstat_res].drop_sel(crop=['Sugarcane']).Production.sum(dim="crop").copy()
+      area_tyx = earthstats_gd[this_earthstat_res].drop_sel(crop=['Sugarcane']).HarvestArea.sum(dim="crop").copy()
+      prod_tyx = earthstats_gd[this_earthstat_res].drop_sel(crop=['Sugarcane']).Production.sum(dim="crop").copy()
    elif thisCrop_clm == "Total (grains only)":
-      area_tyx = earthstats[this_earthstat_res].drop_sel(crop=['Sugarcane', 'Cotton']).HarvestArea.sum(dim="crop").copy()
-      prod_tyx = earthstats[this_earthstat_res].drop_sel(crop=['Sugarcane', 'Cotton']).Production.sum(dim="crop").copy()
+      area_tyx = earthstats_gd[this_earthstat_res].drop_sel(crop=['Sugarcane', 'Cotton']).HarvestArea.sum(dim="crop").copy()
+      prod_tyx = earthstats_gd[this_earthstat_res].drop_sel(crop=['Sugarcane', 'Cotton']).Production.sum(dim="crop").copy()
    else:
-      area_tyx = earthstats[this_earthstat_res].HarvestArea.sel(crop=thisCrop_clm).copy()
-      prod_tyx = earthstats[this_earthstat_res].Production.sel(crop=thisCrop_clm).copy()
+      area_tyx = earthstats_gd[this_earthstat_res].HarvestArea.sel(crop=thisCrop_clm).copy()
+      prod_tyx = earthstats_gd[this_earthstat_res].Production.sel(crop=thisCrop_clm).copy()
    ts_area_y = area_tyx.sum(dim=["lat","lon"]).values
    ydata_area = np.stack((ydata_area,
                           ts_area_y))
@@ -658,11 +672,11 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
    for i, (casename, case) in enumerate(cases.items()):
       
       # Area
-      lu_dsg = reses[case['res']]['dsg']
-      dummy_tyx_da = lu_dsg.AREA_CFT.isel(cft=0, drop=True)
-      area_tyx = np.full(dummy_tyx_da.shape, 0.0)
+      lu_ds = reses[case['res']]['ds']
+      dummy_y_da = lu_ds.AREA_CFT.isel(patch=0, drop=True)
+      area_y = np.full(dummy_y_da.shape, 0.0)
       if "Total" in thisCrop_clm:
-         incl_crops = [x for x in case['ds'].ivt_str.values if x.replace('irrigated_','').replace('temperate_','').replace('tropical_','') in [y.lower() for y in cropList_combined_clm]]
+         incl_crops = [x for x in case['ds'].vegtype_str.values if x.replace('irrigated_','').replace('temperate_','').replace('tropical_','') in [y.lower() for y in cropList_combined_clm]]
          if thisCrop_clm == "Total (no sgc)":
             incl_crops = [x for x in incl_crops if "sugarcane" not in x]
          elif thisCrop_clm == "Total (grains only)":
@@ -671,16 +685,18 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
             pass
          else:
             raise RuntimeError("???")
-         area_tyx = lu_dsg.AREA_CFT.sel(cft=[utils.ivt_str2int(x) for x in incl_crops]).sum(dim="cft").values
+         incl_crops_int = [utils.ivt_str2int(x) for x in incl_crops]
+         isel_list = [i for i, x in enumerate(lu_ds.patches1d_itype_veg.values) if x in incl_crops_int]
+         area_y = lu_ds.AREA_CFT.isel(patch=isel_list).sum(dim="patch").values
       else:
-         for pft_str in case['ds'].ivt_str.values:
+         for pft_str in case['ds'].vegtype_str.values:
             if thisCrop_clm.lower() not in pft_str:
                continue
             pft_int = utils.ivt_str2int(pft_str)
-            area_tyx += lu_dsg.AREA_CFT.sel(cft=pft_int).values
-      area_tyx *= 1e-4 # m2 to ha
-      area_tyx_da = xr.DataArray(data=area_tyx, coords=dummy_tyx_da.coords)
-      ts_area_y = area_tyx_da.sum(dim=["lat", "lon"])
+            where_thisCrop = np.where(lu_ds['patches1d_itype_veg'] == pft_int)[0]
+            area_y += lu_ds.AREA_CFT.isel(patch=where_thisCrop).sum(dim="patch").values
+      area_y *= 1e-4 # m2 to ha
+      ts_area_y = xr.DataArray(data=area_y, coords=dummy_y_da.coords)
       ydata_area = np.concatenate((ydata_area,
                                    np.expand_dims(ts_area_y.values, axis=0)),
                                   axis=0)
@@ -1172,6 +1188,7 @@ for v, vegtype_str in enumerate(clm_types_rfir):
     
 
 # %% Make scatter plots, FAOSTAT vs. CLM, of top 10 countries for each crop
+importlib.reload(cc)
 
 Ntop = 10
 # top_y1 = 1961 # First year of FAO data
@@ -1201,7 +1218,8 @@ NtopYears = len(topYears)
 
 fao_crops = np.unique(fao_all_ctry.Crop.values)
 for c, thisCrop in enumerate(fao_crops):
-      
+   print(f"{thisCrop}...")
+   
    thisCrop_clm = cc.cropnames_fao2clm(thisCrop)
    
    suptitle = f"{thisCrop}, FAOSTAT vs CLM ({top_y1}-{top_yN})"
@@ -1212,9 +1230,11 @@ for c, thisCrop in enumerate(fao_crops):
       continue
    
    # Get yield datasets
+   print("   Analyzing...")
    topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats)
    Ntop_global = Ntop + 1
    
+   print("   Plotting...")
    if which_to_plot == "Yield":
       plot_ds = topN_ds
    elif which_to_plot == "Detrended yield":
@@ -1326,7 +1346,9 @@ for c, thisCrop in enumerate(fao_crops):
    f.savefig(fig_outfile,
              bbox_inches='tight', facecolor='white')
    plt.close()
-   
+ 
+print("Done.")
+ 
    
 # %% Make line plots, FAOSTAT vs. CLM, of top 10 countries for each crop
 
@@ -1359,6 +1381,7 @@ legend_members = caselist + ['FAOSTAT']
 
 fao_crops = np.unique(fao_all_ctry.Crop.values)
 for c, thisCrop in enumerate(fao_crops):
+   print(f"{thisCrop}...")
       
    thisCrop_clm = cc.cropnames_fao2clm(thisCrop)
    
@@ -1370,9 +1393,11 @@ for c, thisCrop in enumerate(fao_crops):
       continue
    
    # Get yield datasets
+   print("   Analyzing...")
    topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats)
    Ntop_global = Ntop + 1
    
+   print("   Plotting...")
    if which_to_plot == "Yield":
       plot_ds = topN_ds
    elif which_to_plot == "Detrended yield":
@@ -1450,7 +1475,9 @@ for c, thisCrop in enumerate(fao_crops):
    f.savefig(fig_outfile,
              bbox_inches='tight', facecolor='white')
    plt.close()
-   
+
+print("Done.")
+
    
 # %% Compare mean growing season length to GGCMI models
 
@@ -1825,5 +1852,4 @@ for thisVar_orig in varList:
       plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
                bbox_inches='tight')
       plt.close()
-
-# %%
+print("Done.")
