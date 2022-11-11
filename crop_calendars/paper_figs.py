@@ -1844,3 +1844,4 @@ for thisVar_orig in varList:
       plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
                bbox_inches='tight')
       plt.close()
+print("Done.")
