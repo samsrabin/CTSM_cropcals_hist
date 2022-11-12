@@ -802,7 +802,7 @@ def extract_gs_timeseries(this_ds, this_var, in_da, include_these, Npatches, Ngs
     return this_ds
 
 
-def fao_data_get(fao_all, element, y1, yN):
+def fao_data_get(fao_all, element, y1, yN, fao_to_clm_dict, cropList_combined_clm):
    fao_this = fao_all.copy().query(f"Element == '{element}'")
 
    # Convert t to Mt
@@ -815,6 +815,15 @@ def fao_data_get(fao_all, element, y1, yN):
 
    # Remove unneeded years
    fao_this = fao_this.filter(items=np.arange(y1,yN+1), axis=0)
+   
+   # Reorder to match CLM
+   if len(fao_to_clm_dict) != len(cropList_combined_clm):
+       raise RuntimeError(f"fao_to_clm_dict and are different lengths ({len(cropList_combined_clm)} vs {len(cropList_combined_clm)})")
+   if len(fao_this.columns) != len(cropList_combined_clm):
+       raise RuntimeError(f"fao_this.columns and are different lengths ({len(fao_this.columns)} vs {len(cropList_combined_clm)})")
+   new_order = [cropList_combined_clm.index(fao_to_clm_dict[x]) for x in fao_this.columns]
+   new_cols = fao_this.columns[new_order]
+   fao_this = fao_this[new_cols]
 
    # Make no-sugarcane version
    fao_this_nosgc = fao_this.drop(columns = ["Sugar cane", "Total"])

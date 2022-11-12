@@ -49,7 +49,18 @@ warnings.filterwarnings("ignore", message="This figure includes Axes that are no
 
 # %% Define functions etc.
 
-cropList_combined_clm = ["Corn", "Rice", "Cotton", "Soybean", "Sugarcane", "Wheat", "Total"]
+cropList_combined_clm = ["Corn", "Rice", "Cotton", "Soybean", "Sugarcane", "Wheat"]
+cropList_combined_clm.sort()
+cropList_combined_clm.append("Total")
+# cropList_combined_faostat = ["Maize", "Rice, paddy", "Seed cotton", "Soybeans", "Sugar cane", "Wheat"]
+
+fao_to_clm_dict = {"Maize": "Corn",
+                   "Rice, paddy": "Rice",
+                   "Seed cotton": "Cotton",
+                   "Soybeans": "Soybean",
+                   "Sugar cane": "Sugarcane",
+                   "Wheat": "Wheat",
+                   "Total": "Total"}
 
 plt.rc('font',**{'family':'sans-serif','sans-serif':['Arial']})
 
@@ -412,8 +423,8 @@ for i, (casename, case) in enumerate(cases.items()):
 fao_all = pd.read_csv("/Users/sam/Documents/git_repos/CTSM_cropcals_hist/crop_calendar_MATLAB/FAOSTAT_data_6-15-2022.csv")
 
 fao_all = cc.fao_data_preproc(fao_all)
-fao_prod, fao_prod_nosgc = cc.fao_data_get(fao_all, 'Production', y1, yN)
-fao_area, fao_area_nosgc = cc.fao_data_get(fao_all, 'Area harvested', y1, yN)
+fao_prod, fao_prod_nosgc = cc.fao_data_get(fao_all, 'Production', y1, yN, fao_to_clm_dict, cropList_combined_clm)
+fao_area, fao_area_nosgc = cc.fao_data_get(fao_all, 'Area harvested', y1, yN, fao_to_clm_dict, cropList_combined_clm)
 
 
 # %% Get CLM crop production
@@ -449,7 +460,7 @@ earthstats_gd['f09_g17'] = xr.open_dataset('/Users/Shared/CESM_work/CropEvalData
 
 # Include just crops we care about
 cropList_fao_gd_all = ['Wheat', 'Maize', 'Rice', 'Barley', 'Rye', 'Millet', 'Sorghum', 'Soybeans', 'Sunflower', 'Potatoes', 'Cassava', 'Sugar cane', 'Sugar beet', 'Oil palm', 'Rape seed / Canola', 'Groundnuts / Peanuts', 'Pulses', 'Citrus', 'Date palm', 'Grapes / Vine', 'Cotton', 'Cocoa', 'Coffee', 'Others perennial', 'Fodder grasses', 'Others annual', 'Fibre crops', 'All crops']
-cropList_fao_gd = ["Maize", "Rice", "Cotton", "Soybeans", "Sugar cane", "Wheat"]
+cropList_fao_gd = ["Maize", "Cotton", "Rice", "Soybeans", "Sugar cane", "Wheat"]
 earthstats_gd['f09_g17'] = earthstats_gd['f09_g17'].isel(crop=[cropList_fao_gd_all.index(x) for x in cropList_fao_gd]).assign_coords({'crop': cropList_combined_clm[:-1]})
 
 # Include just years we care about
@@ -506,6 +517,7 @@ for v in earthstats_gd['f19_g17']:
    print(f"Discrepancy in {v} f19_g17 rel to f09_g17: {discrep_sum_rel}%")
 
 # Ungrid
+importlib.reload(cc)
 earthstats={}
 earthstats['f19_g17'] = cc.ungrid(earthstats_gd['f19_g17'],
                                   cases['New baseline']['ds'], 'GRAIN_TO_FOOD_ANN',
