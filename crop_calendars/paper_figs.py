@@ -85,18 +85,20 @@ def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_typ
    return this_map, time_dim
 
 
-def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend='both'): 
+def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend='both', vmin=None, vmax=None): 
    
    if bounds:
       norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend)
       im = ax.pcolormesh(this_map.lon.values, this_map.lat.values,
                          this_map, shading="auto",
                          norm=norm,
-                         cmap=cmap)
+                         cmap=cmap,
+                         vmin=vmin, vmax=vmax)
    else:
       im = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
                          this_map, shading="auto",
-                         cmap=cmap)
+                         cmap=cmap,
+                         vmin=vmin, vmax=vmax)
       if vrange:
          im.set_clim(vrange[0], vrange[1])
    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
@@ -142,6 +144,116 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
       return im, cbar
    else:
       return im, None
+
+def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=None, vmax=None, new_axes=True, Ncolors=None):
+    for i, casename in enumerate(fig_caselist):
+       if casename == "rx":
+          time_dim = "time"
+          these_rx_vars = ["gs1_" + str(x) for x in utils.vegtype_str2int(found_types)]
+          this_map = xr.concat((rx_ds[x].assign_coords({'ivt_str': found_types[i]}) for i, x in enumerate(these_rx_vars)), dim="ivt_str")
+          this_map = this_map.squeeze(drop=True)
+          if "lon" not in this_map.dims:
+             this_ds = xr.Dataset(data_vars={'tmp': this_map})
+             this_map = utils.grid_one_variable(this_ds, 'tmp')
+            
+            # Apply LU mask
+          parent_map, parent_time_dim = get_non_rx_map(var_info, cases, rx_parent_casename, this_var, thisCrop_main, found_types)
+          if parent_time_dim == "continue":
+             raise RuntimeError("What should I do here?")
+          this_map = this_map.where(~np.isnan(parent_map.mean(dim=parent_time_dim)))
+       else:
+          this_map, time_dim = get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_types)
+          if time_dim == "continue":
+             continue
+       c += 1
+         
+       plotting_diffs = ref_casename and casename != ref_casename
+         
+       # Get mean, set colormap
+       units = var_info['units']
+       if units == "day of year":
+          if time_dim in this_map.dims:
+             ar = stats.circmean(this_map, high=365, low=1, axis=this_map.dims.index(time_dim), nan_policy='omit')
+             dummy_map = this_map.isel({time_dim: 0}, drop=True)
+          else:
+             ar = this_map.copy()
+             dummy_map = this_map.copy()
+          this_map = xr.DataArray(data = ar,
+                                    coords = dummy_map.coords,
+                                    attrs = dummy_map.attrs)
+          if plotting_diffs:
+             this_map_vals = (this_map - refcase_map).values
+             this_map_vals[this_map_vals > 365/2] -= 365
+             this_map_vals[this_map_vals < -365/2] += 365
+             this_map = xr.DataArray(data = this_map_vals,
+                                       coords = this_map.coords,
+                                       attrs = this_map.attrs)
+             cmap = 'RdBu'
+             vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
+             units = "days"
+          else:
+             cmap = 'twilight'
+             vrange = [1, 365]
+       else:
+          if time_dim in this_map.dims:
+             this_map = this_map.mean(dim=time_dim)
+          this_map *= var_info['multiplier']
+          if plotting_diffs:
+             this_map = this_map - refcase_map
+             cmap = 'RdBu'
+             vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
+          else:
+             cmap = 'viridis'
+             vrange = None
+         
+       if casename == ref_casename:
+          refcase_map = this_map.copy()
+         
+       if Ncolors:
+          cmap = cm.get_cmap(cmap, Ncolors)
+            
+       cbar_units = units
+       if plotting_diffs:
+          if ref_casename == "rx":
+             cbar_units = f"Diff. from {rx_row_label} ({units})"
+          else:
+             cbar_units = f"Diff. from {ref_casename} ({units})"
+          if not np.any(np.abs(this_map) > 0):
+             print(f'      {casename} identical to {ref_casename}!')
+             cbar_units += ": None!"
+         
+       rainfed_types = [x for x in found_types if "irrigated" not in x]
+       if new_axes:
+         ax = fig.add_subplot(ny,nx,nx*c+1,projection=ccrs.PlateCarree(), ylabel="mirntnt")
+         axes.append(ax)
+       else:
+          ax = axes[i*2]
+       thisCrop = thisCrop_main
+       im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize, units=cbar_units, cmap=cmap, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin, vmax=vmax)
+       if new_axes:
+          ims.append(im)
+          cbs.append(cb)
+       else:
+          ims[i*2] = im
+          cbs[i*2] = cb
+
+       irrigated_types = [x for x in found_types if "irrigated" in x]
+       if new_axes:
+          ax = fig.add_subplot(ny,nx,nx*c+2,projection=ccrs.PlateCarree())
+          axes.append(ax)
+       else:
+          ax = axes[i*2 + 1]
+       thisCrop = "irrigated_" + thisCrop_main
+       im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize, units=cbar_units, cmap=cmap, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin, vmax=vmax)
+       if new_axes:
+          ims.append(im)
+          cbs.append(cb)
+       else:
+          ims[i*2 + 1] = im
+          cbs[i*2 + 1] = cb
+    return units, vrange, fig, ims, axes, cbs
+
+
 
 # Add GRAINC variants with too-long seasons set to 0
 # CLM max growing season length, mxmat, is stored in the following files:
@@ -841,6 +953,9 @@ for (this_var, var_info) in varList.items():
       continue
    
    # Add "prescribed" "case," if relevant
+   rx_row_label = None
+   rx_parent_casename = None
+   rx_ds = None
    if this_var in ["GDDHARV", "GSLEN", "HDATES", "SDATES"]:
       if this_var == "GDDHARV":
          rx_ds_key = "rx_gdds_ds"
@@ -938,95 +1053,11 @@ for (this_var, var_info) in varList.items():
       ims = []
       axes = []
       cbs = []
-      for i, casename in enumerate(fig_caselist):
-         if casename == "rx":
-            time_dim = "time"
-            these_rx_vars = ["gs1_" + str(x) for x in utils.vegtype_str2int(found_types)]
-            this_map = xr.concat((rx_ds[x].assign_coords({'ivt_str': found_types[i]}) for i, x in enumerate(these_rx_vars)), dim="ivt_str")
-            this_map = this_map.squeeze(drop=True)
-            if "lon" not in this_map.dims:
-               this_ds = xr.Dataset(data_vars={'tmp': this_map})
-               this_map = utils.grid_one_variable(this_ds, 'tmp')
-            
-            # Apply LU mask
-            parent_map, parent_time_dim = get_non_rx_map(var_info, cases, rx_parent_casename, this_var, thisCrop_main, found_types)
-            if parent_time_dim == "continue":
-               raise RuntimeError("What should I do here?")
-            this_map = this_map.where(~np.isnan(parent_map.mean(dim=parent_time_dim)))
-         else:
-            this_map, time_dim = get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_types)
-            if time_dim == "continue":
-               continue
-         c += 1
-         
-         plotting_diffs = ref_casename and casename != ref_casename
-         
-         # Get mean, set colormap
-         units = var_info['units']
-         if units == "day of year":
-            if time_dim in this_map.dims:
-               ar = stats.circmean(this_map, high=365, low=1, axis=this_map.dims.index(time_dim), nan_policy='omit')
-               dummy_map = this_map.isel({time_dim: 0}, drop=True)
-            else:
-               ar = this_map.copy()
-               dummy_map = this_map.copy()
-            this_map = xr.DataArray(data = ar,
-                                    coords = dummy_map.coords,
-                                    attrs = dummy_map.attrs)
-            if plotting_diffs:
-               this_map_vals = (this_map - refcase_map).values
-               this_map_vals[this_map_vals > 365/2] -= 365
-               this_map_vals[this_map_vals < -365/2] += 365
-               this_map = xr.DataArray(data = this_map_vals,
-                                       coords = this_map.coords,
-                                       attrs = this_map.attrs)
-               cmap = 'RdBu'
-               vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
-               units = "days"
-            else:
-               cmap = 'twilight'
-               vrange = [1, 365]
-         else:
-            if time_dim in this_map.dims:
-               this_map = this_map.mean(dim=time_dim)
-            this_map *= var_info['multiplier']
-            if plotting_diffs:
-               this_map = this_map - refcase_map
-               cmap = 'RdBu'
-               vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
-            else:
-               cmap = 'viridis'
-               vrange = None
-         
-         if casename == ref_casename:
-            refcase_map = this_map.copy()
-            
-         cbar_units = units
-         if plotting_diffs:
-            if ref_casename == "rx":
-               cbar_units = f"Diff. from {rx_row_label} ({units})"
-            else:
-               cbar_units = f"Diff. from {ref_casename} ({units})"
-            if not np.any(np.abs(this_map) > 0):
-               print(f'      {casename} identical to {ref_casename}!')
-               cbar_units += ": None!"
-         
-         rainfed_types = [x for x in found_types if "irrigated" not in x]
-         ax = fig.add_subplot(ny,nx,nx*c+1,projection=ccrs.PlateCarree(), ylabel="mirntnt")
-         axes.append(ax)
-         thisCrop = thisCrop_main
-         im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize, units=cbar_units, cmap=cmap, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename))
-         ims.append(im)
-         cbs.append(cb)
+      units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs)
 
-         irrigated_types = [x for x in found_types if "irrigated" in x]
-         ax = fig.add_subplot(ny,nx,nx*c+2,projection=ccrs.PlateCarree())
-         axes.append(ax)
-         thisCrop = "irrigated_" + thisCrop_main
-         im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize, units=cbar_units, cmap=cmap, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename))
-         ims.append(im)
-         cbs.append(cb)
-
+      
+      
+      
       if ref_casename:
          cc.equalize_colorbars(ims[:nx])
          cc.equalize_colorbars(ims[nx:])
@@ -1069,6 +1100,20 @@ for (this_var, var_info) in varList.items():
       if not ref_casename:
          cbar_ax = fig.add_axes(cbar_pos)
          fig.tight_layout()
+         cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=units)
+         cb.ax.tick_params(labelsize=fontsize['ticklabels'])
+         cb.set_label(units, fontsize=fontsize['titles'])
+      
+      cb2 = plt.colorbar(mappable=ims[0], ax=axes[0], location='right')
+      ticks_orig = cb2.get_ticks()
+      cb2.remove()
+      plt.draw()
+      cmap = cm.get_cmap("viridis", len(ticks_orig)-1)
+      units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=min(ticks_orig), vmax=max(ticks_orig), new_axes=False, Ncolors=len(ticks_orig)-1)
+      if not ref_casename:
+         cbar_ax = fig.add_axes(cbar_pos)
+         fig.tight_layout()
+         cb.remove()
          cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=units)
          cb.ax.tick_params(labelsize=fontsize['ticklabels'])
          cb.set_label(units, fontsize=fontsize['titles'])
