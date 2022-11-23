@@ -194,6 +194,10 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
           else:
              cmap = 'twilight'
              vrange = [1, 365]
+             if vmin != None:
+                vrange[0] = vmin
+             if vmax != None:
+                vrange[1] = vmax
        else:
           if time_dim in this_map.dims:
              this_map = this_map.mean(dim=time_dim)
@@ -1108,8 +1112,17 @@ for (this_var, var_info) in varList.items():
       ticks_orig = cb2.get_ticks()
       cb2.remove()
       plt.draw()
-      cmap = cm.get_cmap("viridis", len(ticks_orig)-1)
-      units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=min(ticks_orig), vmax=max(ticks_orig), new_axes=False, Ncolors=len(ticks_orig)-1)
+      Ncolors = len(ticks_orig)-1
+      cmap = cm.get_cmap("viridis", Ncolors)
+      if "DATES" in this_var:
+         vmin = 0
+         vmax = 400
+         cbar_ticklabels = [1, 50, 100, 150, 200, 250, 300, 350, 365]
+      else:
+         vmin = min(ticks_orig)
+         vmax = max(ticks_orig)
+         cbar_ticklabels = None
+      units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors)
       if not ref_casename:
          cbar_ax = fig.add_axes(cbar_pos)
          fig.tight_layout()
@@ -1117,6 +1130,9 @@ for (this_var, var_info) in varList.items():
          cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=units)
          cb.ax.tick_params(labelsize=fontsize['ticklabels'])
          cb.set_label(units, fontsize=fontsize['titles'])
+         if cbar_ticklabels:
+            cb.set_ticks(cb.get_ticks()) # Does nothing except to avoid "FixedFormatter should only be used together with FixedLocator" warning in call of cb.set_ticklabels() below
+            cb.set_ticklabels(cbar_ticklabels)
       
       plt.subplots_adjust(bottom=new_sp_bottom, left=new_sp_left)
       
