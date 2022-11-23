@@ -766,7 +766,7 @@ varList = {
       'time_dim':   'gs',
       'units':      'GDD',
       'multiplier': 1},
-   'GRAIN_TO_FOOD_ANN_GD': {
+   'GRAIN_TO_FOOD_ANN': {
       'suptitle':   'Mean annual yield',
       'time_dim':   'time',
       'units':      't/ha',
