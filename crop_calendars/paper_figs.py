@@ -1063,10 +1063,10 @@ for (this_var, var_info) in varList.items():
       
       
       if ref_casename:
-         cc.equalize_colorbars(ims[:nx])
-         cc.equalize_colorbars(ims[nx:])
+         extend = cc.equalize_colorbars(ims[:nx], this_var=this_var)
+         extend = cc.equalize_colorbars(ims[nx:], this_var=this_var)
       elif not vrange:
-         cc.equalize_colorbars(ims)
+         extend = cc.equalize_colorbars(ims, this_var=this_var)
 
       fig.suptitle(suptitle,
                   x = suptitle_xpos,
@@ -1127,7 +1127,8 @@ for (this_var, var_info) in varList.items():
          cbar_ax = fig.add_axes(cbar_pos)
          fig.tight_layout()
          cb.remove()
-         cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=units)
+         cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=units,
+                           extend = extend)
          cb.ax.tick_params(labelsize=fontsize['ticklabels'])
          cb.set_label(units, fontsize=fontsize['titles'])
          if cbar_ticklabels:

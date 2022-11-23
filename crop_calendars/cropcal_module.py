@@ -757,13 +757,18 @@ def detrend(ps_in):
    return ps_out
 
 
-def equalize_colorbars(ims, center0=False):
+def equalize_colorbars(ims, center0=False, this_var=None):
    vmin = np.inf
    vmax = -np.inf
    nims = len(ims)
    for im in ims:
       vmin = min(vmin, im.get_clim()[0])
       vmax = max(vmax, im.get_clim()[1])
+   
+   extend = "neither"
+   if this_var == "HUIFRAC" and vmax > 1:
+       vmax = 1
+       extend = "max"
    
    if center0:
        v = np.max(np.abs([vmin, vmax]))
@@ -772,6 +777,8 @@ def equalize_colorbars(ims, center0=False):
    
    for i in np.arange(nims):
       ims[i].set_clim(vmin, vmax)
+    
+   return extend
 
 
 # For backwards compatibility with files missing SDATES_PERHARV.
