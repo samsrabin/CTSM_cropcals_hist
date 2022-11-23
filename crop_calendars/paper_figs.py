@@ -555,13 +555,7 @@ for i, (casename, case) in enumerate(cases.items()):
    case_ds['patches1d_itype_combinedCropCLM_str'] = \
       xr.DataArray(cc.fullname_to_combinedCrop(case_ds['patches1d_itype_veg_str'].values, cropList_combined_clm), 
                    coords = case_ds['patches1d_itype_veg_str'].coords)
-   
-   # Yield
-   case['ds']['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da2(case_ds, lu_ds, 'GRAIN_TO_FOOD_ANN', yearList, cropList_combined_clm)
-   
-   # mxmat-limited yield
-   case['ds']['ts_prod_mxmat_yc'] = cc.get_ts_prod_clm_yc_da2(case_ds, lu_ds, 'GRAIN_TO_FOOD_ANN_MXMAT', yearList, cropList_combined_clm)
-   
+      
 print("Done getting production.")
 
 
@@ -692,10 +686,17 @@ mxmat_limited = True
 # extra = "Total (no sgc)"
 extra = "Total (grains only)"
 
-if mxmat_limited:
-   this_ts_prod_var = 'ts_prod_mxmat_yc'
-else:
-   this_ts_prod_var = 'ts_prod_yc'
+# Get production
+for i, (casename, case) in enumerate(cases.items()):
+   case_ds = case['ds']
+   lu_ds = reses[case['res']]['ds']
+   
+   if mxmat_limited:
+      thisVar = 'GRAIN_TO_FOOD_ANN_MXMAT'
+   else:
+      thisVar = 'GRAIN_TO_FOOD_ANN'
+      
+   case_ds['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da2(case_ds, lu_ds, thisVar, yearList, cropList_combined_clm)
 
 # Set up figure
 ny = 2
@@ -840,11 +841,11 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
       
       # Production
       if thisCrop_clm == "Total (no sgc)":
-         ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Total'])[this_ts_prod_var].sum(dim="Crop").copy()
+         ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Total'])['ts_prod_yc'].sum(dim="Crop").copy()
       elif thisCrop_clm == "Total (grains only)":
-         ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Cotton', 'Total'])[this_ts_prod_var].sum(dim="Crop").copy()
+         ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Cotton', 'Total'])['ts_prod_yc'].sum(dim="Crop").copy()
       else:
-         ts_prod_y = case['ds'][this_ts_prod_var].sel(Crop=thisCrop_clm).copy()
+         ts_prod_y = case['ds']['ts_prod_yc'].sel(Crop=thisCrop_clm).copy()
       ydata_prod = np.concatenate((ydata_prod,
                                  np.expand_dims(ts_prod_y.values, axis=0)),
                                  axis=0)
