@@ -188,7 +188,7 @@ def check_constant_vars(this_ds, case, ignore_nan, constantGSs=None, verbose=Tru
         rx_ds = None
         if isinstance(case, dict):
             if v == "GDDHARV" and 'rx_gdds_file' in case:
-                rx_ds = import_rx_dates("gdd", case['rx_gdds_file'], this_ds).squeeze()
+                rx_ds = import_rx_dates("gdd", case['rx_gdds_file'], this_ds, set_neg1_to_nan=False).squeeze()
 
         for t1 in np.arange(this_ds.dims[time_coord]-1):
             
@@ -1279,7 +1279,7 @@ def import_max_gs_length(paramfile_dir, my_clm_ver, my_clm_subver):
     return mxmat_dict
 
 # E.g. import_rx_dates("sdate", sdates_rx_file, dates_ds0_orig)
-def import_rx_dates(var_prefix, date_inFile, dates_ds):
+def import_rx_dates(var_prefix, date_inFile, dates_ds, set_neg1_to_nan=True):
     # Get run info:
     # Max number of growing seasons per year
     if "mxsowings" in dates_ds:
@@ -1298,8 +1298,19 @@ def import_rx_dates(var_prefix, date_inFile, dates_ds):
 
     ds = utils.import_ds(date_inFile, myVars=date_varList)
     
+    did_warn = False
     for v in ds:
-        ds = ds.rename({v: v.replace(var_prefix,"gs")})
+        v_new = v.replace(var_prefix,"gs")
+        ds = ds.rename({v: v_new})
+        
+        # Set -1 prescribed GDD values to NaN. Only warn the first time.
+        if set_neg1_to_nan and var_prefix == "gdd" and v_new != v and np.any(ds[v_new].values < 0):
+            if np.any((ds[v_new].values < 0) & (ds[v_new].values != -1)):
+                raise RuntimeError(f"Unexpected negative value in {v}")
+            if not did_warn:
+                print(f"Setting -1 rx GDD values to NaN")
+                did_warn = True
+            ds[v_new] = ds[v_new].where(ds[v_new] != -1)
     
     return ds
 
