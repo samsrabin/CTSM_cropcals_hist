@@ -1108,22 +1108,22 @@ for (this_var, var_info) in varList.items():
          cb.ax.tick_params(labelsize=fontsize['ticklabels'])
          cb.set_label(units, fontsize=fontsize['titles'])
       
-      cb2 = plt.colorbar(mappable=ims[0], ax=axes[0], location='right')
-      ticks_orig = cb2.get_ticks()
-      cb2.remove()
-      plt.draw()
-      Ncolors = len(ticks_orig)-1
-      if "DATES" in this_var:
-         vmin = 0
-         vmax = 400
-         cbar_ticklabels = [1, 50, 100, 150, 200, 250, 300, 350, 365]
-      else:
-         vmin = min(ticks_orig)
-         vmax = max(ticks_orig)
-         cbar_ticklabels = None
-      cmap = cm.get_cmap("viridis", Ncolors)
-      units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors)
-      if not ref_casename:
+         cb2 = plt.colorbar(mappable=ims[0], ax=axes[0], location='right')
+         ticks_orig = cb2.get_ticks()
+         cb2.remove()
+         plt.draw()
+         Ncolors = len(ticks_orig)-1
+         if "DATES" in this_var:
+            vmin = 0
+            vmax = 400
+            cbar_ticklabels = [1, 50, 100, 150, 200, 250, 300, 350, 365]
+         else:
+            vmin = min(ticks_orig)
+            vmax = max(ticks_orig)
+            cbar_ticklabels = None
+         cmap = cm.get_cmap("viridis", Ncolors)
+         units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors)
+         
          cbar_ax = fig.add_axes(cbar_pos)
          fig.tight_layout()
          cb.remove()
