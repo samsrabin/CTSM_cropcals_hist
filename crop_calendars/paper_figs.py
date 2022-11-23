@@ -192,7 +192,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
              vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
              units = "days"
           else:
-             cmap = 'twilight'
+             cmap = 'twilight_shifted'
              vrange = [1, 365]
              if vmin != None:
                 vrange[0] = vmin
@@ -1113,7 +1113,6 @@ for (this_var, var_info) in varList.items():
       cb2.remove()
       plt.draw()
       Ncolors = len(ticks_orig)-1
-      cmap = cm.get_cmap("viridis", Ncolors)
       if "DATES" in this_var:
          vmin = 0
          vmax = 400
@@ -1122,6 +1121,7 @@ for (this_var, var_info) in varList.items():
          vmin = min(ticks_orig)
          vmax = max(ticks_orig)
          cbar_ticklabels = None
+      cmap = cm.get_cmap("viridis", Ncolors)
       units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors)
       if not ref_casename:
          cbar_ax = fig.add_axes(cbar_pos)
