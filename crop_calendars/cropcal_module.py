@@ -953,7 +953,7 @@ def get_reason_list_text():
 
 
 # Get yield dataset for top N countries (plus World)
-def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_all_ctry, earthstats):
+def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_all_ctry, earthstats, min_viable_hui, mxmats):
 
     top_y1 = topYears[0]
     top_yN = topYears[-1]
@@ -1004,8 +1004,9 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
             raise RuntimeError(f'No matches found for {thisCrop_fao} in lu_ds.patches1d_itype_veg')
       
         # Yield...
+        case_ds = get_yield_ann(case_ds, min_viable_hui=min_viable_hui, mxmats=mxmats)
         tmp_ds = case_ds.isel(patch=i_thisCrop_case, time=i_theseYears_case)
-        yield_da = tmp_ds['GRAIN_TO_FOOD_ANN']\
+        yield_da = tmp_ds['YIELD_ANN']\
             .groupby(tmp_ds['patches1d_gi'])\
             .apply(xr.DataArray.sum, dim='patch', skipna=True)\
             .rename({'time': 'Year'})\
@@ -1253,6 +1254,82 @@ def get_vegtype_str_paramfile(vegtype_str_in):
         vegtype_str_out = vegtype_str_in
     return vegtype_str_out
 
+
+def get_yield(ds, min_viable_hui=1.0, mxmats=None):
+    
+    mxmat_limited = bool(mxmats)
+    
+    if 'YIELD' in ds:
+        if ds['YIELD'].attrs['min_viable_hui'] == min_viable_hui and ds['YIELD'].attrs['mxmat_limited'] == mxmat_limited:
+            return ds
+        elif 'locked_yield' in ds['YIELD'].attrs and ds['YIELD'].attrs['locked_yield']:
+            return ds
+    
+    ds["YIELD"] = ds["GRAINC_TO_FOOD_PERHARV"].copy()
+    
+    # Set yield to zero where minimum viable HUI wasn't reached
+    if min_viable_hui >= 0:
+        huifrac = ds['HUIFRAC_PERHARV'].copy().values
+        huifrac[np.where(ds['GDDHARV_PERHARV'].values==0)] = 1
+        if np.any(huifrac < min_viable_hui):
+            print(f"Setting yield to zero where minimum viable HUI ({min_viable_hui}) wasn't reached")
+            tmp_da = ds["GRAINC_TO_FOOD_PERHARV"]
+            tmp = tmp_da.copy().values
+            tmp[np.where((huifrac < min_viable_hui) & (tmp > 0))] = 0
+            ds["YIELD"] = xr.DataArray(data = tmp,
+                                        attrs = tmp_da.attrs,
+                                        coords = tmp_da.coords)
+    
+    # Get GRAINC variants with values set to 0 if season was longer than CLM PFT parameter mxmat
+    if mxmat_limited:
+        tmp_da = ds["YIELD"]
+        tmp_ra = tmp_da.copy().values
+        for veg_str in np.unique(ds.patches1d_itype_veg_str.values):
+            mxmat_veg_str = veg_str.replace("soybean", "temperate_soybean").replace("tropical_temperate", "tropical")
+            mxmat = mxmats[mxmat_veg_str]
+            tmp_ra[np.where((ds.patches1d_itype_veg_str.values == veg_str) & (ds["GSLEN_PERHARV"].values > mxmat))] = 0
+        ds["YIELD"] = xr.DataArray(data = tmp_ra,
+                                   coords = tmp_da.coords,
+                                   attrs = tmp_da.attrs)
+    
+    # Get *biomass* *actually harvested*
+    ds["YIELD"] = adjust_grainC(ds["YIELD"], ds.patches1d_itype_veg_str)
+    
+    # Save details
+    ds["YIELD"].attrs['min_viable_hui'] = min_viable_hui
+    ds["YIELD"].attrs['mxmat_limited'] = mxmat_limited
+    
+    return ds
+            
+
+def get_yield_ann(ds, min_viable_hui=1.0, mxmats=None):
+    
+    mxmat_limited = bool(mxmats)
+    
+    if 'YIELD_ANN' in ds:
+        if ds['YIELD_ANN'].attrs['min_viable_hui'] == min_viable_hui and ds['YIELD_ANN'].attrs['mxmat_limited'] == mxmat_limited:
+            return ds
+        elif 'locked_yield' in ds['YIELD_ANN'].attrs and ds['YIELD_ANN'].attrs['locked_yield']:
+            return ds
+    
+    ds = get_yield(ds, min_viable_hui=min_viable_hui, mxmats=mxmats)
+    
+    tmp = ds["YIELD"].sum(dim='mxharvests', skipna=True).values
+    grainc_to_food_ann_orig = ds["GRAINC_TO_FOOD_ANN"]
+    ds["YIELD_ANN"] = xr.DataArray(data = tmp,
+                                   attrs = grainc_to_food_ann_orig.attrs,
+                                   coords = grainc_to_food_ann_orig.coords
+                                   ).where(~np.isnan(grainc_to_food_ann_orig))
+    
+    # Save details
+    ds["YIELD_ANN"].attrs['min_viable_hui'] = min_viable_hui
+    ds["YIELD_ANN"].attrs['mxmat_limited'] = mxmat_limited
+    if 'locked_yield' in ds['YIELD'].attrs:
+        ds["YIELD_ANN"].attrs['locked_yield'] = True
+    
+    return ds
+
+
 def import_max_gs_length(paramfile_dir, my_clm_ver, my_clm_subver):
     # Get parameter file
     pattern = os.path.join(paramfile_dir, f"*{my_clm_ver}_params.{my_clm_subver}.nc")
@@ -1316,7 +1393,7 @@ def import_rx_dates(var_prefix, date_inFile, dates_ds, set_neg1_to_nan=True):
 
 
 def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mgdcrop_list(), 
-                        sdates_rx_ds=None, gdds_rx_ds=None, verbose=False, mxmats=None, min_viable_hui=-np.inf):
+                        sdates_rx_ds=None, gdds_rx_ds=None, verbose=False):
     
     # Minimum harvest threshold allowed in PlantCrop()
     gdd_min = 50
@@ -1407,77 +1484,21 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
     varList_no_zero = ["DATE", "YEAR"]
     check_no_zeros(this_ds, varList_no_zero, "original file")
     
-    # Set yield to zero where minimum viable HUI wasn't reached
-    if min_viable_hui >= 0:
-        huifrac = (this_ds['HUI_PERHARV'] / this_ds['GDDHARV_PERHARV']).values
-        huifrac[np.where(this_ds['GDDHARV_PERHARV'].values==0)] = 1
-        if np.any(huifrac < min_viable_hui):
-            print(f"Setting yield to zero where minimum viable HUI ({min_viable_hui}) wasn't reached")
-            tmp_da = this_ds["GRAINC_TO_FOOD_PERHARV"]
-            tmp = tmp_da.copy().values
-            tmp[np.where((huifrac < min_viable_hui) & (tmp > 0))] = 0
-            this_ds["GRAINC_TO_FOOD_PERHARV"] = xr.DataArray(data = tmp,
-                                                                attrs = tmp_da.attrs,
-                                                                coords = tmp_da.coords)
-            tmp = this_ds["GRAINC_TO_FOOD_PERHARV"].sum(dim='mxharvests', skipna=True
-                                                        ).values
-            grainc_to_food_ann_orig = this_ds["GRAINC_TO_FOOD_ANN"]
-            this_ds["GRAINC_TO_FOOD_ANN"] = xr.DataArray(data = tmp,
-                                                            attrs = grainc_to_food_ann_orig.attrs,
-                                                            coords = grainc_to_food_ann_orig.coords
-                                                            ).where(~np.isnan(grainc_to_food_ann_orig))
-    
     # Convert time*mxharvests axes to growingseason axis
     this_ds_gs = convert_axis_time2gs(this_ds, verbose=verbose, incl_orig=False)
+    
+    # These are needed for calculating yield later
+    this_ds_gs['GRAINC_TO_FOOD_PERHARV'] = this_ds['GRAINC_TO_FOOD_PERHARV']
+    this_ds_gs['GDDHARV_PERHARV'] = this_ds['GDDHARV_PERHARV']
     
     # Get growing season length
     this_ds["GSLEN_PERHARV"] = get_gs_len_da(this_ds["HDATES"] - this_ds["SDATES_PERHARV"])
     this_ds_gs["GSLEN"] = get_gs_len_da(this_ds_gs["HDATES"] - this_ds_gs["SDATES"])
+    this_ds_gs["GSLEN_PERHARV"] = this_ds["GSLEN_PERHARV"]
     
-    # Get *biomass* *actually harvested*
-    this_ds["GRAIN_TO_FOOD_ANN"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
-    this_ds["GRAIN_TO_FOOD_PERHARV"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_PERHARV"], this_ds.patches1d_itype_veg_str)
-    this_ds_gs["GRAIN_TO_FOOD_ANN"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
-    this_ds_gs["GRAIN_TO_FOOD"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD"], this_ds.patches1d_itype_veg_str)
-          
-    # Get GRAINC variants with values set to 0 if season was longer than CLM PFT parameter mxmat
-    if mxmats:
-        for v in this_ds:
-            if "FOOD" not in v or "ANN" in v:
-                continue
-            v2 = v + "_MXMAT"
-            tmp_da = this_ds[v]
-            tmp_ra = tmp_da.copy().values
-            for veg_str in np.unique(this_ds.patches1d_itype_veg_str.values):
-                mxmat_veg_str = veg_str.replace("soybean", "temperate_soybean").replace("tropical_temperate", "tropical")
-                mxmat = mxmats[mxmat_veg_str]
-                tmp_ra[np.where((this_ds.patches1d_itype_veg_str.values == veg_str) & (this_ds["GSLEN_PERHARV"].values > mxmat))] = 0
-            this_ds[v2] = xr.DataArray(data = tmp_ra,
-                                       coords = tmp_da.coords,
-                                       attrs = tmp_da.attrs)
-        for v in this_ds:
-            if "FOOD" not in v or "ANN" not in v:
-                continue
-            ph = v.replace("ANN", "PERHARV_MXMAT")
-            v2 = v.replace("ANN", "ANN_MXMAT")
-            this_ds[v2] = this_ds[ph].sum(dim="mxharvests")
-            this_ds_gs[v2] = this_ds[v2].copy()
-            
-        for v in this_ds_gs:
-            if "FOOD" not in v or "ANN" in v:
-                continue
-            tmp_da = this_ds_gs[v]
-            tmp_ra = tmp_da.copy().values
-            for veg_str in np.unique(this_ds_gs.patches1d_itype_veg_str.values):
-                mxmat_veg_str = veg_str.replace("soybean", "temperate_soybean").replace("tropical_temperate", "tropical")
-                mxmat = mxmats[mxmat_veg_str]
-                tmp_ra[np.where(np.expand_dims(this_ds_gs.patches1d_itype_veg_str.values == veg_str, 1) & (this_ds_gs["GSLEN"].values > mxmat))] = 0
-            this_ds_gs[v + "_MXMAT"] = xr.DataArray(data = tmp_ra,
-                                                    coords = tmp_da.coords,
-                                                    attrs = tmp_da.attrs)
-             
     # Get HUI accumulation as fraction of required
     this_ds_gs["HUIFRAC"] = this_ds_gs["HUI"] / this_ds_gs["GDDHARV"]
+    this_ds_gs["HUIFRAC_PERHARV"] = this_ds["HUI_PERHARV"] / this_ds["GDDHARV_PERHARV"]
     
     # Avoid tiny negative values
     varList_no_negative = ["GRAIN", "REASON", "GDD", "HUI", "YEAR", "DATE", "GSLEN"]
@@ -1489,7 +1510,7 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
     
     # Check that e.g., GDDACCUM <= HUI
     for vars in [["GDDACCUM", "HUI"],
-                     ["SYEARS", "HYEARS"]]:
+                 ["SYEARS", "HYEARS"]]:
         if all(v in this_ds_gs for v in vars):
             check_v0_le_v1(this_ds_gs, vars, both_nan_ok=True, throw_error=True)
         

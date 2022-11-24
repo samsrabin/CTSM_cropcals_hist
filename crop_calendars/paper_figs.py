@@ -383,12 +383,11 @@ for i, (casename, case) in enumerate(cases.items()):
         this_ds = xr.open_dataset(case['filepath'])
 
         # Convert gC/m2 to g/m2 actually harvested
-        this_ds["GRAIN_TO_FOOD_ANN"] = cc.adjust_grainC(this_ds.GRAINC_TO_FOOD, this_ds.patches1d_itype_veg)
+        this_ds["YIELD"] = cc.adjust_grainC(this_ds.GRAINC_TO_FOOD, this_ds.patches1d_itype_veg)
+        this_ds["YIELD"].attrs['min_viable_hui'] = 0.0
+        this_ds["YIELD"].attrs['mxmat_limited'] = True
+        this_ds["YIELD"].attrs['locked_yield'] = True
         
-        for v in this_ds:
-            if "GRAIN" in v:
-                this_ds[v + "_MXMAT"] = this_ds[v]
-
         # Rework to match what we already have
         this_ds = this_ds.assign_coords({"ivt": np.arange(np.min(this_ds.patches1d_itype_veg.values),
                                                           np.max(this_ds.patches1d_itype_veg.values)+1)})
@@ -399,8 +398,7 @@ for i, (casename, case) in enumerate(cases.items()):
 
     else:
         this_ds = cc.import_output(case['filepath'], myVars=myVars,
-                                   y1=y1, yN=yN, verbose=verbose_import,
-                                   mxmats=mxmats, min_viable_hui=min_viable_hui)
+                                   y1=y1, yN=yN, verbose=verbose_import)
         bad_patches = cc.check_constant_vars(this_ds, case, ignore_nan=True, constantGSs=case['constantGSs'], verbose=True, throw_error=False)
         # for p in bad_patches:
         #	  cc.print_gs_table(this_ds.isel(patch=p))
@@ -626,7 +624,7 @@ for v in earthstats_gd['f19_g17']:
 importlib.reload(cc)
 earthstats={}
 earthstats['f19_g17'] = cc.ungrid(earthstats_gd['f19_g17'],
-                                  cases['New baseline']['ds'], 'GRAIN_TO_FOOD_ANN',
+                                  cases['New baseline']['ds'], 'GRAINC_TO_FOOD_ANN',
                                   lon='patches1d_ixy',
                                   lat='patches1d_jxy',
                                   crop='patches1d_itype_combinedCropCLM_str')
@@ -676,23 +674,13 @@ for i, x in enumerate(np.unique(countries.gadm0.values)):
 
 # %% Compare area, production, and yield of individual crops
 
+min_viable_hui = 1.0
+
 # mxmat_limited = False
 mxmat_limited = True
 
 # extra = "Total (no sgc)"
 extra = "Total (grains only)"
-
-# Get production
-for i, (casename, case) in enumerate(cases.items()):
-    case_ds = case['ds']
-    lu_ds = reses[case['res']]['ds']
-    
-    if mxmat_limited:
-        thisVar = 'GRAIN_TO_FOOD_ANN_MXMAT'
-    else:
-        thisVar = 'GRAIN_TO_FOOD_ANN'
-        
-    case_ds['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da2(case_ds, lu_ds, thisVar, yearList, cropList_combined_clm)
 
 # Set up figure
 ny = 2
@@ -713,6 +701,11 @@ this_earthstat_res = "f09_g17"
 fig_caselist += [f"FAO EarthStat ({this_earthstat_res})"]
 for (casename, case) in cases.items():
     fig_caselist.append(casename)
+
+if mxmat_limited:
+    mxmats_tmp = mxmats
+else:
+    mxmats_tmp = None
     
 def make_1crop_plot(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN):
     da = xr.DataArray(data = ydata_this,
@@ -836,6 +829,8 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
                                     axis=0)
         
         # Production
+        case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp)
+        case['ds']['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da2(case['ds'], lu_ds, 'YIELD_ANN', yearList, cropList_combined_clm)
         if thisCrop_clm == "Total (no sgc)":
             ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Total'])['ts_prod_yc'].sum(dim="Crop").copy()
         elif thisCrop_clm == "Total (grains only)":
@@ -866,6 +861,10 @@ finishup_allcrops_plot(c, ny, nx, axes_yield_dt, f_yield_dt, "Global crop yield 
 
 # %% Make maps of individual crops (rainfed, irrigated)
 
+# Yield settings
+min_viable_hui = 1.0
+mxmat_limited = True
+
 # Define reference case, if you want to plot differences
 ref_casename = None
 # ref_casename = 'New baseline'
@@ -879,7 +878,7 @@ varList = {
         'time_dim':   'gs',
         'units':      'GDD',
         'multiplier': 1},
-    'GRAIN_TO_FOOD_ANN': {
+    'YIELD_ANN': {
         'suptitle':   'Mean annual yield',
         'time_dim':   'time',
         'units':      't/ha',
@@ -941,6 +940,14 @@ for (this_var, var_info) in varList.items():
     ny = 0
     fig_caselist = []
     for i, (casename, case) in enumerate(cases.items()):
+        
+        if this_var == "YIELD_ANN":
+            if mxmat_limited:
+                mxmats_tmp = mxmats
+            else:
+                mxmats_tmp = None
+            case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp)
+        
         if ref_casename and ref_casename != "rx" and cases[ref_casename]['res'] != case['res']:
             # Not bothering with regridding (for now?)
             pass
@@ -1056,9 +1063,6 @@ for (this_var, var_info) in varList.items():
         cbs = []
         units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs)
 
-        
-        
-        
         if ref_casename:
             extend = cc.equalize_colorbars(ims[:nx], this_var=this_var)
             extend = cc.equalize_colorbars(ims[nx:], this_var=this_var)
@@ -1270,6 +1274,10 @@ for v, vegtype_str in enumerate(clm_types_rfir):
 # %% Make scatter plots, FAOSTAT vs. CLM, of top 10 countries for each crop
 importlib.reload(cc)
 
+# Yield settings
+min_viable_hui = 1.0
+mxmat_limited = True
+
 Ntop = 10
 # top_y1 = 1961 # First year of FAO data
 top_y1 = 1992 # Pre-1992, you start getting USSR, which isn't in map
@@ -1306,15 +1314,19 @@ for c, thisCrop in enumerate(fao_crops):
     file_prefix = which_to_plot.replace('aly','')
     fig_outfile = outDir_figs + f"{file_prefix} scatter top 10 " + suptitle + ".pdf"
     if os.path.exists(fig_outfile) and not overwrite:
-        print(f'	  Skipping {thisCrop_out} (file exists).')
+        print(f'    Skipping {thisCrop_out} (file exists).')
         continue
     
     # Get yield datasets
-    print("	 Analyzing...")
-    topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats)
+    print("    Analyzing...")
+    if mxmat_limited:
+        mxmats_tmp = mxmats
+    else:
+        mxmats_tmp = None
+    topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats, min_viable_hui, mxmats_tmp)
     Ntop_global = Ntop + 1
     
-    print("	 Plotting...")
+    print("    Plotting...")
     if which_to_plot == "Yield":
         plot_ds = topN_ds
     elif which_to_plot == "Detrended yield":
@@ -1432,6 +1444,10 @@ print("Done.")
     
 # %% Make line plots, FAOSTAT vs. CLM, of top 10 countries for each crop
 
+# Yield settings
+min_viable_hui = 1.0
+mxmat_limited = True
+
 Ntop = 10
 # top_y1 = 1961 # First year of FAO data
 top_y1 = 1992 # Pre-1992, you start getting USSR, which isn't in map
@@ -1442,6 +1458,11 @@ portrait = False
 # which_to_plot = "Yield"
 # which_to_plot = "Detrended yield"
 which_to_plot = "Yield anomaly"
+
+if mxmat_limited:
+    mxmats_tmp = mxmats
+else:
+    mxmats_tmp = None
 
 if portrait:
     ny = 4
@@ -1474,7 +1495,7 @@ for c, thisCrop in enumerate(fao_crops):
     
     # Get yield datasets
     print("    Analyzing...")
-    topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats)
+    topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats, min_viable_hui, mxmats_tmp)
     Ntop_global = Ntop + 1
     
     print("    Plotting...")
