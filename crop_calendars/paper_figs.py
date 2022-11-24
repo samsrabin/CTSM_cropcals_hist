@@ -543,11 +543,9 @@ fao_prod, fao_prod_nosgc = cc.fao_data_get(fao_all, 'Production', y1, yN, fao_to
 fao_area, fao_area_nosgc = cc.fao_data_get(fao_all, 'Area harvested', y1, yN, fao_to_clm_dict, cropList_combined_clm)
 
 
-# %% Get CLM crop production
-importlib.reload(cc)
+# %% Get names for CLM crop production
 
 for i, (casename, case) in enumerate(cases.items()):
-    print(f"Getting production for {casename}...")
     case_ds = case['ds']
     lu_ds = reses[case['res']]['ds']
     
@@ -555,8 +553,6 @@ for i, (casename, case) in enumerate(cases.items()):
     case_ds['patches1d_itype_combinedCropCLM_str'] = \
         xr.DataArray(cc.fullname_to_combinedCrop(case_ds['patches1d_itype_veg_str'].values, cropList_combined_clm),
                      coords = case_ds['patches1d_itype_veg_str'].coords)
-        
-print("Done getting production.")
 
 
 # %% Import FAO Earthstat (gridded FAO data)
