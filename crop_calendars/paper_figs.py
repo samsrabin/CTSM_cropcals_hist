@@ -1037,6 +1037,7 @@ for (this_var, var_info) in varList.items():
             raise RuntimeError(f"No case found with {rx_ds_key}")
     elif ref_casename == "rx":
         print(f"Skipping {this_var} because it has no rx dataset against which to compare simulations")
+        continue
     
     # Rearrange caselist for this figure so that reference case is first
     if ref_casename:
