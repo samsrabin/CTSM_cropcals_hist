@@ -967,7 +967,9 @@ for (this_var, var_info) in varList.items():
     print(f'Mapping {this_var}...')
     
     # Get colormap
-    abs_cmap = None
+    abs_cmap = abs_cmap_default
+    if "DATE" in this_var:
+        abs_cmap = "twilight_shifted"
     if ("YIELD" in this_var or "PROD" in this_var) and ref_casename:
         diff_cmap = "BrBG"
     else:
@@ -1151,7 +1153,7 @@ for (this_var, var_info) in varList.items():
             cb.set_label(units, fontsize=fontsize['titles'])
         
         # Chunk colorbar
-        cb2 = plt.colorbar(mappable=ims[0], ax=axes[0], location='right')
+        cb2 = plt.colorbar(mappable=ims[0], ax=axes[0], location='bottom')
         ticks_orig = cb2.get_ticks()
         cb2.remove()
         plt.draw()
