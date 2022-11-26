@@ -1143,6 +1143,8 @@ for (this_var, var_info) in varList.items():
             cb2.remove()
             plt.draw()
             Ncolors = len(ticks_orig)-1
+            if Ncolors <= 5:
+                Ncolors *= 2
             if "DATES" in this_var:
                 vmin = 0
                 vmax = 400
