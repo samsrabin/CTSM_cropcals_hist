@@ -699,8 +699,8 @@ for i, x in enumerate(np.unique(countries.gadm0.values)):
 
 min_viable_hui = 1.0
 
-# mxmat_limited = False
-mxmat_limited = True
+mxmat_limited = False
+# mxmat_limited = True
 
 # extra = "Total (no sgc)"
 extra = "Total (grains only)"
