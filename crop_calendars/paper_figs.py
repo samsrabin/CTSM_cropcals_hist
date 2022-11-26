@@ -897,6 +897,11 @@ varList = {
         'time_dim':   'time',
         'units':      't/ha',
         'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
+    'PROD_ANN': {
+        'suptitle':   'Mean annual production',
+        'time_dim':   'time',
+        'units':      'Mt',
+        'multiplier': 1e-12}, # g to Mt
     'GSLEN': {
         'suptitle':   'Mean growing season length',
         'time_dim':   'gs',
@@ -952,7 +957,7 @@ for (this_var, var_info) in varList.items():
     
     # Get colormap
     abs_cmap = None
-    if "YIELD" in this_var and ref_casename:
+    if ("YIELD" in this_var or "PROD" in this_var) and ref_casename:
         diff_cmap = "BrBG"
     else:
         diff_cmap = None
@@ -962,12 +967,15 @@ for (this_var, var_info) in varList.items():
     fig_caselist = []
     for i, (casename, case) in enumerate(cases.items()):
         
-        if this_var == "YIELD_ANN":
+        if this_var in ["YIELD_ANN", "PROD_ANN"]:
             if mxmat_limited:
                 mxmats_tmp = mxmats
             else:
                 mxmats_tmp = None
             case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp)
+            
+            if this_var == "PROD_ANN":
+                case['ds']['PROD_ANN'] = case['ds']['YIELD_ANN'] * lu_ds['AREA_CFT']
         
         if ref_casename and ref_casename != "rx" and cases[ref_casename]['res'] != case['res']:
             # Not bothering with regridding (for now?)
