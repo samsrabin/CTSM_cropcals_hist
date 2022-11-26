@@ -826,7 +826,7 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
         dummy_y_da = lu_ds.AREA_CFT.isel(patch=0, drop=True)
         area_y = np.full(dummy_y_da.shape, 0.0)
         if "Total" in thisCrop_clm:
-            incl_crops = [x for x in case['ds'].vegtype_str.values if x.replace('irrigated_','').replace('temperate_','').replace('tropical_','') in [y.lower() for y in cropList_combined_clm]]
+            incl_crops = [x for x in case['ds'].vegtype_str.values if x.replace('irrigated_','').replace('temperate_','').replace('tropical_','').replace('spring_','') in [y.lower() for y in cropList_combined_clm]]
             if thisCrop_clm == "Total (no sgc)":
                 incl_crops = [x for x in incl_crops if "sugarcane" not in x]
             elif thisCrop_clm == "Total (grains only)":
