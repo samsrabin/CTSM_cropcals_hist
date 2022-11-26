@@ -145,7 +145,7 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
     else:
         return im, None
 
-def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=None, vmax=None, new_axes=True, Ncolors=None):
+def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None):
     for i, casename in enumerate(fig_caselist):
         if casename == "rx":
             time_dim = "time"
@@ -188,11 +188,18 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 this_map = xr.DataArray(data = this_map_vals,
                                         coords = this_map.coords,
                                         attrs = this_map.attrs)
-                cmap = 'RdBu'
+                if diff_cmap:
+                    cmap = diff_cmap
+                else:
+                    cmap = 'RdBu'
+                    
                 vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
                 units = "days"
             else:
-                cmap = 'twilight_shifted'
+                if abs_cmap:
+                    cmap = abs_cmap
+                else:
+                    cmap = 'twilight_shifted'
                 vrange = [1, 365]
                 if vmin != None:
                     vrange[0] = vmin
@@ -204,10 +211,17 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
             this_map *= var_info['multiplier']
             if plotting_diffs:
                 this_map = this_map - refcase_map
-                cmap = 'RdBu'
+                if diff_cmap:
+                    cmap = diff_cmap
+                else:
+                    cmap = 'RdBu'
+                    
                 vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
             else:
-                cmap = 'viridis'
+                if abs_cmap:
+                    cmap = abs_cmap
+                else:
+                    cmap = 'viridis'
                 vrange = None
             
         if casename == ref_casename:
@@ -935,6 +949,13 @@ for (this_var, var_info) in varList.items():
     suptitle = var_info['suptitle'] + f' ({yrange_str})'
     
     print(f'Mapping {this_var}...')
+    
+    # Get colormap
+    abs_cmap = None
+    if "YIELD" in this_var and ref_casename:
+        diff_cmap = "BrBG"
+    else:
+        diff_cmap = None
 
     # First, determine how many cases have this variable
     ny = 0
@@ -1061,7 +1082,7 @@ for (this_var, var_info) in varList.items():
         ims = []
         axes = []
         cbs = []
-        units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs)
+        units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, abs_cmap=abs_cmap, diff_cmap=diff_cmap)
 
         if ref_casename:
             extend = cc.equalize_colorbars(ims[:nx], this_var=this_var)
@@ -1122,8 +1143,11 @@ for (this_var, var_info) in varList.items():
                 vmin = min(ticks_orig)
                 vmax = max(ticks_orig)
                 cbar_ticklabels = None
-            cmap = cm.get_cmap("viridis", Ncolors)
-            units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors)
+            if abs_cmap:
+                this_cmap = cm.get_cmap(abs_cmap, Ncolors)
+            else:
+                this_cmap = cm.get_cmap("viridis", Ncolors)
+            units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap)
             
             cbar_ax = fig.add_axes(cbar_pos)
             fig.tight_layout()
