@@ -85,7 +85,7 @@ def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_typ
     return this_map, time_dim
 
 
-def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend='both', vmin=None, vmax=None): 
+def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend='both', vmin=None, vmax=None, cbar=None): 
     
     if bounds:
         norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend)
@@ -107,7 +107,9 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
     if this_title:
         ax.set_title(this_title, fontsize=fontsize['titles'])
     if show_cbar:
-        cbar = plt.colorbar(im, orientation="horizontal", fraction=0.1, pad=0.02)
+        if cbar:
+            cbar.remove()
+        cbar = plt.colorbar(im, ax=ax, orientation="horizontal", fraction=0.1, pad=0.02)
         cbar.set_label(label=units, fontsize=fontsize['axislabels'])
         cbar.ax.tick_params(labelsize=fontsize['ticklabels'])
      
@@ -147,6 +149,11 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
 
 def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None):
     for i, casename in enumerate(fig_caselist):
+        
+        plotting_diffs = ref_casename and casename != ref_casename
+        if plotting_diffs and not new_axes:
+            continue
+        
         if casename == "rx":
             time_dim = "time"
             these_rx_vars = ["gs1_" + str(x) for x in utils.vegtype_str2int(found_types)]
@@ -166,8 +173,6 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
             if time_dim == "continue":
                 continue
         c += 1
-            
-        plotting_diffs = ref_casename and casename != ref_casename
             
         # Get mean, set colormap
         units = var_info['units']
@@ -244,10 +249,12 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
         if new_axes:
             ax = fig.add_subplot(ny,nx,nx*c+1,projection=ccrs.PlateCarree(), ylabel="mirntnt")
             axes.append(ax)
+            cb = None
         else:
             ax = axes[i*2]
+            cb = cbs[i*2]
         thisCrop = thisCrop_main
-        im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize, units=cbar_units, cmap=cmap, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin, vmax=vmax)
+        im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize, units=cbar_units, cmap=cmap, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin, vmax=vmax, cbar=cb)
         if new_axes:
             ims.append(im)
             cbs.append(cb)
@@ -259,10 +266,12 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
         if new_axes:
             ax = fig.add_subplot(ny,nx,nx*c+2,projection=ccrs.PlateCarree())
             axes.append(ax)
+            cb = None
         else:
             ax = axes[i*2 + 1]
+            cb = cbs[i*2 + 1]
         thisCrop = "irrigated_" + thisCrop_main
-        im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize, units=cbar_units, cmap=cmap, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin, vmax=vmax)
+        im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize, units=cbar_units, cmap=cmap, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin, vmax=vmax, cbar=cb)
         if new_axes:
             ims.append(im)
             cbs.append(cb)
@@ -1131,6 +1140,7 @@ for (this_var, var_info) in varList.items():
                               fontsize=fontsize['titles'],
                               y=1.1)
         
+        # Draw all-subplot colorbar
         if not ref_casename:
             cbar_ax = fig.add_axes(cbar_pos)
             fig.tight_layout()
@@ -1138,27 +1148,30 @@ for (this_var, var_info) in varList.items():
             cb.ax.tick_params(labelsize=fontsize['ticklabels'])
             cb.set_label(units, fontsize=fontsize['titles'])
         
-            cb2 = plt.colorbar(mappable=ims[0], ax=axes[0], location='right')
-            ticks_orig = cb2.get_ticks()
-            cb2.remove()
-            plt.draw()
-            Ncolors = len(ticks_orig)-1
-            if Ncolors <= 5:
-                Ncolors *= 2
-            if "DATES" in this_var:
-                vmin = 0
-                vmax = 400
-                cbar_ticklabels = [1, 50, 100, 150, 200, 250, 300, 350, 365]
-            else:
-                vmin = min(ticks_orig)
-                vmax = max(ticks_orig)
-                cbar_ticklabels = None
-            if abs_cmap:
-                this_cmap = cm.get_cmap(abs_cmap, Ncolors)
-            else:
-                this_cmap = cm.get_cmap("viridis", Ncolors)
-            units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap)
-            
+        # Chunk colorbar
+        cb2 = plt.colorbar(mappable=ims[0], ax=axes[0], location='right')
+        ticks_orig = cb2.get_ticks()
+        cb2.remove()
+        plt.draw()
+        Ncolors = len(ticks_orig)-1
+        if Ncolors <= 5:
+            Ncolors *= 2
+        if "DATES" in this_var:
+            vmin = 0
+            vmax = 400
+            cbar_ticklabels = [1, 50, 100, 150, 200, 250, 300, 350, 365]
+        else:
+            vmin = min(ticks_orig)
+            vmax = max(ticks_orig)
+            cbar_ticklabels = None
+        if abs_cmap:
+            this_cmap = cm.get_cmap(abs_cmap, Ncolors)
+        else:
+            this_cmap = cm.get_cmap("viridis", Ncolors)
+        units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap)
+           
+        # Redraw all-subplot colorbar 
+        if not ref_casename:
             cbar_ax = fig.add_axes(cbar_pos)
             fig.tight_layout()
             cb.remove()
