@@ -196,7 +196,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 if diff_cmap:
                     cmap = diff_cmap
                 else:
-                    cmap = 'RdBu'
+                    cmap = 'RdBu_r'
                     
                 vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
                 units = "days"
@@ -219,7 +219,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 if diff_cmap:
                     cmap = diff_cmap
                 else:
-                    cmap = 'RdBu'
+                    cmap = 'RdBu_r'
                     
                 vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
             else:
@@ -883,6 +883,8 @@ finishup_allcrops_plot(c, ny, nx, axes_yield_dt, f_yield_dt, "Global crop yield 
 
 
 # %% Make maps of individual crops (rainfed, irrigated)
+
+abs_cmap_default = 'rainbow'
 
 # Yield settings
 min_viable_hui = 1.0
