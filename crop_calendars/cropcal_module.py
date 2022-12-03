@@ -441,6 +441,24 @@ def check_v0_le_v1(this_ds, vars, msg_txt=" ", both_nan_ok = False, throw_error=
             raise RuntimeError(msg)
 
 
+def christoph_detrend(x, w, center0=False):
+    if w==0:
+        raise RuntimeError("Don't use christoph_detrend() with w=0")
+
+    moving_average = get_moving_average(x, w)
+
+    r = get_window_radius(w)
+    result = x[..., r:-r] - moving_average
+    
+    if not center0:
+        ma_mean = np.mean(moving_average, axis=x.ndim-1)
+        if x.ndim == 2:
+            ma_mean = np.expand_dims(ma_mean, axis=1)
+        result += ma_mean
+    
+    return result
+
+
 # Convert time*mxharvests axes to growingseason axis
 def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     
@@ -914,6 +932,23 @@ def get_mean_byCountry(fao, top_y1, top_yN):
    return fao.query(f'Year>={top_y1} & Year<={top_yN}').groupby(['Crop','Element','Area'])['Value'].mean()
 
 
+# w is total window width (not radius)
+def get_moving_average(x, w):
+    if w==0:
+        return x
+    
+    if x.ndim == 2:
+        Ncases = x.shape[0]
+        r = get_window_radius(w)
+        result = np.full((Ncases, x.shape[1] - 2*r), fill_value=np.nan)
+        for c in np.arange(0, (Ncases)):
+            result[c,:] = get_moving_average(x[c,:], w)
+    else:
+        return np.convolve(x, np.ones(w), 'valid') / w
+    
+    return result
+
+
 # For backwards compatibility with files missing SDATES_PERHARV.
 def get_Nharv(array_in, these_dims):
     # Sum over time and mxevents to get number of events in time series for each patch
@@ -950,6 +985,40 @@ def get_reason_list_text():
         "Sown a yr ago tmrw.",	 # 6
         "Sowing tmrw. (Jan 1)"	 # 7
         ]
+
+
+def get_timeseries_bias(sim, obs, fig_caselist, weights=None):
+    
+    weights_provided = weights is not None
+    
+    # The 1st dimension of sim array is case and the 2nd is year. Additional dimensions (e.g., country) should be collapsed into the second.
+    if sim.ndim > 2:
+        raise RuntimeError("Need to collapse all dimensions of sim after the first into the second.")
+    if obs.ndim > 1:
+        raise RuntimeError("Need to collapse all dimensions of obs into the first.")
+    if weights_provided and weights.ndim > 1:
+        raise RuntimeError("Need to collapse all dimensions of weights into the first.")
+    
+    # Simulations should be Ncases x Npoints
+    if sim.ndim < 2:
+        raise RuntimeError("sim array must have at least 2 dimensions (Ncases x Npoints)")    
+    
+    # Weights and obs should be the same shape
+    if weights_provided and obs.shape != weights.shape:
+        raise RuntimeError("weights array must be the same shape as obs array")
+    
+    # Weights must not be negative
+    if weights_provided and np.any(weights < 0):
+        raise RuntimeError("Negative weights not allowed")
+    
+    if weights_provided:
+        weights = weights / np.sum(weights) # Ensure sum to 1
+        bias = np.sum((sim - obs) * weights, axis=1)
+    else:
+        Npoints = sim.shape[1]
+        bias = 1/Npoints * np.sum(sim - obs, axis=1)
+    
+    return bias
 
 
 # Get yield dataset for top N countries (plus World)
@@ -1253,6 +1322,12 @@ def get_vegtype_str_paramfile(vegtype_str_in):
     else:
         vegtype_str_out = vegtype_str_in
     return vegtype_str_out
+
+
+def get_window_radius(w):
+    if not w % 2:
+        raise RuntimeError("Window width must be odd")
+    return int((w-1) / 2)
 
 
 def get_yield(ds, min_viable_hui=1.0, mxmats=None):

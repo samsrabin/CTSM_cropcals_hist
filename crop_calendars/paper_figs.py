@@ -706,6 +706,13 @@ mxmat_limited = False
 # extra = "Total (no sgc)"
 extra = "Total (grains only)"
 
+# Window width for detrending (-1 for no detrending)
+w = 5
+
+# Rounding precision for stats
+stats_round = 3
+
+
 # Set up figure
 ny = 2
 nx = 4
@@ -731,7 +738,7 @@ if mxmat_limited:
 else:
     mxmats_tmp = None
     
-def make_1crop_plot(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN):
+def make_1crop_plot(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN, stats2=None):
     da = xr.DataArray(data = ydata_this,
                             coords = {'Case': caselist,
                                       'Year': np.arange(y1,yN+1)})
@@ -755,8 +762,13 @@ def make_1crop_plot(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN):
         da.isel(Case=i).plot.line(x="Year", ax=ax_this, 
                                   color=color, linestyle=linestyle,
                                   linewidth=2)
+    thisTitle = thisCrop_clm
+    if stats2 is not None:
+        if len(stats2) != 2:
+            raise RuntimeError("len(stats2) != 2")
+        thisTitle += f" ({stats2[0]} → {stats2[1]})"
     
-    ax_this.title.set_text(thisCrop_clm)
+    ax_this.title.set_text(thisTitle)
     ax_this.set_xlabel("")
     ax_this.set_ylabel(units)
     if ax_this.get_legend():
@@ -784,12 +796,15 @@ def finishup_allcrops_plot(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, 
     plt.close(f_this)
 
 for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
+    is_obs = []
+    
     ax_area = axes_area[c]
     ax_prod = axes_prod[c]
     ax_yield = axes_yield[c]
     ax_yield_dt = axes_yield_dt[c]
     
     # FAOSTAT
+    is_obs.append(True)
     if thisCrop_clm not in cropList_combined_clm:
         thisCrop_fao = fao_area_nosgc.columns[-1]
         ydata_area = np.array(fao_area_nosgc[thisCrop_fao])
@@ -800,6 +815,7 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
         ydata_prod = np.array(fao_prod[thisCrop_fao])
     
     # FAO EarthStat
+    is_obs.append(True)
     if thisCrop_clm == "Total":
         area_tyx = earthstats_gd[this_earthstat_res].HarvestArea.sum(dim="crop").copy()
         prod_tyx = earthstats_gd[this_earthstat_res].Production.sum(dim="crop").copy()
@@ -821,6 +837,7 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
         
     # CLM outputs
     for i, (casename, case) in enumerate(cases.items()):
+        is_obs.append(False)
         
         # Area
         lu_ds = reses[case['res']]['ds']
@@ -870,10 +887,34 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
     # Calculate FAO* yields
     ydata_yield = ydata_prod / ydata_area
     
+    
+    # Get stats
+    
+    r = cc.get_window_radius(w)
+    if w <= 0:
+        ydata_yield_dt = signal.detrend(ydata_yield, axis=1) + np.mean(ydata_yield, axis=1, keepdims=True)
+    else:
+        ydata_yield_dt = cc.christoph_detrend(ydata_yield, w)
+    ydata_yield_sdt = signal.detrend(ydata_yield, axis=1) + np.mean(ydata_yield, axis=1, keepdims=True)
+    
+    inds_obs = [i for i,x in enumerate(is_obs) if x]
+    inds_sim = [i for i,x in enumerate(is_obs) if not x]
+    
+    bias0 = None
+    for o in inds_obs:
+        this_obs = fig_caselist[o]
+        print(f"Comparing to {this_obs}:")
+        
+        bias = cc.get_timeseries_bias(ydata_yield_dt[inds_sim,:], ydata_yield_dt[o,:], fig_caselist, weights=ydata_prod[o,r:-r])
+        bias = np.round(bias, stats_round)
+        if bias0 is None:
+            bias0 = bias
+        for i, casename in enumerate(fig_caselist[2:]):
+            print(f"   {thisCrop_clm} bias MM window={w} weighted {casename}: {bias[i]}")
     # Make plots for this crop
     make_1crop_plot(ax_area, ydata_area, fig_caselist, thisCrop_clm, "Mha", y1, yN)
     make_1crop_plot(ax_prod, ydata_prod, fig_caselist, thisCrop_clm, "Mt", y1, yN)
-    make_1crop_plot(ax_yield, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", y1, yN)
+    make_1crop_plot(ax_yield, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", y1, yN, stats2=bias0)
     make_1crop_plot(ax_yield_dt, cc.detrend(ydata_yield), fig_caselist, thisCrop_clm, "t/ha", y1, yN)
     
 # Finish up and save
