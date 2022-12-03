@@ -175,6 +175,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
         c += 1
             
         # Get mean, set colormap
+        diverging_map = "PiYG_r"
         units = var_info['units']
         if units == "day of year":
             if time_dim in this_map.dims:
@@ -196,7 +197,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 if diff_cmap:
                     cmap = diff_cmap
                 else:
-                    cmap = 'RdBu_r'
+                    cmap = diverging_map
                     
                 vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
                 units = "days"
@@ -219,7 +220,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 if diff_cmap:
                     cmap = diff_cmap
                 else:
-                    cmap = 'RdBu_r'
+                    cmap = diverging_map
                     
                 vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
             else:
