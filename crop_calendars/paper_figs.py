@@ -745,7 +745,7 @@ def make_1crop_plot(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN, 
     
     light_gray = [x/255 for x in [148, 148, 148]]
     dark_gray = [x/255 for x in [64, 64, 74]]
-    grays = [light_gray, dark_gray]
+    grays = [dark_gray, light_gray]
     
     for i, casename in enumerate(caselist):
         if i <= 1:
