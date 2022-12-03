@@ -57,7 +57,7 @@ indirs.append(dict(path="/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-
                    used_rx_sdate = True,
                    used_rx_harvthresh = True,
                    landuse_varies = True,
-                   name = "Prescribed calendars"))
+                   name = "Prescribed Calendars"))
 
 ggcmi_out_topdir = "/Users/Shared/GGCMI/AgMIP.output"
 ggcmi_cropcal_dir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar"
