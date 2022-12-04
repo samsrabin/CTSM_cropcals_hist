@@ -723,7 +723,7 @@ plot_yN = 2010
 ny = 2
 nx = 4
 # figsize = (14, 7.5)
-figsize = (20, 10)
+figsize = (35, 18)
 def get_figs_axes(ny, nx, figsize):
     f_list, axes_list = plt.subplots(ny, nx, figsize=figsize)
     axes_list = axes_list.flatten()
@@ -779,7 +779,8 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN,
             linestyle = "-"
         da.isel(Case=i).plot.line(x="Year", ax=ax_this, 
                                   color=color, linestyle=linestyle,
-                                  linewidth=2)
+                                  linewidth=3)
+    
     thisTitle = thisCrop_clm
     if stats2 is not None:
         if len(stats2) != 2:
@@ -787,8 +788,10 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN,
         thisTitle += f" ({stats2[0]} → {stats2[1]})"
     
     ax_this.title.set_text(thisTitle)
+    ax_this.title.set_size(32)
+    ax_this.tick_params(axis='both', which='major', labelsize=20)
     ax_this.set_xlabel("")
-    ax_this.set_ylabel(units)
+    ax_this.set_ylabel(units, fontsize=24)
     if ax_this.get_legend():
         ax_this.get_legend().remove()
 
@@ -807,7 +810,8 @@ def finishup_allcrops_lines(c, ny, nx, axes_this, f_this, suptitle, outDir_figs,
     f_this.legend(handles = axes_this[0].lines,
                   labels = fig_caselist,
                   loc = "upper center",
-                  ncol = int(np.floor(len(fig_caselist)/4))+1)
+                  ncol = int(np.floor(len(fig_caselist)/4))+1,
+                  fontsize=28)
 
     f_this.savefig(outDir_figs + "Timeseries " + suptitle + " by crop.pdf",
                    bbox_inches='tight')
@@ -1142,9 +1146,9 @@ if ref_casename:
     fontsize['ticklabels'] = 8
     fontsize['suptitle'] = 16
 else:
-    fontsize['titles'] = 18
-    fontsize['axislabels'] = 15
-    fontsize['ticklabels'] = 15
+    fontsize['titles'] = 28
+    fontsize['axislabels'] = 24
+    fontsize['ticklabels'] = 24
     fontsize['suptitle'] = 24
 
 
@@ -1243,7 +1247,7 @@ for (this_var, var_info) in varList.items():
         figsize = (24, 7.5)	  # width, height
         suptitle_ypos = 0.85
     elif ny == 2:
-        figsize = (12, 7)		# width, height
+        figsize = (15, 8.5)		# width, height
         if ref_casename:
             suptitle_xpos = 0.515
             suptitle_ypos = 0.95
