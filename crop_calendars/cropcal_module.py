@@ -1903,6 +1903,18 @@ def set_up_ds_with_gs_axis(ds_in):
     return ds_out
 
 
+def shift_sim_timeseries(array_in_cy, whichWay, inds_obs, inds_sim):
+    array_out_cy = np.full((array_in_cy.shape[0], array_in_cy.shape[1]-2), fill_value=np.nan)
+    array_out_cy[inds_obs,:] = array_in_cy[inds_obs,1:-1]
+    if whichWay == "L":
+        array_out_cy[inds_sim,:] = array_in_cy[inds_sim,:-2]
+    elif whichWay == "R":
+        array_out_cy[inds_sim,:] = array_in_cy[inds_sim,2:]
+    else:
+        raise RuntimeError("whichWay {whichWay} not recognized. Use L or R.")
+    return array_out_cy
+
+
 def strip_cropname(x):
     for y in ['irrigated', 'temperate', 'tropical', 'spring', 'winter']:
         x = x.replace(y+"_", "")
@@ -1969,6 +1981,16 @@ def ungrid(gridded_xr, ungridded_target_ds, coords_var, **kwargs):
                                           dims = 'patch')
     ungridded_da = gridded_xr.isel(isel_dict, drop=True).assign_coords(new_coords)
     return ungridded_da
+
+
+# After https://www.itl.nist.gov/div898/software/dataplot/refman2/auxillar/weigcorr.htm
+def weighted_cov(a, b, w):
+    ma = np.average(a, weights=w)
+    mb = np.average(b, weights=w)
+    return np.sum(w*(a-ma)*(b-mb)) / np.sum(w)
+    
+def weighted_pearsons_r(x, y, w):
+    return weighted_cov(x, y, w) / np.sqrt(weighted_cov(x, x, w)*weighted_cov(y, y, w))
 
 def yield_anomalies(ps_in):
     if isinstance(ps_in, xr.DataArray):

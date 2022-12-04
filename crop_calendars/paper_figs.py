@@ -310,7 +310,7 @@ for i, mxmat in enumerate(paramfile_mxmats):
 importlib.reload(cc)
 
 y1 = 1961
-yN = 2010
+yN = 2013
 
 gs1 = y1
 gsN = yN - 1
@@ -712,6 +712,12 @@ w = 5
 # Rounding precision for stats
 stats_round = 3
 
+# Which observation dataset should be included on figure?
+obs_for_fig = "FAOSTAT"
+
+# Which years to include?
+plot_y1 = 1980
+plot_yN = 2010
 
 # Set up figure
 ny = 2
@@ -724,6 +730,19 @@ f_prod, axes_prod = plt.subplots(ny, nx, figsize=figsize)
 axes_prod = axes_prod.flatten()
 f_yield, axes_yield = plt.subplots(ny, nx, figsize=figsize)
 axes_yield = axes_yield.flatten()
+f_yield_orig, axes_yield_orig = plt.subplots(ny, nx, figsize=figsize)
+axes_yield_orig = axes_yield_orig.flatten()
+f_yield_shiftL, axes_yield_shiftL = plt.subplots(ny, nx, figsize=figsize)
+axes_yield_shiftL = axes_yield_shiftL.flatten()
+f_yield_shiftR, axes_yield_shiftR = plt.subplots(ny, nx, figsize=figsize)
+axes_yield_shiftR = axes_yield_shiftR.flatten()
+f_yield_dt_orig, axes_yield_dt_orig = plt.subplots(ny, nx, figsize=figsize)
+axes_yield_dt_orig = axes_yield_dt_orig.flatten()
+f_yield_dt_shiftL, axes_yield_dt_shiftL = plt.subplots(ny, nx, figsize=figsize)
+axes_yield_dt_shiftL = axes_yield_dt_shiftL.flatten()
+f_yield_dt_shiftR, axes_yield_dt_shiftR = plt.subplots(ny, nx, figsize=figsize)
+axes_yield_dt_shiftR = axes_yield_dt_shiftR.flatten()
+
 f_yield_dt, axes_yield_dt = plt.subplots(ny, nx, figsize=figsize)
 axes_yield_dt = axes_yield_dt.flatten()
 
@@ -801,6 +820,13 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
     ax_area = axes_area[c]
     ax_prod = axes_prod[c]
     ax_yield = axes_yield[c]
+    ax_yield_orig = axes_yield_orig[c]
+    ax_yield_shiftL = axes_yield_shiftL[c]
+    ax_yield_shiftR = axes_yield_shiftR[c]
+    ax_yield_dt = axes_yield_dt[c]
+    ax_yield_dt_orig = axes_yield_dt_orig[c]
+    ax_yield_dt_shiftL = axes_yield_dt_shiftL[c]
+    ax_yield_dt_shiftR = axes_yield_dt_shiftR[c]
     ax_yield_dt = axes_yield_dt[c]
     
     # FAOSTAT
@@ -883,45 +909,138 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
                                     axis=0)
     # Convert ha to Mha
     ydata_area *= 1e-6
-    
+        
     # Calculate FAO* yields
     ydata_yield = ydata_prod / ydata_area
-    
-    
+        
     # Get stats
     
+    # Get shifted data
+    inds_obs = [i for i,x in enumerate(is_obs) if x]
+    inds_sim = [i for i,x in enumerate(is_obs) if not x]
+    ydata_yield_shiftL = cc.shift_sim_timeseries(ydata_yield, "L", inds_obs, inds_sim)
+    ydata_yield_shiftR = cc.shift_sim_timeseries(ydata_yield, "R", inds_obs, inds_sim)
+    ydata_prod_shiftL = cc.shift_sim_timeseries(ydata_prod, "L", inds_obs, inds_sim)
+    ydata_prod_shiftR = cc.shift_sim_timeseries(ydata_prod, "R", inds_obs, inds_sim)
+    
+    # Now ignore the outer timesteps to ensure the same years are being considered
+    yearList_shifted = yearList[1:-1]
+    ydata_area = ydata_area[:,1:-1]
+    ydata_prod = ydata_prod[:,1:-1]
+    ydata_yield = ydata_yield[:,1:-1]
+
+    # Get detrended data
     r = cc.get_window_radius(w)
     if w <= 0:
         ydata_yield_dt = signal.detrend(ydata_yield, axis=1) + np.mean(ydata_yield, axis=1, keepdims=True)
+        yearList_shifted_dt = yearList_shifted
     else:
         ydata_yield_dt = cc.christoph_detrend(ydata_yield, w)
+        ydata_yield_shiftL_dt = cc.christoph_detrend(ydata_yield_shiftL, w)
+        ydata_yield_shiftR_dt = cc.christoph_detrend(ydata_yield_shiftR, w)
+        yearList_shifted_dt = yearList_shifted[r:-r]
     ydata_yield_sdt = signal.detrend(ydata_yield, axis=1) + np.mean(ydata_yield, axis=1, keepdims=True)
     
-    inds_obs = [i for i,x in enumerate(is_obs) if x]
-    inds_sim = [i for i,x in enumerate(is_obs) if not x]
+    # Restrict non-detrended data to years of interest
+    if plot_y1 < yearList_shifted_dt[0]:
+        raise RuntimeError(f"plot_y1 {plot_y1} is before the beginning of yearList_shifted_dt {yearList_shifted_dt[0]}")
+    if plot_yN > yearList_shifted_dt[-1]:
+        raise RuntimeError(f"plot_yN {plot_yN} is after the end of yearList_shifted_dt {yearList_shifted_dt[-1]}")
+    yearList_shifted_ok = np.where((yearList_shifted >= plot_y1) & (yearList_shifted <= plot_yN))[0]
+    ydata_area = ydata_area[:,yearList_shifted_ok]
+    ydata_prod = ydata_prod[:,yearList_shifted_ok]
+    ydata_yield = ydata_yield[:,yearList_shifted_ok]
+    ydata_yield_shiftL = ydata_yield_shiftL[:,yearList_shifted_ok]
+    ydata_yield_shiftR = ydata_yield_shiftR[:,yearList_shifted_ok]
+    yearList_shifted_dt_ok = np.where((yearList_shifted_dt >= plot_y1) & (yearList_shifted_dt <= plot_yN))[0]
+    ydata_yield_dt = ydata_yield_dt[:,yearList_shifted_dt_ok]
+    ydata_yield_shiftL_dt = ydata_yield_shiftL_dt[:,yearList_shifted_dt_ok]
+    ydata_yield_shiftR_dt = ydata_yield_shiftR_dt[:,yearList_shifted_dt_ok]
     
     bias0 = None
     for o in inds_obs:
         this_obs = fig_caselist[o]
         print(f"Comparing to {this_obs}:")
         
-        bias = cc.get_timeseries_bias(ydata_yield_dt[inds_sim,:], ydata_yield_dt[o,:], fig_caselist, weights=ydata_prod[o,r:-r])
+        bias = cc.get_timeseries_bias(ydata_yield_dt[inds_sim,:], ydata_yield_dt[o,:], fig_caselist, weights=ydata_prod[o,:])
         bias = np.round(bias, stats_round)
-        if bias0 is None:
+        if this_obs == obs_for_fig:
             bias0 = bias
         for i, casename in enumerate(fig_caselist[2:]):
             print(f"   {thisCrop_clm} bias MM window={w} weighted {casename}: {bias[i]}")
+        
+        # corrcoeff = [stats.linregress(ydata_yield[o,:], ydata_yield[x,:]) for x in np.arange(2, ydata_yield.shape[0])]
+        # for i, casename in enumerate(fig_caselist[2:]):
+        #     print(f"   {thisCrop_clm} r orig unweighted {casename}: {np.round(corrcoeff[i].rvalue, stats_round)}")
+            
+        # corrcoeff = [stats.linregress(ydata_yield_sdt[o,r:-r], ydata_yield_sdt[x,r:-r]) for x in inds_sim]
+        # for i, casename in enumerate(fig_caselist[2:]):
+        #     print(f"   {thisCrop_clm} r signal.detrend() unweighted {casename}: {np.round(corrcoeff[i].rvalue, stats_round)}")
+        
+        # Weights should never be shifted, as they are observed values.
+        weights = ydata_prod[o,:]
+        
+        corrcoeff = [cc.weighted_pearsons_r(ydata_yield_dt[o,:], ydata_yield_dt[x,:], weights) for x in inds_sim]
+        for i, casename in enumerate(fig_caselist[2:]):
+            print(f"   {thisCrop_clm} r MM window={w} weighted {casename}: {np.round(corrcoeff[i], stats_round)}")
+        if this_obs == obs_for_fig:
+            corrcoef_ref = corrcoeff
+            
+        corrcoeffL = [cc.weighted_pearsons_r(ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[x,:], weights) for x in inds_sim]
+        for i, casename in enumerate(fig_caselist[2:]):
+            print(f"   {thisCrop_clm} r MM window={w} unweighted shift LEFT {casename}: {np.round(corrcoeffL[i], stats_round)}")
+        if this_obs == obs_for_fig:
+            corrcoefL_ref = corrcoeffL
+        
+        corrcoeffR = [cc.weighted_pearsons_r(ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[x,:], weights) for x in inds_sim]
+        for i, casename in enumerate(fig_caselist[2:]):
+            print(f"   {thisCrop_clm} r MM window={w} unweighted shift RIGHT {casename}: {np.round(corrcoeffR[i], stats_round)}")
+        if this_obs == obs_for_fig:
+            corrcoefR_ref = corrcoeffR
+    
+    ydata_yield_touse = ydata_yield.copy()
+    ydata_yield_dt_touse = ydata_yield_dt.copy()
+    for i,s in enumerate(inds_sim):
+        Lshift_better = corrcoefL_ref[i] >= 0.3 + corrcoef_ref[i]
+        Rshift_better = corrcoefR_ref[i] >= 0.3 + corrcoef_ref[i]
+        if Lshift_better and Rshift_better:
+            if corrcoefL_ref[i] > corrcoefR_ref[i]:
+                Rshift_better = False
+            else:
+                Lshift_better = False
+        if Lshift_better:
+            print(f"Shifting {fig_caselist[s]} sim yield 1 year left")
+            ydata_yield_touse[s,:] = ydata_yield_shiftL[s,:]
+            ydata_yield_dt_touse[s,:] = ydata_yield_shiftL_dt[s,:]
+        elif Rshift_better:
+            print(f"Shifting {fig_caselist[s]} sim yield 1 year right")
+            ydata_yield_touse[s,:] = ydata_yield_shiftR[s,:]
+            ydata_yield_dt_touse[s,:] = ydata_yield_shiftR_dt[s,:]
+    
     # Make plots for this crop
-    make_1crop_plot(ax_area, ydata_area, fig_caselist, thisCrop_clm, "Mha", y1, yN)
-    make_1crop_plot(ax_prod, ydata_prod, fig_caselist, thisCrop_clm, "Mt", y1, yN)
-    make_1crop_plot(ax_yield, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", y1, yN, stats2=bias0)
-    make_1crop_plot(ax_yield_dt, cc.detrend(ydata_yield), fig_caselist, thisCrop_clm, "t/ha", y1, yN)
+    make_1crop_plot(ax_area, ydata_area, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
+    make_1crop_plot(ax_prod, ydata_prod, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
+    make_1crop_plot(ax_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_plot(ax_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_plot(ax_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_plot(ax_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_plot(ax_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_plot(ax_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_plot(ax_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_plot(ax_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
     
 # Finish up and save
 finishup_allcrops_plot(c, ny, nx, axes_area, f_area, "Global crop area", outDir_figs, mxmat_limited)
 finishup_allcrops_plot(c, ny, nx, axes_prod, f_prod, "Global crop production", outDir_figs, mxmat_limited)
 finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outDir_figs, mxmat_limited)
+finishup_allcrops_plot(c, ny, nx, axes_yield_orig, f_yield_orig, "Global crop yield no-shift", outDir_figs, mxmat_limited)
+finishup_allcrops_plot(c, ny, nx, axes_yield_shiftL, f_yield_shiftL, "Global crop yield shiftL", outDir_figs, mxmat_limited)
+finishup_allcrops_plot(c, ny, nx, axes_yield_shiftR, f_yield_shiftR, "Global crop yield shiftR", outDir_figs, mxmat_limited)
 finishup_allcrops_plot(c, ny, nx, axes_yield_dt, f_yield_dt, "Global crop yield (detrended)", outDir_figs, mxmat_limited)
+finishup_allcrops_plot(c, ny, nx, axes_yield_dt_orig, f_yield_dt_orig, "Global crop yield (detrended) no-shift", outDir_figs, mxmat_limited)
+finishup_allcrops_plot(c, ny, nx, axes_yield_dt_shiftL, f_yield_dt_shiftL, "Global crop yield (detrended) shiftL", outDir_figs, mxmat_limited)
+finishup_allcrops_plot(c, ny, nx, axes_yield_dt_shiftR, f_yield_dt_shiftR, "Global crop yield (detrended) shiftR", outDir_figs, mxmat_limited)
+
 
 
 # %% Make maps of individual crops (rainfed, irrigated)
