@@ -724,39 +724,38 @@ ny = 2
 nx = 4
 # figsize = (14, 7.5)
 figsize = (20, 10)
-f_area, axes_area = plt.subplots(ny, nx, figsize=figsize)
-axes_area = axes_area.flatten()
-f_area_orig, axes_area_orig = plt.subplots(ny, nx, figsize=figsize)
-axes_area_orig = axes_area_orig.flatten()
-f_area_shiftL, axes_area_shiftL = plt.subplots(ny, nx, figsize=figsize)
-axes_area_shiftL = axes_area_shiftL.flatten()
-f_area_shiftR, axes_area_shiftR = plt.subplots(ny, nx, figsize=figsize)
-axes_area_shiftR = axes_area_shiftR.flatten()
-f_prod, axes_prod = plt.subplots(ny, nx, figsize=figsize)
-axes_prod = axes_prod.flatten()
-f_prod_orig, axes_prod_orig = plt.subplots(ny, nx, figsize=figsize)
-axes_prod_orig = axes_prod_orig.flatten()
-f_prod_shiftL, axes_prod_shiftL = plt.subplots(ny, nx, figsize=figsize)
-axes_prod_shiftL = axes_prod_shiftL.flatten()
-f_prod_shiftR, axes_prod_shiftR = plt.subplots(ny, nx, figsize=figsize)
-axes_prod_shiftR = axes_prod_shiftR.flatten()
-f_yield, axes_yield = plt.subplots(ny, nx, figsize=figsize)
-axes_yield = axes_yield.flatten()
-f_yield_orig, axes_yield_orig = plt.subplots(ny, nx, figsize=figsize)
-axes_yield_orig = axes_yield_orig.flatten()
-f_yield_shiftL, axes_yield_shiftL = plt.subplots(ny, nx, figsize=figsize)
-axes_yield_shiftL = axes_yield_shiftL.flatten()
-f_yield_shiftR, axes_yield_shiftR = plt.subplots(ny, nx, figsize=figsize)
-axes_yield_shiftR = axes_yield_shiftR.flatten()
-f_yield_dt_orig, axes_yield_dt_orig = plt.subplots(ny, nx, figsize=figsize)
-axes_yield_dt_orig = axes_yield_dt_orig.flatten()
-f_yield_dt_shiftL, axes_yield_dt_shiftL = plt.subplots(ny, nx, figsize=figsize)
-axes_yield_dt_shiftL = axes_yield_dt_shiftL.flatten()
-f_yield_dt_shiftR, axes_yield_dt_shiftR = plt.subplots(ny, nx, figsize=figsize)
-axes_yield_dt_shiftR = axes_yield_dt_shiftR.flatten()
-
-f_yield_dt, axes_yield_dt = plt.subplots(ny, nx, figsize=figsize)
-axes_yield_dt = axes_yield_dt.flatten()
+f_lines_area, axes_lines_area = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_area = axes_lines_area.flatten()
+f_lines_area_orig, axes_lines_area_orig = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_area_orig = axes_lines_area_orig.flatten()
+f_lines_area_shiftL, axes_lines_area_shiftL = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_area_shiftL = axes_lines_area_shiftL.flatten()
+f_lines_area_shiftR, axes_lines_area_shiftR = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_area_shiftR = axes_lines_area_shiftR.flatten()
+f_lines_prod, axes_lines_prod = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_prod = axes_lines_prod.flatten()
+f_lines_prod_orig, axes_lines_prod_orig = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_prod_orig = axes_lines_prod_orig.flatten()
+f_lines_prod_shiftL, axes_lines_prod_shiftL = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_prod_shiftL = axes_lines_prod_shiftL.flatten()
+f_lines_prod_shiftR, axes_lines_prod_shiftR = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_prod_shiftR = axes_lines_prod_shiftR.flatten()
+f_lines_yield, axes_lines_yield = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_yield = axes_lines_yield.flatten()
+f_lines_yield_orig, axes_lines_yield_orig = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_yield_orig = axes_lines_yield_orig.flatten()
+f_lines_yield_shiftL, axes_lines_yield_shiftL = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_yield_shiftL = axes_lines_yield_shiftL.flatten()
+f_lines_yield_shiftR, axes_lines_yield_shiftR = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_yield_shiftR = axes_lines_yield_shiftR.flatten()
+f_lines_yield_dt_orig, axes_lines_yield_dt_orig = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_yield_dt_orig = axes_lines_yield_dt_orig.flatten()
+f_lines_yield_dt_shiftL, axes_lines_yield_dt_shiftL = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_yield_dt_shiftL = axes_lines_yield_dt_shiftL.flatten()
+f_lines_yield_dt_shiftR, axes_lines_yield_dt_shiftR = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_yield_dt_shiftR = axes_lines_yield_dt_shiftR.flatten()
+f_lines_yield_dt, axes_lines_yield_dt = plt.subplots(ny, nx, figsize=figsize)
+axes_lines_yield_dt = axes_lines_yield_dt.flatten()
 
 fig_caselist = ["FAOSTAT"]
 this_earthstat_res = "f09_g17"
@@ -769,7 +768,7 @@ if mxmat_limited:
 else:
     mxmats_tmp = None
     
-def make_1crop_plot(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN, stats2=None):
+def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN, stats2=None):
     da = xr.DataArray(data = ydata_this,
                             coords = {'Case': caselist,
                                       'Year': np.arange(y1,yN+1)})
@@ -805,7 +804,7 @@ def make_1crop_plot(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN, 
     if ax_this.get_legend():
         ax_this.get_legend().remove()
 
-def finishup_allcrops_plot(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, mxmat_limited):
+def finishup_allcrops_lines(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, mxmat_limited):
     # Delete unused axes, if any
     for a in np.arange(c+1, ny*nx):
         f_this.delaxes(axes_this[a])
@@ -822,30 +821,30 @@ def finishup_allcrops_plot(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, 
                   loc = "upper center",
                   ncol = int(np.floor(len(fig_caselist)/4))+1)
 
-    f_this.savefig(outDir_figs + suptitle + " by crop.pdf",
+    f_this.savefig(outDir_figs + "Timeseries " + suptitle + " by crop.pdf",
                    bbox_inches='tight')
     plt.close(f_this)
 
 for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
     is_obs = []
     
-    ax_area = axes_area[c]
-    ax_area_orig = axes_area_orig[c]
-    ax_area_shiftL = axes_area_shiftL[c]
-    ax_area_shiftR = axes_area_shiftR[c]
-    ax_prod = axes_prod[c]
-    ax_prod_orig = axes_prod_orig[c]
-    ax_prod_shiftL = axes_prod_shiftL[c]
-    ax_prod_shiftR = axes_prod_shiftR[c]
-    ax_yield = axes_yield[c]
-    ax_yield_orig = axes_yield_orig[c]
-    ax_yield_shiftL = axes_yield_shiftL[c]
-    ax_yield_shiftR = axes_yield_shiftR[c]
-    ax_yield_dt = axes_yield_dt[c]
-    ax_yield_dt_orig = axes_yield_dt_orig[c]
-    ax_yield_dt_shiftL = axes_yield_dt_shiftL[c]
-    ax_yield_dt_shiftR = axes_yield_dt_shiftR[c]
-    ax_yield_dt = axes_yield_dt[c]
+    ax_lines_area = axes_lines_area[c]
+    ax_lines_area_orig = axes_lines_area_orig[c]
+    ax_lines_area_shiftL = axes_lines_area_shiftL[c]
+    ax_lines_area_shiftR = axes_lines_area_shiftR[c]
+    ax_lines_prod = axes_lines_prod[c]
+    ax_lines_prod_orig = axes_lines_prod_orig[c]
+    ax_lines_prod_shiftL = axes_lines_prod_shiftL[c]
+    ax_lines_prod_shiftR = axes_lines_prod_shiftR[c]
+    ax_lines_yield = axes_lines_yield[c]
+    ax_lines_yield_orig = axes_lines_yield_orig[c]
+    ax_lines_yield_shiftL = axes_lines_yield_shiftL[c]
+    ax_lines_yield_shiftR = axes_lines_yield_shiftR[c]
+    ax_lines_yield_dt = axes_lines_yield_dt[c]
+    ax_lines_yield_dt_orig = axes_lines_yield_dt_orig[c]
+    ax_lines_yield_dt_shiftL = axes_lines_yield_dt_shiftL[c]
+    ax_lines_yield_dt_shiftR = axes_lines_yield_dt_shiftR[c]
+    ax_lines_yield_dt = axes_lines_yield_dt[c]
     
     # FAOSTAT
     is_obs.append(True)
@@ -1048,41 +1047,41 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
             ydata_yield_dt_touse[s,:] = ydata_yield_shiftR_dt[s,:]
     
     # Make plots for this crop
-    make_1crop_plot(ax_area, ydata_area_touse, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
-    make_1crop_plot(ax_area_orig, ydata_area, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
-    make_1crop_plot(ax_area_shiftL, ydata_area_shiftL, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
-    make_1crop_plot(ax_area_shiftR, ydata_area_shiftR, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
-    make_1crop_plot(ax_prod, ydata_prod_touse, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
-    make_1crop_plot(ax_prod_orig, ydata_prod, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
-    make_1crop_plot(ax_prod_shiftL, ydata_prod_shiftL, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
-    make_1crop_plot(ax_prod_shiftR, ydata_prod_shiftR, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
-    make_1crop_plot(ax_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
-    make_1crop_plot(ax_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
-    make_1crop_plot(ax_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
-    make_1crop_plot(ax_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
-    make_1crop_plot(ax_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
-    make_1crop_plot(ax_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
-    make_1crop_plot(ax_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
-    make_1crop_plot(ax_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_lines(ax_lines_area, ydata_area_touse, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
+    make_1crop_lines(ax_lines_area_orig, ydata_area, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
+    make_1crop_lines(ax_lines_area_shiftL, ydata_area_shiftL, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
+    make_1crop_lines(ax_lines_area_shiftR, ydata_area_shiftR, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
+    make_1crop_lines(ax_lines_prod, ydata_prod_touse, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
+    make_1crop_lines(ax_lines_prod_orig, ydata_prod, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
+    make_1crop_lines(ax_lines_prod_shiftL, ydata_prod_shiftL, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
+    make_1crop_lines(ax_lines_prod_shiftR, ydata_prod_shiftR, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
+    make_1crop_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_lines(ax_lines_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_lines(ax_lines_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_lines(ax_lines_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_lines(ax_lines_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
     
 # Finish up and save
 print("Finishing and saving...")
-finishup_allcrops_plot(c, ny, nx, axes_area, f_area, "Global crop area", outDir_figs, mxmat_limited)
-finishup_allcrops_plot(c, ny, nx, axes_area_orig, f_area_orig, "Global crop area no-shift", outDir_figs, mxmat_limited)
-finishup_allcrops_plot(c, ny, nx, axes_area_shiftL, f_area_shiftL, "Global crop area shiftL", outDir_figs, mxmat_limited)
-finishup_allcrops_plot(c, ny, nx, axes_area_shiftR, f_area_shiftR, "Global crop area shiftR", outDir_figs, mxmat_limited)
-finishup_allcrops_plot(c, ny, nx, axes_prod, f_prod, "Global crop production", outDir_figs, mxmat_limited)
-finishup_allcrops_plot(c, ny, nx, axes_prod_orig, f_prod_orig, "Global crop production no-shift", outDir_figs, mxmat_limited)
-finishup_allcrops_plot(c, ny, nx, axes_prod_shiftL, f_prod_shiftL, "Global crop production shiftL", outDir_figs, mxmat_limited)
-finishup_allcrops_plot(c, ny, nx, axes_prod_shiftR, f_prod_shiftR, "Global crop production shiftR", outDir_figs, mxmat_limited)
-finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outDir_figs, mxmat_limited)
-finishup_allcrops_plot(c, ny, nx, axes_yield_orig, f_yield_orig, "Global crop yield no-shift", outDir_figs, mxmat_limited)
-finishup_allcrops_plot(c, ny, nx, axes_yield_shiftL, f_yield_shiftL, "Global crop yield shiftL", outDir_figs, mxmat_limited)
-finishup_allcrops_plot(c, ny, nx, axes_yield_shiftR, f_yield_shiftR, "Global crop yield shiftR", outDir_figs, mxmat_limited)
-finishup_allcrops_plot(c, ny, nx, axes_yield_dt, f_yield_dt, "Global crop yield (detrended)", outDir_figs, mxmat_limited)
-finishup_allcrops_plot(c, ny, nx, axes_yield_dt_orig, f_yield_dt_orig, "Global crop yield (detrended) no-shift", outDir_figs, mxmat_limited)
-finishup_allcrops_plot(c, ny, nx, axes_yield_dt_shiftL, f_yield_dt_shiftL, "Global crop yield (detrended) shiftL", outDir_figs, mxmat_limited)
-finishup_allcrops_plot(c, ny, nx, axes_yield_dt_shiftR, f_yield_dt_shiftR, "Global crop yield (detrended) shiftR", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_area, f_lines_area, "Global crop area", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_area_orig, f_lines_area_orig, "Global crop area no-shift", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_area_shiftL, f_lines_area_shiftL, "Global crop area shiftL", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_area_shiftR, f_lines_area_shiftR, "Global crop area shiftR", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_prod, f_lines_prod, "Global crop production", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_prod_orig, f_lines_prod_orig, "Global crop production no-shift", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_prod_shiftL, f_lines_prod_shiftL, "Global crop production shiftL", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_prod_shiftR, f_lines_prod_shiftR, "Global crop production shiftR", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_yield, f_lines_yield, "Global crop yield", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_yield_orig, f_lines_yield_orig, "Global crop yield no-shift", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_yield_shiftL, f_lines_yield_shiftL, "Global crop yield shiftL", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_yield_shiftR, f_lines_yield_shiftR, "Global crop yield shiftR", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_yield_dt, f_lines_yield_dt, "Global crop yield (detrended)", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_yield_dt_orig, f_lines_yield_dt_orig, "Global crop yield (detrended) no-shift", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_yield_dt_shiftL, f_lines_yield_dt_shiftL, "Global crop yield (detrended) shiftL", outDir_figs, mxmat_limited)
+finishup_allcrops_lines(c, ny, nx, axes_lines_yield_dt_shiftR, f_lines_yield_dt_shiftR, "Global crop yield (detrended) shiftR", outDir_figs, mxmat_limited)
 
 print("Done.")
 
