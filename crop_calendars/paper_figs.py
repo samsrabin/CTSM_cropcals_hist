@@ -726,8 +726,20 @@ nx = 4
 figsize = (20, 10)
 f_area, axes_area = plt.subplots(ny, nx, figsize=figsize)
 axes_area = axes_area.flatten()
+f_area_orig, axes_area_orig = plt.subplots(ny, nx, figsize=figsize)
+axes_area_orig = axes_area_orig.flatten()
+f_area_shiftL, axes_area_shiftL = plt.subplots(ny, nx, figsize=figsize)
+axes_area_shiftL = axes_area_shiftL.flatten()
+f_area_shiftR, axes_area_shiftR = plt.subplots(ny, nx, figsize=figsize)
+axes_area_shiftR = axes_area_shiftR.flatten()
 f_prod, axes_prod = plt.subplots(ny, nx, figsize=figsize)
 axes_prod = axes_prod.flatten()
+f_prod_orig, axes_prod_orig = plt.subplots(ny, nx, figsize=figsize)
+axes_prod_orig = axes_prod_orig.flatten()
+f_prod_shiftL, axes_prod_shiftL = plt.subplots(ny, nx, figsize=figsize)
+axes_prod_shiftL = axes_prod_shiftL.flatten()
+f_prod_shiftR, axes_prod_shiftR = plt.subplots(ny, nx, figsize=figsize)
+axes_prod_shiftR = axes_prod_shiftR.flatten()
 f_yield, axes_yield = plt.subplots(ny, nx, figsize=figsize)
 axes_yield = axes_yield.flatten()
 f_yield_orig, axes_yield_orig = plt.subplots(ny, nx, figsize=figsize)
@@ -818,7 +830,13 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
     is_obs = []
     
     ax_area = axes_area[c]
+    ax_area_orig = axes_area_orig[c]
+    ax_area_shiftL = axes_area_shiftL[c]
+    ax_area_shiftR = axes_area_shiftR[c]
     ax_prod = axes_prod[c]
+    ax_prod_orig = axes_prod_orig[c]
+    ax_prod_shiftL = axes_prod_shiftL[c]
+    ax_prod_shiftR = axes_prod_shiftR[c]
     ax_yield = axes_yield[c]
     ax_yield_orig = axes_yield_orig[c]
     ax_yield_shiftL = axes_yield_shiftL[c]
@@ -918,10 +936,12 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
     # Get shifted data
     inds_obs = [i for i,x in enumerate(is_obs) if x]
     inds_sim = [i for i,x in enumerate(is_obs) if not x]
-    ydata_yield_shiftL = cc.shift_sim_timeseries(ydata_yield, "L", inds_obs, inds_sim)
-    ydata_yield_shiftR = cc.shift_sim_timeseries(ydata_yield, "R", inds_obs, inds_sim)
+    ydata_area_shiftL = cc.shift_sim_timeseries(ydata_area, "L", inds_obs, inds_sim)
+    ydata_area_shiftR = cc.shift_sim_timeseries(ydata_area, "R", inds_obs, inds_sim)
     ydata_prod_shiftL = cc.shift_sim_timeseries(ydata_prod, "L", inds_obs, inds_sim)
     ydata_prod_shiftR = cc.shift_sim_timeseries(ydata_prod, "R", inds_obs, inds_sim)
+    ydata_yield_shiftL = cc.shift_sim_timeseries(ydata_yield, "L", inds_obs, inds_sim)
+    ydata_yield_shiftR = cc.shift_sim_timeseries(ydata_yield, "R", inds_obs, inds_sim)
     
     # Now ignore the outer timesteps to ensure the same years are being considered
     yearList_shifted = yearList[1:-1]
@@ -948,7 +968,11 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
         raise RuntimeError(f"plot_yN {plot_yN} is after the end of yearList_shifted_dt {yearList_shifted_dt[-1]}")
     yearList_shifted_ok = np.where((yearList_shifted >= plot_y1) & (yearList_shifted <= plot_yN))[0]
     ydata_area = ydata_area[:,yearList_shifted_ok]
+    ydata_area_shiftL = ydata_area_shiftL[:,yearList_shifted_ok]
+    ydata_area_shiftR = ydata_area_shiftR[:,yearList_shifted_ok]
     ydata_prod = ydata_prod[:,yearList_shifted_ok]
+    ydata_prod_shiftL = ydata_prod_shiftL[:,yearList_shifted_ok]
+    ydata_prod_shiftR = ydata_prod_shiftR[:,yearList_shifted_ok]
     ydata_yield = ydata_yield[:,yearList_shifted_ok]
     ydata_yield_shiftL = ydata_yield_shiftL[:,yearList_shifted_ok]
     ydata_yield_shiftR = ydata_yield_shiftR[:,yearList_shifted_ok]
@@ -998,6 +1022,8 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
         if this_obs == obs_for_fig:
             corrcoefR_ref = corrcoeffR
     
+    ydata_area_touse = ydata_area.copy()
+    ydata_prod_touse = ydata_prod.copy()
     ydata_yield_touse = ydata_yield.copy()
     ydata_yield_dt_touse = ydata_yield_dt.copy()
     for i,s in enumerate(inds_sim):
@@ -1010,16 +1036,26 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
                 Lshift_better = False
         if Lshift_better:
             print(f"Shifting {fig_caselist[s]} sim yield 1 year left")
+            ydata_area_touse[s,:] = ydata_area_shiftL[s,:]
+            ydata_prod_touse[s,:] = ydata_prod_shiftL[s,:]
             ydata_yield_touse[s,:] = ydata_yield_shiftL[s,:]
             ydata_yield_dt_touse[s,:] = ydata_yield_shiftL_dt[s,:]
         elif Rshift_better:
             print(f"Shifting {fig_caselist[s]} sim yield 1 year right")
+            ydata_area_touse[s,:] = ydata_area_shiftR[s,:]
+            ydata_prod_touse[s,:] = ydata_prod_shiftR[s,:]
             ydata_yield_touse[s,:] = ydata_yield_shiftR[s,:]
             ydata_yield_dt_touse[s,:] = ydata_yield_shiftR_dt[s,:]
     
     # Make plots for this crop
-    make_1crop_plot(ax_area, ydata_area, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
-    make_1crop_plot(ax_prod, ydata_prod, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
+    make_1crop_plot(ax_area, ydata_area_touse, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
+    make_1crop_plot(ax_area_orig, ydata_area, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
+    make_1crop_plot(ax_area_shiftL, ydata_area_shiftL, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
+    make_1crop_plot(ax_area_shiftR, ydata_area_shiftR, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
+    make_1crop_plot(ax_prod, ydata_prod_touse, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
+    make_1crop_plot(ax_prod_orig, ydata_prod, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
+    make_1crop_plot(ax_prod_shiftL, ydata_prod_shiftL, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
+    make_1crop_plot(ax_prod_shiftR, ydata_prod_shiftR, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
     make_1crop_plot(ax_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
     make_1crop_plot(ax_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
     make_1crop_plot(ax_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
@@ -1030,8 +1066,15 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
     make_1crop_plot(ax_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
     
 # Finish up and save
+print("Finishing and saving...")
 finishup_allcrops_plot(c, ny, nx, axes_area, f_area, "Global crop area", outDir_figs, mxmat_limited)
+finishup_allcrops_plot(c, ny, nx, axes_area_orig, f_area_orig, "Global crop area no-shift", outDir_figs, mxmat_limited)
+finishup_allcrops_plot(c, ny, nx, axes_area_shiftL, f_area_shiftL, "Global crop area shiftL", outDir_figs, mxmat_limited)
+finishup_allcrops_plot(c, ny, nx, axes_area_shiftR, f_area_shiftR, "Global crop area shiftR", outDir_figs, mxmat_limited)
 finishup_allcrops_plot(c, ny, nx, axes_prod, f_prod, "Global crop production", outDir_figs, mxmat_limited)
+finishup_allcrops_plot(c, ny, nx, axes_prod_orig, f_prod_orig, "Global crop production no-shift", outDir_figs, mxmat_limited)
+finishup_allcrops_plot(c, ny, nx, axes_prod_shiftL, f_prod_shiftL, "Global crop production shiftL", outDir_figs, mxmat_limited)
+finishup_allcrops_plot(c, ny, nx, axes_prod_shiftR, f_prod_shiftR, "Global crop production shiftR", outDir_figs, mxmat_limited)
 finishup_allcrops_plot(c, ny, nx, axes_yield, f_yield, "Global crop yield", outDir_figs, mxmat_limited)
 finishup_allcrops_plot(c, ny, nx, axes_yield_orig, f_yield_orig, "Global crop yield no-shift", outDir_figs, mxmat_limited)
 finishup_allcrops_plot(c, ny, nx, axes_yield_shiftL, f_yield_shiftL, "Global crop yield shiftL", outDir_figs, mxmat_limited)
@@ -1041,6 +1084,7 @@ finishup_allcrops_plot(c, ny, nx, axes_yield_dt_orig, f_yield_dt_orig, "Global c
 finishup_allcrops_plot(c, ny, nx, axes_yield_dt_shiftL, f_yield_dt_shiftL, "Global crop yield (detrended) shiftL", outDir_figs, mxmat_limited)
 finishup_allcrops_plot(c, ny, nx, axes_yield_dt_shiftR, f_yield_dt_shiftR, "Global crop yield (detrended) shiftR", outDir_figs, mxmat_limited)
 
+print("Done.")
 
 
 # %% Make maps of individual crops (rainfed, irrigated)
