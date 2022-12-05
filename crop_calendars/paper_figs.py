@@ -715,12 +715,15 @@ stats_round = 3
 # Which observation dataset should be included on figure?
 obs_for_fig = "FAOSTAT"
 
+# Use annual yields? If not, uses growing-season yields.
+use_annual_yields = False
+
 # Which years to include?
 plot_y1 = 1980
 plot_yN = 2010
 
 # Do not actually make figures
-noFigs = True
+noFigs = False
 
 # Set up figure
 ny = 2
@@ -761,10 +764,10 @@ if mxmat_limited:
 else:
     mxmats_tmp = None
     
-def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN, stats2=None, stats_round=None):
+def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel, y1, yN, stats2=None, stats_round=None):
     da = xr.DataArray(data = ydata_this,
                             coords = {'Case': caselist,
-                                      'Year': np.arange(y1,yN+1)})
+                                      xlabel: np.arange(y1,yN+1)})
     
     light_gray = [x/255 for x in [148, 148, 148]]
     dark_gray = [x/255 for x in [64, 64, 74]]
@@ -782,7 +785,7 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN,
             linestyle = ":"
         else:
             linestyle = "-"
-        da.isel(Case=i).plot.line(x="Year", ax=ax_this, 
+        da.isel(Case=i).plot.line(x=xlabel, ax=ax_this, 
                                   color=color, linestyle=linestyle,
                                   linewidth=3)
     
@@ -797,7 +800,7 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN,
     ax_this.title.set_text(thisTitle)
     ax_this.title.set_size(32)
     ax_this.tick_params(axis='both', which='major', labelsize=20)
-    ax_this.set_xlabel("")
+    ax_this.set_xlabel(xlabel, fontsize=24)
     ax_this.set_ylabel(units, fontsize=24)
     if ax_this.get_legend():
         ax_this.get_legend().remove()
@@ -914,8 +917,13 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
                                     axis=0)
         
         # Production
-        case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp)
-        case['ds']['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da2(case['ds'], lu_ds, 'YIELD_ANN', yearList, cropList_combined_clm)
+        if use_annual_yields:
+            case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp)
+            yieldVar = "YIELD_ANN"
+        else:
+            case['ds'] = cc.get_yield(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp, force_update=True)
+            yieldVar = "YIELD"
+        case['ds']['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da2(case['ds'], lu_ds, yieldVar, cropList_combined_clm)
         if thisCrop_clm == "Total (no sgc)":
             ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Total'])['ts_prod_yc'].sum(dim="Crop").copy()
         elif thisCrop_clm == "Total (grains only)":
@@ -925,6 +933,12 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
         ydata_prod = np.concatenate((ydata_prod,
                                      np.expand_dims(ts_prod_y.values, axis=0)),
                                     axis=0)
+        
+        # Get yield time dimension name
+        non_Crop_dims = [x for x in case['ds']['ts_prod_yc'].dims if x != "Crop"]
+        if len(non_Crop_dims) != 1:
+            raise RuntimeError(f"Expected one non-Crop dimension of case['ds']['ts_prod_yc']; found {len(non_Crop_dims)}: {non_Crop_dims}")
+        yield_time_dim = non_Crop_dims[0]
     # Convert ha to Mha
     ydata_area *= 1e-6
         
@@ -1052,24 +1066,29 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
     
     # Make plots for this crop
     if not noFigs:
-        make_1crop_lines(ax_lines_area, ydata_area_touse, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_area_orig, ydata_area, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_area_shiftL, ydata_area_shiftL, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_area_shiftR, ydata_area_shiftR, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_prod, ydata_prod_touse, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_prod_orig, ydata_prod, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_prod_shiftL, ydata_prod_shiftL, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_prod_shiftR, ydata_prod_shiftR, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0, stats_round=stats_round)
-        make_1crop_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round)
-        make_1crop_lines(ax_lines_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0, stats_round=stats_round)
-        make_1crop_lines(ax_lines_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round)
-        make_1crop_lines(ax_lines_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN)
+        xlabel = "Year"
+        make_1crop_lines(ax_lines_area, ydata_area_touse, fig_caselist, thisCrop_clm, "Mha", xlabel, plot_y1, plot_yN)
+        make_1crop_lines(ax_lines_area_orig, ydata_area, fig_caselist, thisCrop_clm, "Mha", xlabel, plot_y1, plot_yN)
+        make_1crop_lines(ax_lines_area_shiftL, ydata_area_shiftL, fig_caselist, thisCrop_clm, "Mha", xlabel, plot_y1, plot_yN)
+        make_1crop_lines(ax_lines_area_shiftR, ydata_area_shiftR, fig_caselist, thisCrop_clm, "Mha", xlabel, plot_y1, plot_yN)
+        if yield_time_dim == "Year":
+            xlabel = "Year"
+        else:
+            xlabel = f"Obs year, sim {yield_time_dim.lower()}"
+        make_1crop_lines(ax_lines_prod, ydata_prod_touse, fig_caselist, thisCrop_clm, "Mt", xlabel, plot_y1, plot_yN)
+        make_1crop_lines(ax_lines_prod_orig, ydata_prod, fig_caselist, thisCrop_clm, "Mt", xlabel, plot_y1, plot_yN)
+        make_1crop_lines(ax_lines_prod_shiftL, ydata_prod_shiftL, fig_caselist, thisCrop_clm, "Mt", xlabel, plot_y1, plot_yN)
+        make_1crop_lines(ax_lines_prod_shiftR, ydata_prod_shiftR, fig_caselist, thisCrop_clm, "Mt", xlabel, plot_y1, plot_yN)
+        make_1crop_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=stats_round)
+        make_1crop_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round)
+        make_1crop_lines(ax_lines_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN)
+        make_1crop_lines(ax_lines_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN)
+        make_1crop_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=stats_round)
+        make_1crop_lines(ax_lines_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round)
+        make_1crop_lines(ax_lines_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN)
+        make_1crop_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN)
         # Scatter plots
-        # make_1crop_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, "t/ha", plot_y1, plot_yN, 
+        # make_1crop_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, 
         #                    stats2=corrcoef_ref, stats_round=stats_round)
 
 # Finish up and save

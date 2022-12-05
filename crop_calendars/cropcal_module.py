@@ -1242,13 +1242,31 @@ def get_ts_prod_clm_yc_da(yield_gd, lu_ds, yearList, cropList_combined_clm):
                                                         "Crop": cropList_combined_clm})
     return ts_prod_clm_yc_da
 
-def get_ts_prod_clm_yc_da2(case_ds, lu_ds, yieldVar, yearList, cropList_combined_clm):
+def get_ts_prod_clm_yc_da2(case_ds, lu_ds, yieldVar, cropList_combined_clm):
+    
+   # Get time dimension names.
+   # To match time dimension on lu_ds, rename anything other than "time" to that.
+   non_patch_dims = [x for x in case_ds[yieldVar].dims if x != "patch"]
+   if len(non_patch_dims) != 1:
+       raise RuntimeError(f"Expected one non-patch dimension of case_ds['{yieldVar}']; found {len(non_patch_dims)}: {non_patch_dims}")
+   time_dim_in = non_patch_dims[0]
+   if time_dim_in == "time":
+       time_dim_out = "Year"
+       yearList = [x.year for x in case_ds[yieldVar].time.values]
+   elif time_dim_in == "gs":
+       time_dim_out = "Growing season"
+       yearList = case_ds[yieldVar].gs.values
+   else:
+       raise RuntimeError(f"Unknown time_dim_out for time_dim_in {time_dim_in}")
+   if time_dim_in != "time":
+       print(f"WARNING: Using calendar years from LU data with yield data of time dimension {time_dim_in}.")
+       lu_ds = lu_ds.assign_coords({'time': case_ds[yieldVar].gs.values}).rename({'time': time_dim_in})
    
    prod_da = case_ds[yieldVar] * lu_ds['AREA_CFT']
    
    ts_prod_clm_yc_da = prod_da.groupby(case_ds['patches1d_itype_combinedCropCLM_str'])\
                        .apply(xr.DataArray.sum, dim='patch', skipna=True)\
-                       .rename({'time': 'Year',
+                       .rename({time_dim_in: time_dim_out,
                                 'patches1d_itype_combinedCropCLM_str': 'Crop'})\
                        .isel(Crop=slice(1,len(cropList_combined_clm)))\
                        * 1e-12
@@ -1259,7 +1277,7 @@ def get_ts_prod_clm_yc_da2(case_ds, lu_ds, yieldVar, yearList, cropList_combined
                                   ts_prod_clm_ySUM),
                                   dim="Crop")\
                        .assign_coords({'Crop': cropList_combined_clm,
-                                       'Year': yearList})
+                                       time_dim_out: yearList})
    
    return ts_prod_clm_yc_da
    
@@ -1330,49 +1348,65 @@ def get_window_radius(w):
     return int((w-1) / 2)
 
 
-def get_yield(ds, min_viable_hui=1.0, mxmats=None):
+def get_yield(ds, min_viable_hui=1.0, mxmats=None, forAnnual=False, force_update=False):
     
     mxmat_limited = bool(mxmats)
     
-    if 'YIELD' in ds:
-        if ds['YIELD'].attrs['min_viable_hui'] == min_viable_hui and ds['YIELD'].attrs['mxmat_limited'] == mxmat_limited:
+    yield_var = "YIELD"
+    grainc_var = "GRAINC_TO_FOOD"
+    huifrac_var = "HUIFRAC"
+    gddharv_var = "GDDHARV"
+    gslen_var = "GSLEN"
+    if forAnnual:
+        yield_var += "_PERHARV"
+        grainc_var += "_PERHARV"
+        huifrac_var += "_PERHARV"
+        gddharv_var += "_PERHARV"
+        gslen_var += "_PERHARV"
+    
+    if yield_var in ds and not force_update:
+        if ds[yield_var].attrs['min_viable_hui'] == min_viable_hui and ds[yield_var].attrs['mxmat_limited'] == mxmat_limited:
             return ds
-        elif 'locked_yield' in ds['YIELD'].attrs and ds['YIELD'].attrs['locked_yield']:
+        elif 'locked_yield' in ds[yield_var].attrs and ds[yield_var].attrs['locked_yield']:
             return ds
     
-    ds["YIELD"] = ds["GRAINC_TO_FOOD_PERHARV"].copy()
+    ds[yield_var] = ds[grainc_var].copy()
     
     # Set yield to zero where minimum viable HUI wasn't reached
     if min_viable_hui >= 0:
-        huifrac = ds['HUIFRAC_PERHARV'].copy().values
-        huifrac[np.where(ds['GDDHARV_PERHARV'].values==0)] = 1
+        huifrac = ds[huifrac_var].copy().values
+        huifrac[np.where(ds[gddharv_var].values==0)] = 1
         if np.any(huifrac < min_viable_hui):
             print(f"Setting yield to zero where minimum viable HUI ({min_viable_hui}) wasn't reached")
-            tmp_da = ds["GRAINC_TO_FOOD_PERHARV"]
+            tmp_da = ds[grainc_var]
             tmp = tmp_da.copy().values
             tmp[np.where((huifrac < min_viable_hui) & (tmp > 0))] = 0
-            ds["YIELD"] = xr.DataArray(data = tmp,
+            ds[yield_var] = xr.DataArray(data = tmp,
                                         attrs = tmp_da.attrs,
                                         coords = tmp_da.coords)
     
     # Get GRAINC variants with values set to 0 if season was longer than CLM PFT parameter mxmat
     if mxmat_limited:
-        tmp_da = ds["YIELD"]
+        tmp_da = ds[yield_var]
         tmp_ra = tmp_da.copy().values
         for veg_str in np.unique(ds.patches1d_itype_veg_str.values):
             mxmat_veg_str = veg_str.replace("soybean", "temperate_soybean").replace("tropical_temperate", "tropical")
             mxmat = mxmats[mxmat_veg_str]
-            tmp_ra[np.where((ds.patches1d_itype_veg_str.values == veg_str) & (ds["GSLEN_PERHARV"].values > mxmat))] = 0
-        ds["YIELD"] = xr.DataArray(data = tmp_ra,
+            tmp_ra[np.where((ds.patches1d_itype_veg_str.values == veg_str) & (ds[gslen_var].values > mxmat))] = 0
+        ds[yield_var] = xr.DataArray(data = tmp_ra,
                                    coords = tmp_da.coords,
                                    attrs = tmp_da.attrs)
     
     # Get *biomass* *actually harvested*
-    ds["YIELD"] = adjust_grainC(ds["YIELD"], ds.patches1d_itype_veg_str)
+    ds[yield_var] = adjust_grainC(ds[yield_var], ds.patches1d_itype_veg_str)
     
     # Save details
-    ds["YIELD"].attrs['min_viable_hui'] = min_viable_hui
-    ds["YIELD"].attrs['mxmat_limited'] = mxmat_limited
+    ds[yield_var].attrs['min_viable_hui'] = min_viable_hui
+    ds[yield_var].attrs['mxmat_limited'] = mxmat_limited
+    
+    # Get dimensions in expected order (time/gs, patch)
+    if not forAnnual:
+        ds[yield_var] = ds[yield_var].transpose("gs", "patch")
     
     return ds
             
@@ -1387,9 +1421,9 @@ def get_yield_ann(ds, min_viable_hui=1.0, mxmats=None):
         elif 'locked_yield' in ds['YIELD_ANN'].attrs and ds['YIELD_ANN'].attrs['locked_yield']:
             return ds
     
-    ds = get_yield(ds, min_viable_hui=min_viable_hui, mxmats=mxmats)
+    ds = get_yield(ds, min_viable_hui=min_viable_hui, mxmats=mxmats, forAnnual=True)
     
-    tmp = ds["YIELD"].sum(dim='mxharvests', skipna=True).values
+    tmp = ds["YIELD_PERHARV"].sum(dim='mxharvests', skipna=True).values
     grainc_to_food_ann_orig = ds["GRAINC_TO_FOOD_ANN"]
     ds["YIELD_ANN"] = xr.DataArray(data = tmp,
                                    attrs = grainc_to_food_ann_orig.attrs,
