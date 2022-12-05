@@ -756,7 +756,7 @@ if mxmat_limited:
 else:
     mxmats_tmp = None
     
-def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN, stats2=None):
+def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN, stats2=None, stats_round=None):
     da = xr.DataArray(data = ydata_this,
                             coords = {'Case': caselist,
                                       'Year': np.arange(y1,yN+1)})
@@ -785,6 +785,8 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, y1, yN,
     if stats2 is not None:
         if len(stats2) != 2:
             raise RuntimeError("len(stats2) != 2")
+        if stats_round is not None:
+            stats2 = np.round(stats2, stats_round)
         thisTitle += f" ({stats2[0]} → {stats2[1]})"
     
     ax_this.title.set_text(thisTitle)
@@ -978,11 +980,10 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
         print(f"Comparing to {this_obs}:")
         
         bias = cc.get_timeseries_bias(ydata_yield_dt[inds_sim,:], ydata_yield_dt[o,:], fig_caselist, weights=ydata_prod[o,:])
-        bias = np.round(bias, stats_round)
         if this_obs == obs_for_fig:
             bias0 = bias
         for i, casename in enumerate(fig_caselist[2:]):
-            print(f"   {thisCrop_clm} bias MM window={w} weighted {casename}: {bias[i]}")
+            print(f"   {thisCrop_clm} bias MM window={w} weighted {casename}: {np.round(bias[i], stats_round)}")
         
         # corrcoeff = [stats.linregress(ydata_yield[o,:], ydata_yield[x,:]) for x in np.arange(2, ydata_yield.shape[0])]
         # for i, casename in enumerate(fig_caselist[2:]):
@@ -1037,6 +1038,10 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
             ydata_prod_touse[s,:] = ydata_prod_shiftR[s,:]
             ydata_yield_touse[s,:] = ydata_yield_shiftR[s,:]
             ydata_yield_dt_touse[s,:] = ydata_yield_shiftR_dt[s,:]
+
+    # Get shifted bias
+    o = fig_caselist.index(obs_for_fig)
+    bias_shifted = cc.get_timeseries_bias(ydata_yield_dt_touse[inds_sim,:], ydata_yield_dt_touse[o,:], fig_caselist, weights=ydata_prod[o,:])
     
     # Make plots for this crop
     make_1crop_lines(ax_lines_area, ydata_area_touse, fig_caselist, thisCrop_clm, "Mha", plot_y1, plot_yN)
@@ -1047,14 +1052,14 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
     make_1crop_lines(ax_lines_prod_orig, ydata_prod, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
     make_1crop_lines(ax_lines_prod_shiftL, ydata_prod_shiftL, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
     make_1crop_lines(ax_lines_prod_shiftR, ydata_prod_shiftR, fig_caselist, thisCrop_clm, "Mt", plot_y1, plot_yN)
-    make_1crop_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
-    make_1crop_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
-    make_1crop_lines(ax_lines_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
-    make_1crop_lines(ax_lines_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
-    make_1crop_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
-    make_1crop_lines(ax_lines_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
-    make_1crop_lines(ax_lines_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
-    make_1crop_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0)
+    make_1crop_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0, stats_round=stats_round)
+    make_1crop_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round)
+    make_1crop_lines(ax_lines_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN)
+    make_1crop_lines(ax_lines_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN)
+    make_1crop_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias0, stats_round=stats_round)
+    make_1crop_lines(ax_lines_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round)
+    make_1crop_lines(ax_lines_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN)
+    make_1crop_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, "t/ha", plot_y1, plot_yN)
     
 # Finish up and save
 print("Finishing and saving...")
