@@ -1348,7 +1348,7 @@ def get_window_radius(w):
     return int((w-1) / 2)
 
 
-def get_yield(ds, min_viable_hui=1.0, mxmats=None, forAnnual=False, force_update=False):
+def get_yield(ds, min_viable_hui=None, mxmats=None, forAnnual=False, force_update=False):
     
     mxmat_limited = bool(mxmats)
     
@@ -1364,7 +1364,7 @@ def get_yield(ds, min_viable_hui=1.0, mxmats=None, forAnnual=False, force_update
         gddharv_var += "_PERHARV"
         gslen_var += "_PERHARV"
     
-    if yield_var in ds and not force_update:
+    if yield_var in ds and not force_update and all([x in ds[yield_var].attrs for x in ['min_viable_hui', 'mxmat_limited']]):
         if ds[yield_var].attrs['min_viable_hui'] == min_viable_hui and ds[yield_var].attrs['mxmat_limited'] == mxmat_limited:
             return ds
         elif 'locked_yield' in ds[yield_var].attrs and ds[yield_var].attrs['locked_yield']:
@@ -1373,14 +1373,27 @@ def get_yield(ds, min_viable_hui=1.0, mxmats=None, forAnnual=False, force_update
     ds[yield_var] = ds[grainc_var].copy()
     
     # Set yield to zero where minimum viable HUI wasn't reached
-    if min_viable_hui >= 0:
+    if min_viable_hui is not None:
+        
         huifrac = ds[huifrac_var].copy().values
         huifrac[np.where(ds[gddharv_var].values==0)] = 1
-        if np.any(huifrac < min_viable_hui):
+        if min_viable_hui == "isimip3" or min_viable_hui == "ggcmi3":
+            corn_value = 0.8
+            other_value = 0.9
+            min_viable_hui_touse = np.full_like(huifrac, fill_value=other_value)
+            for veg_str in np.unique(ds.patches1d_itype_veg_str.values):
+                if "corn" not in veg_str:
+                    continue
+                patch_index = list(ds.patches1d_itype_veg_str.dims).index("patch")
+                is_thistype = np.where((ds.patches1d_itype_veg_str.values == veg_str))[patch_index]
+                min_viable_hui_touse[is_thistype,:] = corn_value
+        else:
+            min_viable_hui_touse = min_viable_hui
+        if np.any(huifrac < min_viable_hui_touse):
             print(f"Setting yield to zero where minimum viable HUI ({min_viable_hui}) wasn't reached")
             tmp_da = ds[grainc_var]
             tmp = tmp_da.copy().values
-            tmp[np.where((huifrac < min_viable_hui) & (tmp > 0))] = 0
+            tmp[np.where((huifrac < min_viable_hui_touse) & (tmp > 0))] = 0
             ds[yield_var] = xr.DataArray(data = tmp,
                                         attrs = tmp_da.attrs,
                                         coords = tmp_da.coords)

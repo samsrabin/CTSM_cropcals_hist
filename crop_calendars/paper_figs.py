@@ -700,6 +700,7 @@ for i, x in enumerate(np.unique(countries.gadm0.values)):
 # %% Compare area, production, and yield of individual crops
 
 min_viable_hui = 1.0
+# min_viable_hui = "ggcmi3"
 
 mxmat_limited = False
 # mxmat_limited = True
