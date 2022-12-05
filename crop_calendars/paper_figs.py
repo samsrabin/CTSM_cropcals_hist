@@ -33,6 +33,7 @@ import matplotlib.colors as mcolors
 import glob
 import cartopy.crs as ccrs
 from matplotlib import cm
+from matplotlib import collections as mplcollections
 import datetime as dt
 import re
 import importlib
@@ -815,6 +816,8 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlab
             color = cm.Dark2(i)
         plt.sca(ax_this)
         plt.scatter(xdata, ydata_this[i,:], color=color, s=100, alpha=0.8)
+        m, b = np.polyfit(xdata, ydata_this[i,:], 1)
+        plt.plot(xdata, m*xdata+b, color=color)
     
     thisTitle = thisCrop_clm
     if stats2 is not None:
@@ -868,7 +871,10 @@ def finishup_allcrops_scatter(c, ny, nx, axes_this, f_this, suptitle, outDir_fig
                     x = 0.1, horizontalalignment = 'left',
                     fontsize=24)
     
-    f_this.legend(handles = axes_this[0].get_children(),
+    # Get the handles of just the points (i.e., not including regression lines)    
+    legend_handles = [x for x in axes_this[0].get_children() if isinstance(x, mplcollections.PathCollection)]
+    
+    f_this.legend(handles = legend_handles,
                   labels = [fig_caselist[x] for x in inds_sim],
                   loc = "upper center",
                   ncol = int(np.floor(len(fig_caselist)/4))+1,
