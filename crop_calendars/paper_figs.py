@@ -768,7 +768,7 @@ if mxmat_limited:
 else:
     mxmats_tmp = None
     
-def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel, y1, yN, stats2=None, stats_round=None):
+def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel, y1, yN, stats2=None, stats_round=None, shift_symbols=None):
     da = xr.DataArray(data = ydata_this,
                             coords = {'Case': caselist,
                                       xlabel: np.arange(y1,yN+1)})
@@ -799,7 +799,10 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
             raise RuntimeError("len(stats2) != 2")
         if stats_round is not None:
             stats2 = np.round(stats2, stats_round)
-        thisTitle += f" ({stats2[0]} → {stats2[1]})"
+        if shift_symbols is None:
+            thisTitle += f" ({stats2[0]} → {stats2[1]})"
+        else:
+            thisTitle += f" ({shift_symbols[0]}{stats2[0]} → {shift_symbols[1]}{stats2[1]})"
     
     ax_this.title.set_text(thisTitle)
     ax_this.title.set_size(32)
@@ -809,7 +812,7 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
     if ax_this.get_legend():
         ax_this.get_legend().remove()
 
-def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlabel, equalize_scatter_axes, stats2=None, stats_round=None):
+def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlabel, equalize_scatter_axes, stats2=None, stats_round=None, shift_symbols=None):
     
     for i, casename in enumerate(caselist):
         if i==2:
@@ -835,7 +838,10 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlab
             raise RuntimeError("len(stats2) != 2")
         if stats_round is not None:
             stats2 = np.round(stats2, stats_round)
-        thisTitle += f" ({stats2[0]} → {stats2[1]})"
+        if shift_symbols is None:
+            thisTitle += f" ({stats2[0]} → {stats2[1]})"
+        else:
+            thisTitle += f" ({shift_symbols[0]}{stats2[0]} → {shift_symbols[1]}{stats2[1]})"
     
     ax_this.title.set_text(thisTitle)
     ax_this.title.set_size(32)
@@ -1108,6 +1114,7 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
     ydata_yield_touse = ydata_yield.copy()
     ydata_yield_dt_touse = ydata_yield_dt.copy()
     corrcoef_ref_touse = corrcoef_ref.copy()
+    shift_symbols = []
     for i,s in enumerate(inds_sim):
         Lshift_better = corrcoefL_ref[i] >= 0.3 + corrcoef_ref[i]
         Rshift_better = corrcoefR_ref[i] >= 0.3 + corrcoef_ref[i]
@@ -1123,6 +1130,7 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
             ydata_yield_touse[s,:] = ydata_yield_shiftL[s,:]
             ydata_yield_dt_touse[s,:] = ydata_yield_shiftL_dt[s,:]
             corrcoef_ref_touse[i] = corrcoefL_ref[i]
+            shift_symbols.append("$^L$")
         elif Rshift_better:
             print(f"Shifting {fig_caselist[s]} sim yield 1 year right")
             ydata_area_touse[s,:] = ydata_area_shiftR[s,:]
@@ -1130,6 +1138,9 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
             ydata_yield_touse[s,:] = ydata_yield_shiftR[s,:]
             ydata_yield_dt_touse[s,:] = ydata_yield_shiftR_dt[s,:]
             corrcoef_ref_touse[i] = corrcoefR_ref[i]
+            shift_symbols.append("$^R$")
+        else:
+            shift_symbols.append("")
 
     # Get shifted bias
     o = fig_caselist.index(obs_for_fig)
@@ -1146,21 +1157,23 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
             xlabel = "Year"
         else:
             xlabel = f"Obs year, sim {yield_time_dim.lower()}"
-        make_1crop_lines(ax_lines_prod, ydata_prod_touse, fig_caselist, thisCrop_clm, "Mt", xlabel, plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_prod_orig, ydata_prod, fig_caselist, thisCrop_clm, "Mt", xlabel, plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_prod_shiftL, ydata_prod_shiftL, fig_caselist, thisCrop_clm, "Mt", xlabel, plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_prod_shiftR, ydata_prod_shiftR, fig_caselist, thisCrop_clm, "Mt", xlabel, plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=stats_round)
-        make_1crop_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round)
-        make_1crop_lines(ax_lines_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=stats_round)
-        make_1crop_lines(ax_lines_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round)
-        make_1crop_lines(ax_lines_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN)
-        make_1crop_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN)
+        noshift_symbols = ["", ""]
+        shiftL_symbols = ["$^L$", "$^L$"]
+        shiftR_symbols = ["$^R$", "$^R$"]
+        make_1crop_lines(ax_lines_prod, ydata_prod_touse, fig_caselist, thisCrop_clm, "Mt", xlabel, plot_y1, plot_yN, shift_symbols=shift_symbols)
+        make_1crop_lines(ax_lines_prod_orig, ydata_prod, fig_caselist, thisCrop_clm, "Mt", xlabel, plot_y1, plot_yN, shift_symbols=noshift_symbols)
+        make_1crop_lines(ax_lines_prod_shiftL, ydata_prod_shiftL, fig_caselist, thisCrop_clm, "Mt", xlabel, plot_y1, plot_yN, shift_symbols=shiftL_symbols)
+        make_1crop_lines(ax_lines_prod_shiftR, ydata_prod_shiftR, fig_caselist, thisCrop_clm, "Mt", xlabel, plot_y1, plot_yN, shift_symbols=shiftR_symbols)
+        make_1crop_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=stats_round, shift_symbols=shift_symbols)
+        make_1crop_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round, shift_symbols=noshift_symbols)
+        make_1crop_lines(ax_lines_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, shift_symbols=shiftL_symbols)
+        make_1crop_lines(ax_lines_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, shift_symbols=shiftR_symbols)
+        make_1crop_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=stats_round, shift_symbols=shift_symbols)
+        make_1crop_lines(ax_lines_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round, shift_symbols=noshift_symbols)
+        make_1crop_lines(ax_lines_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, shift_symbols=shiftL_symbols)
+        make_1crop_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, shift_symbols=shiftR_symbols)
         # Scatter plots
-        make_1crop_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, "t/ha", 
-                           equalize_scatter_axes, stats2=corrcoef_ref_touse, stats_round=stats_round)
+        make_1crop_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, "t/ha", equalize_scatter_axes, stats2=corrcoef_ref_touse, stats_round=stats_round, shift_symbols=shift_symbols)
         
 # Finish up and save
 if not noFigs:
