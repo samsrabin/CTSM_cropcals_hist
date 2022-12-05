@@ -704,6 +704,9 @@ min_viable_hui = 1.0
 mxmat_limited = False
 # mxmat_limited = True
 
+# Equalize axes of scatter plots?
+equalize_scatter_axes = False
+
 # extra = "Total (no sgc)"
 extra = "Total (grains only)"
 
@@ -806,7 +809,7 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
     if ax_this.get_legend():
         ax_this.get_legend().remove()
 
-def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlabel, stats2=None, stats_round=None):
+def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlabel, equalize_scatter_axes, stats2=None, stats_round=None):
     
     for i, casename in enumerate(caselist):
         if i==2:
@@ -818,6 +821,13 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlab
         plt.scatter(xdata, ydata_this[i,:], color=color, s=100, alpha=0.8)
         m, b = np.polyfit(xdata, ydata_this[i,:], 1)
         plt.plot(xdata, m*xdata+b, color=color)
+    
+    if equalize_scatter_axes:
+        xlim = ax_this.get_xlim()
+        ylim = ax_this.get_ylim()
+        newlim = [min(xlim[0], ylim[0]), max(xlim[1], ylim[1])]
+        ax_this.set_xlim(newlim)
+        ax_this.set_ylim(newlim)
     
     thisTitle = thisCrop_clm
     if stats2 is not None:
@@ -1150,8 +1160,8 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
         make_1crop_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN)
         # Scatter plots
         make_1crop_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, "t/ha", 
-                           stats2=corrcoef_ref_touse, stats_round=stats_round)
-
+                           equalize_scatter_axes, stats2=corrcoef_ref_touse, stats_round=stats_round)
+        
 # Finish up and save
 if not noFigs:
     print("Finishing and saving...")
