@@ -786,6 +786,10 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
         elif i==4:
             # Purple more distinct from my light gray
             color = [x/255 for x in [133, 92, 255]]
+        elif casename == "CLM Default":
+            color = [x/255 for x in [92, 219, 219]]
+        elif casename == "Prescribed Calendars":
+            color = [x/255 for x in [250, 102, 240]]
         else:
             color = cm.Dark2(i-2)
         if casename == "CLM Default" and "Original baseline" in caselist:
@@ -818,7 +822,11 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
 def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlabel, equalize_scatter_axes, stats2=None, stats_round=None, shift_symbols=None):
     
     for i, casename in enumerate(caselist):
-        if i==2:
+        if casename == "CLM Default":
+            color = [x/255 for x in [92, 219, 219]]
+        elif casename == "Prescribed Calendars":
+            color = [x/255 for x in [250, 102, 240]]
+        elif i==2:
             # Purple more distinct from my light gray
             color = [x/255 for x in [133, 92, 255]]
         else:
