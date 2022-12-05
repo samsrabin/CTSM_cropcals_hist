@@ -751,7 +751,7 @@ if not noFigs:
     f_lines_yield_dt_shiftL, axes_lines_yield_dt_shiftL = get_figs_axes(ny, nx, figsize)
     f_lines_yield_dt_shiftR, axes_lines_yield_dt_shiftR = get_figs_axes(ny, nx, figsize)
     f_lines_yield_dt, axes_lines_yield_dt = get_figs_axes(ny, nx, figsize)
-    # f_scatter_yield_dt, axes_scatter_yield_dt = get_figs_axes(ny, nx, figsize)
+    f_scatter_yield_dt, axes_scatter_yield_dt = get_figs_axes(ny, nx, figsize)
 
 fig_caselist = ["FAOSTAT"]
 this_earthstat_res = "f09_g17"
@@ -805,6 +805,33 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
     if ax_this.get_legend():
         ax_this.get_legend().remove()
 
+def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlabel, stats2=None, stats_round=None):
+    
+    for i, casename in enumerate(caselist):
+        if i==2:
+            # Purple more distinct from my light gray
+            color = [x/255 for x in [133, 92, 255]]
+        else:
+            color = cm.Dark2(i)
+        ax_this.scatter(xdata, ydata_this[i,:], color=color)
+    
+    thisTitle = thisCrop_clm
+    if stats2 is not None:
+        if len(stats2) != 2:
+            raise RuntimeError("len(stats2) != 2")
+        if stats_round is not None:
+            stats2 = np.round(stats2, stats_round)
+        thisTitle += f" ({stats2[0]} → {stats2[1]})"
+    
+    ax_this.title.set_text(thisTitle)
+    ax_this.title.set_size(32)
+    ax_this.tick_params(axis='both', which='major', labelsize=20)
+    ax_this.set_xlabel(axlabel, fontsize=24)
+    ax_this.set_ylabel(axlabel, fontsize=24)
+    if ax_this.get_legend():
+        ax_this.get_legend().remove()
+
+
 def finishup_allcrops_lines(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, mxmat_limited):
     # Delete unused axes, if any
     for a in np.arange(c+1, ny*nx):
@@ -827,6 +854,30 @@ def finishup_allcrops_lines(c, ny, nx, axes_this, f_this, suptitle, outDir_figs,
                    bbox_inches='tight')
     plt.close(f_this)
 
+
+def finishup_allcrops_scatter(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, mxmat_limited):
+    # Delete unused axes, if any
+    for a in np.arange(c+1, ny*nx):
+        f_this.delaxes(axes_this[a])
+        
+    if mxmat_limited:
+        suptitle += " (limited season length)"
+        
+    f_this.suptitle(suptitle,
+                    x = 0.1, horizontalalignment = 'left',
+                    fontsize=24)
+    
+    f_this.legend(handles = axes_this[0].get_children(),
+                  labels = [fig_caselist[x] for x in inds_sim],
+                  loc = "upper center",
+                  ncol = int(np.floor(len(fig_caselist)/4))+1,
+                  fontsize=28)
+
+    f_this.savefig(outDir_figs + "Scatter " + suptitle + " by crop.pdf",
+                   bbox_inches='tight')
+    plt.close(f_this)
+
+
 for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
     is_obs = []
     
@@ -848,7 +899,7 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
         ax_lines_yield_dt_shiftL = axes_lines_yield_dt_shiftL[c]
         ax_lines_yield_dt_shiftR = axes_lines_yield_dt_shiftR[c]
         ax_lines_yield_dt = axes_lines_yield_dt[c]
-        # ax_scatter_yield_dt = axes_scatter_yield_dt[c]
+        ax_scatter_yield_dt = axes_scatter_yield_dt[c]
     
     # FAOSTAT
     is_obs.append(True)
@@ -1039,6 +1090,7 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
     ydata_prod_touse = ydata_prod.copy()
     ydata_yield_touse = ydata_yield.copy()
     ydata_yield_dt_touse = ydata_yield_dt.copy()
+    corrcoef_ref_touse = corrcoef_ref.copy()
     for i,s in enumerate(inds_sim):
         Lshift_better = corrcoefL_ref[i] >= 0.3 + corrcoef_ref[i]
         Rshift_better = corrcoefR_ref[i] >= 0.3 + corrcoef_ref[i]
@@ -1053,12 +1105,14 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
             ydata_prod_touse[s,:] = ydata_prod_shiftL[s,:]
             ydata_yield_touse[s,:] = ydata_yield_shiftL[s,:]
             ydata_yield_dt_touse[s,:] = ydata_yield_shiftL_dt[s,:]
+            corrcoef_ref_touse[i] = corrcoefL_ref[i]
         elif Rshift_better:
             print(f"Shifting {fig_caselist[s]} sim yield 1 year right")
             ydata_area_touse[s,:] = ydata_area_shiftR[s,:]
             ydata_prod_touse[s,:] = ydata_prod_shiftR[s,:]
             ydata_yield_touse[s,:] = ydata_yield_shiftR[s,:]
             ydata_yield_dt_touse[s,:] = ydata_yield_shiftR_dt[s,:]
+            corrcoef_ref_touse[i] = corrcoefR_ref[i]
 
     # Get shifted bias
     o = fig_caselist.index(obs_for_fig)
@@ -1088,8 +1142,8 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
         make_1crop_lines(ax_lines_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN)
         make_1crop_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN)
         # Scatter plots
-        # make_1crop_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, "t/ha", xlabel, plot_y1, plot_yN, 
-        #                    stats2=corrcoef_ref, stats_round=stats_round)
+        make_1crop_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, "t/ha", 
+                           stats2=corrcoef_ref_touse, stats_round=stats_round)
 
 # Finish up and save
 if not noFigs:
@@ -1110,6 +1164,7 @@ if not noFigs:
     finishup_allcrops_lines(c, ny, nx, axes_lines_yield_dt_orig, f_lines_yield_dt_orig, "Global crop yield (detrended) no-shift", outDir_figs, mxmat_limited)
     finishup_allcrops_lines(c, ny, nx, axes_lines_yield_dt_shiftL, f_lines_yield_dt_shiftL, "Global crop yield (detrended) shiftL", outDir_figs, mxmat_limited)
     finishup_allcrops_lines(c, ny, nx, axes_lines_yield_dt_shiftR, f_lines_yield_dt_shiftR, "Global crop yield (detrended) shiftR", outDir_figs, mxmat_limited)
+    finishup_allcrops_scatter(c, ny, nx, axes_scatter_yield_dt, f_scatter_yield_dt, "Global crop yield (detrended)", outDir_figs, mxmat_limited)
 
 print("Done.")
 
