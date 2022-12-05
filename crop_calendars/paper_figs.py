@@ -813,7 +813,8 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlab
             color = [x/255 for x in [133, 92, 255]]
         else:
             color = cm.Dark2(i)
-        ax_this.scatter(xdata, ydata_this[i,:], color=color)
+        plt.sca(ax_this)
+        plt.scatter(xdata, ydata_this[i,:], color=color, s=100, alpha=0.8)
     
     thisTitle = thisCrop_clm
     if stats2 is not None:
