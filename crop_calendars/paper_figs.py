@@ -1098,9 +1098,11 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
 
     # Get detrended data
     r = cc.get_window_radius(w)
-    if w <= 0:
+    if w == 0:
         ydata_yield_dt = signal.detrend(ydata_yield, axis=1) + np.mean(ydata_yield, axis=1, keepdims=True)
         yearList_shifted_dt = yearList_shifted
+    elif w==-1:
+        raise RuntimeError("Specify w ≥ 0")
     else:
         ydata_yield_dt = cc.christoph_detrend(ydata_yield, w)
         ydata_yield_shiftL_dt = cc.christoph_detrend(ydata_yield_shiftL, w)
