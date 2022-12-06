@@ -755,8 +755,8 @@ equalize_scatter_axes = False
 # extra = "Total (no sgc)"
 extra = "Total (grains only)"
 
-# Window width for detrending (-1 for no detrending)
 w = 5
+# Window width for detrending (0 for signal.detrend())
 
 # Rounding precision for stats
 stats_round = 3
@@ -1097,17 +1097,19 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
     ydata_yield = ydata_yield[:,1:-1]
 
     # Get detrended data
-    r = cc.get_window_radius(w)
     if w == 0:
+        r = 1
         ydata_yield_dt = signal.detrend(ydata_yield, axis=1) + np.mean(ydata_yield, axis=1, keepdims=True)
-        yearList_shifted_dt = yearList_shifted
+        ydata_yield_shiftL_dt = signal.detrend(ydata_yield_shiftL, axis=1) + np.mean(ydata_yield, axis=1, keepdims=True)
+        ydata_yield_shiftR_dt = signal.detrend(ydata_yield_shiftR, axis=1) + np.mean(ydata_yield, axis=1, keepdims=True)
     elif w==-1:
         raise RuntimeError("Specify w ≥ 0")
     else:
+        r = cc.get_window_radius(w)
         ydata_yield_dt = cc.christoph_detrend(ydata_yield, w)
         ydata_yield_shiftL_dt = cc.christoph_detrend(ydata_yield_shiftL, w)
         ydata_yield_shiftR_dt = cc.christoph_detrend(ydata_yield_shiftR, w)
-        yearList_shifted_dt = yearList_shifted[r:-r]
+    yearList_shifted_dt = yearList_shifted[r:-r]
     ydata_yield_sdt = signal.detrend(ydata_yield, axis=1) + np.mean(ydata_yield, axis=1, keepdims=True)
     
     # Restrict non-detrended data to years of interest
