@@ -1424,17 +1424,17 @@ def get_yield(ds, min_viable_hui=None, mxmats=None, forAnnual=False, force_updat
     return ds
             
 
-def get_yield_ann(ds, min_viable_hui=1.0, mxmats=None):
+def get_yield_ann(ds, min_viable_hui=1.0, mxmats=None, force_update=False):
     
     mxmat_limited = bool(mxmats)
     
-    if 'YIELD_ANN' in ds:
+    if 'YIELD_ANN' in ds and not force_update:
         if ds['YIELD_ANN'].attrs['min_viable_hui'] == min_viable_hui and ds['YIELD_ANN'].attrs['mxmat_limited'] == mxmat_limited:
             return ds
         elif 'locked_yield' in ds['YIELD_ANN'].attrs and ds['YIELD_ANN'].attrs['locked_yield']:
             return ds
     
-    ds = get_yield(ds, min_viable_hui=min_viable_hui, mxmats=mxmats, forAnnual=True)
+    ds = get_yield(ds, min_viable_hui=min_viable_hui, mxmats=mxmats, forAnnual=True, force_update=force_update)
     
     tmp = ds["YIELD_PERHARV"].sum(dim='mxharvests', skipna=True).values
     grainc_to_food_ann_orig = ds["GRAINC_TO_FOOD_ANN"]

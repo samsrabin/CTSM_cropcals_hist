@@ -1059,7 +1059,7 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
             case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp)
             yieldVar = "YIELD_ANN"
         else:
-            case['ds'] = cc.get_yield(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp, force_update=True)
+            case['ds'] = cc.get_yield(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp)
             yieldVar = "YIELD"
         case['ds']['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da2(case['ds'], lu_ds, yieldVar, cropList_combined_clm)
         if thisCrop_clm == "Total (no sgc)":
