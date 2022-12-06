@@ -1641,6 +1641,9 @@ print('Done making maps.')
 # %% Make maps of harvest reasons
 importlib.reload(cc)
 
+plot_gs1 = 1980
+plot_gsN = 2009
+
 thisVar = "HARVEST_REASON"
 reason_list_text_all = cc.get_reason_list_text()
 
@@ -1653,6 +1656,8 @@ for i, (casename, case) in enumerate(cases.items()):
             np.unique(case['ds'][thisVar].values))))
 reason_list = [int(x) for x in reason_list if not np.isnan(x)]
 reason_list_text = [reason_list_text_all[x] for x in reason_list]
+
+plot_Ngs = plot_gsN - plot_gs1 + 1
 
 ny = 2
 nx = len(reason_list)
@@ -1696,14 +1701,14 @@ for v, vegtype_str in enumerate(clm_types_rfir):
     
     for i, (casename, case) in enumerate(cases.items()):
         # Grid
-        thisCrop_gridded = utils.grid_one_variable(case['ds'], thisVar, \
+        thisCrop_gridded = utils.grid_one_variable(case['ds'].sel(gs=slice(plot_gs1, plot_gsN)), thisVar, \
             vegtype=vegtype_int).squeeze(drop=True)
         
         # Map each reason's frequency
         for f, reason in enumerate(reason_list):
             reason_text = reason_list_text[f]
             
-            map_yx = cc.get_reason_freq_map(Ngs, thisCrop_gridded, reason)
+            map_yx = cc.get_reason_freq_map(plot_Ngs, thisCrop_gridded, reason)
             ax = cc.make_axis(fig, ny, nx, i*nx + f+1)
             axes.append(ax)
             im0 = make_map(ax, map_yx, fontsize, cmap=cmap, bounds=bounds, extend_bounds=extend, linewidth=0.3)
@@ -1731,7 +1736,7 @@ for v, vegtype_str in enumerate(clm_types_rfir):
         axes[a].set_ylabel(caselist[i], fontsize=fontsize['titles'])
         axes[a].yaxis.set_label_coords(-0.05, 0.5)
 
-    suptitle = f"Harvest reason: {vegtype_str_title} ({gs1}-{gsN} growing seasons)"
+    suptitle = f"Harvest reason: {vegtype_str_title} ({plot_gs1}-{plot_gsN} growing seasons)"
     fig.suptitle(suptitle, fontsize=fontsize['titles']*1.2, fontweight="bold")
     fig.subplots_adjust(bottom=cbar_adj_bottom)
      
