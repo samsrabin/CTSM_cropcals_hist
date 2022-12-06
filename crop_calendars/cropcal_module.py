@@ -1384,9 +1384,15 @@ def get_yield(ds, min_viable_hui=None, mxmats=None, forAnnual=False, force_updat
             for veg_str in np.unique(ds.patches1d_itype_veg_str.values):
                 if "corn" not in veg_str:
                     continue
-                patch_index = list(ds.patches1d_itype_veg_str.dims).index("patch")
-                is_thistype = np.where((ds.patches1d_itype_veg_str.values == veg_str))[patch_index]
-                min_viable_hui_touse[is_thistype,:] = corn_value
+                is_thistype = np.where((ds.patches1d_itype_veg_str.values == veg_str))[0]
+                patch_index = list(ds[huifrac_var].dims).index("patch")
+                if patch_index == 0:
+                    min_viable_hui_touse[is_thistype,...] = corn_value
+                elif patch_index == ds[huifrac_var].ndim - 1:
+                    min_viable_hui_touse[...,is_thistype] = corn_value
+                else:
+                    # Need patch to be either first or last dimension to allow use of ellipses
+                    raise RuntimeError(f"Temporarily rearrange min_viable_hui_touse so that patch dimension is first (0) or last ({ds[huifrac_var].ndim - 1}), instead of {patch_index}.")
         else:
             min_viable_hui_touse = min_viable_hui
         if np.any(huifrac < min_viable_hui_touse):
