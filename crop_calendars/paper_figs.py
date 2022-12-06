@@ -90,10 +90,10 @@ def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_typ
     return this_map, time_dim
 
 
-def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend='both', vmin=None, vmax=None, cbar=None): 
+def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend_bounds='both', vmin=None, vmax=None, cbar=None, ticklabels=None, extend_nonbounds='both'): 
     
     if bounds:
-        norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend)
+        norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend_bounds)
         im = ax.pcolormesh(this_map.lon.values, this_map.lat.values,
                            this_map, shading="auto",
                            norm=norm,
@@ -114,7 +114,9 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
     if show_cbar:
         if cbar:
             cbar.remove()
-        cbar = plt.colorbar(im, ax=ax, orientation="horizontal", fraction=0.1, pad=0.02)
+        cbar = plt.colorbar(im, ax=ax, orientation="horizontal", fraction=0.1, pad=0.02, extend=extend_nonbounds)
+        if ticklabels is not None:
+            cbar.set_ticks(ticklabels)
         cbar.set_label(label=units, fontsize=fontsize['axislabels'])
         cbar.ax.tick_params(labelsize=fontsize['ticklabels'])
      
@@ -152,13 +154,25 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
     else:
         return im, None
 
-def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None):
+def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False):
     for i, casename in enumerate(fig_caselist):
         
         plotting_diffs = ref_casename and casename != ref_casename
+        cmap_to_use = None
         if plotting_diffs and not new_axes:
-            continue
-        
+            vmin_to_use = diff_vmin
+            vmax_to_use = diff_vmax
+            Ncolors_to_use = diff_Ncolors
+            cmap_to_use = diff_cmap
+            ticklabels_to_use = diff_ticklabels
+        else:
+            vmin_to_use = vmin
+            vmax_to_use = vmax
+            Ncolors_to_use = Ncolors
+            if not new_axes:
+                cmap_to_use = abs_cmap
+            ticklabels_to_use = None
+            
         if casename == "rx":
             time_dim = "time"
             these_rx_vars = ["gs1_" + str(x) for x in utils.vegtype_str2int(found_types)]
@@ -204,7 +218,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 else:
                     cmap = diverging_map
                     
-                vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
+                vrange = [-165, 165]
                 units = "days"
             else:
                 if abs_cmap:
@@ -213,9 +227,9 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                     cmap = 'twilight_shifted'
                 vrange = [1, 365]
                 if vmin != None:
-                    vrange[0] = vmin
+                    vrange[0] = vmin_to_use
                 if vmax != None:
-                    vrange[1] = vmax
+                    vrange[1] = vmax_to_use
         else:
             if time_dim in this_map.dims:
                 this_map = this_map.mean(dim=time_dim)
@@ -226,8 +240,11 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                     cmap = diff_cmap
                 else:
                     cmap = diverging_map
-                    
-                vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
+                
+                if new_axes:
+                    vrange = list(np.nanmax(np.abs(this_map.values)) * np.array([-1,1]))
+                else:
+                    vrange = None
             else:
                 if abs_cmap:
                     cmap = abs_cmap
@@ -238,8 +255,8 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
         if casename == ref_casename:
             refcase_map = this_map.copy()
             
-        if Ncolors:
-            cmap = cm.get_cmap(cmap, Ncolors)
+        if Ncolors and cmap_to_use is None:
+            cmap_to_use = cm.get_cmap(cmap, Ncolors_to_use)
                 
         cbar_units = units
         if plotting_diffs:
@@ -260,7 +277,18 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
             ax = axes[i*2]
             cb = cbs[i*2]
         thisCrop = thisCrop_main
-        im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize, units=cbar_units, cmap=cmap, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin, vmax=vmax, cbar=cb)
+        this_map_sel = this_map.copy().sel(ivt_str=thisCrop)
+        if plotting_diffs and not new_axes and force_diffmap_within_vrange:
+            this_map_sel_vals = this_map_sel.copy().values
+            this_map_sel_vals[np.where(this_map_sel_vals < diff_vmin)] = diff_vmin
+            this_map_sel_vals[np.where(this_map_sel_vals > diff_vmax)] = diff_vmax
+            this_map_sel = xr.DataArray(data=this_map_sel_vals,
+                                        coords=this_map_sel.coords,
+                                        attrs=this_map_sel.attrs)
+            extend = "both"
+        else:
+            extend = "neither"
+        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend)
         if new_axes:
             ims.append(im)
             cbs.append(cb)
@@ -277,7 +305,18 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
             ax = axes[i*2 + 1]
             cb = cbs[i*2 + 1]
         thisCrop = "irrigated_" + thisCrop_main
-        im, cb = make_map(ax, this_map.sel(ivt_str=thisCrop), fontsize, units=cbar_units, cmap=cmap, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin, vmax=vmax, cbar=cb)
+        this_map_sel = this_map.copy().sel(ivt_str=thisCrop)
+        if plotting_diffs and not new_axes and force_diffmap_within_vrange:
+            this_map_sel_vals = this_map_sel.copy().values
+            this_map_sel_vals[np.where(this_map_sel_vals < diff_vmin)] = diff_vmin
+            this_map_sel_vals[np.where(this_map_sel_vals > diff_vmax)] = diff_vmax
+            this_map_sel = xr.DataArray(data=this_map_sel_vals,
+                                        coords=this_map_sel.coords,
+                                        attrs=this_map_sel.attrs)
+            extend = "both"
+        else:
+            extend = "neither"
+        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend)
         if new_axes:
             ims.append(im)
             cbs.append(cb)
@@ -702,6 +741,7 @@ for i, x in enumerate(np.unique(countries.gadm0.values)):
 
 
 # %% Compare area, production, and yield of individual crops
+importlib.reload(cc)
 
 min_viable_hui = 1.0
 # min_viable_hui = "ggcmi3"
@@ -1091,6 +1131,8 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
     bias0 = None
     for o in inds_obs:
         this_obs = fig_caselist[o]
+        if this_obs != obs_for_fig:
+            continue
         print(f"Comparing to {this_obs}:")
         
         bias = cc.get_timeseries_bias(ydata_yield_dt[inds_sim,:], ydata_yield_dt[o,:], fig_caselist, weights=ydata_prod[o,:])
@@ -1236,8 +1278,8 @@ mxmat_limited = True
 
 # Define reference case, if you want to plot differences
 # ref_casename = None
-ref_casename = 'CLM Default'
-# ref_casename = 'rx'
+# ref_casename = 'CLM Default'
+ref_casename = 'rx'
 
 overwrite = True
 
@@ -1245,46 +1287,46 @@ plot_y1 = 1980
 plot_yN = 2010
 
 varList = {
-    'GDDHARV': {
-        'suptitle':   'Mean harvest requirement',
-        'time_dim':   'gs',
-        'units':      'GDD',
-        'multiplier': 1},
-    'YIELD_ANN': {
-        'suptitle':   'Mean annual yield',
-        'time_dim':   'time',
-        'units':      't/ha',
-        'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
-    'PROD_ANN': {
-        'suptitle':   'Mean annual production',
-        'time_dim':   'time',
-        'units':      'Mt',
-        'multiplier': 1e-12}, # g to Mt
+    # 'GDDHARV': {
+    #     'suptitle':   'Mean harvest requirement',
+    #     'time_dim':   'gs',
+    #     'units':      'GDD',
+    #     'multiplier': 1},
+    # 'YIELD_ANN': {
+    #     'suptitle':   'Mean annual yield',
+    #     'time_dim':   'time',
+    #     'units':      't/ha',
+    #     'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
+    # 'PROD_ANN': {
+    #     'suptitle':   'Mean annual production',
+    #     'time_dim':   'time',
+    #     'units':      'Mt',
+    #     'multiplier': 1e-12}, # g to Mt
     'GSLEN': {
         'suptitle':   'Mean growing season length',
         'time_dim':   'gs',
         'units':      'days',
         'multiplier': 1},
-    'HDATES': {
-        'suptitle':   'Mean harvest date',
-        'time_dim':   'gs',
-        'units':      'day of year',
-        'multiplier': 1},
-    'HUI': {
-        'suptitle':   'Mean HUI at harvest',
-        'time_dim':   'gs',
-        'units':      'GDD',
-        'multiplier': 1},
-    'HUIFRAC': {
-        'suptitle':   'Mean HUI at harvest (fraction of required)',
-        'time_dim':   'gs',
-        'units':      'Fraction of required',
-        'multiplier': 1},
-    'SDATES': {
-        'suptitle':   'Mean sowing date',
-        'time_dim':   'gs',
-        'units':      'day of year',
-        'multiplier': 1},
+    # 'HDATES': {
+    #     'suptitle':   'Mean harvest date',
+    #     'time_dim':   'gs',
+    #     'units':      'day of year',
+    #     'multiplier': 1},
+    # 'HUI': {
+    #     'suptitle':   'Mean HUI at harvest',
+    #     'time_dim':   'gs',
+    #     'units':      'GDD',
+    #     'multiplier': 1},
+    # 'HUIFRAC': {
+    #     'suptitle':   'Mean HUI at harvest (fraction of required)',
+    #     'time_dim':   'gs',
+    #     'units':      'Fraction of required',
+    #     'multiplier': 1},
+    # 'SDATES': {
+    #     'suptitle':   'Mean sowing date',
+    #     'time_dim':   'gs',
+    #     'units':      'day of year',
+    #     'multiplier': 1},
 }
 
 nx = 2
@@ -1320,7 +1362,7 @@ for (this_var, var_info) in varList.items():
     if ("YIELD" in this_var or "PROD" in this_var) and ref_casename:
         diff_cmap = "BrBG"
     else:
-        diff_cmap = None
+        diff_cmap = "PiYG_r"
 
     # First, determine how many cases have this variable
     ny = 0
@@ -1427,6 +1469,9 @@ for (this_var, var_info) in varList.items():
 
     for thisCrop_main in clm_types:
         
+        if "rice" not in thisCrop_main:
+            continue
+        
         # Get the name we'll use in output text/filenames
         thisCrop_out = thisCrop_main
         if "soybean" in thisCrop_out and "tropical" not in thisCrop_out:
@@ -1501,26 +1546,62 @@ for (this_var, var_info) in varList.items():
             cb.set_label(units, fontsize=fontsize['titles'])
         
         # Chunk colorbar
-        cb2 = plt.colorbar(mappable=ims[0], ax=axes[0], location='bottom')
-        ticks_orig = cb2.get_ticks()
-        cb2.remove()
-        plt.draw()
-        Ncolors = len(ticks_orig)-1
-        if Ncolors <= 5:
-            Ncolors *= 2
-        if "DATES" in this_var:
-            vmin = 0
-            vmax = 400
-            cbar_ticklabels = [1, 50, 100, 150, 200, 250, 300, 350, 365]
+        def get_colorbar_chunks(im, ax, this_var, cmap_name, is_diff):
+            force_diffmap_within_vrange = False
+            cb2 = plt.colorbar(mappable=im, ax=ax, location='bottom')
+            ticks_orig = cb2.get_ticks()
+            cb2.remove()
+            plt.draw()
+            Ncolors = len(ticks_orig)-1
+            if Ncolors <= 5:
+                Ncolors *= 2
+            if is_diff and Ncolors % 2 == 0:
+                Ncolors += 1
+            if is_diff:
+                if "DATES" in this_var:
+                    vmin = -165
+                    vmax = 165
+                    Ncolors = 11
+                    cbar_ticklabels = np.arange(vmin, vmax+1, 30)
+                    force_diffmap_within_vrange = True
+                elif this_var == "HUIFRAC":
+                    vmin = -0.9
+                    vmax = 0.9
+                    Ncolors = 9
+                    cbar_ticklabels = np.arange(vmin, vmax+0.01, 0.2)
+                    force_diffmap_within_vrange = True
+                else:
+                    cbar_width = max(ticks_orig) - min(ticks_orig)
+                    cbin_width = cbar_width / Ncolors
+                    vmax = cbin_width*Ncolors/2
+                    ceil_to_nearest = 10**np.floor(np.log10(vmax)-1)
+                    cbin_width = np.ceil(cbin_width / ceil_to_nearest)*ceil_to_nearest
+                    vmin = -cbin_width*Ncolors/2
+                    vmax = cbin_width*Ncolors/2
+                    cbar_ticklabels = np.arange(vmin, vmax+1, cbin_width)
+            elif "DATES" in this_var:
+                vmin = 0
+                vmax = 400
+                cbar_ticklabels = [1, 50, 100, 150, 200, 250, 300, 350, 365]
+            else:
+                vmin = min(ticks_orig)
+                vmax = max(ticks_orig)
+                cbar_ticklabels = None
+            if cmap_name:
+                this_cmap = cm.get_cmap(cmap_name, Ncolors)
+            else:
+                this_cmap = cm.get_cmap("viridis", Ncolors)
+            return vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange
+        vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[0], axes[0], this_var, abs_cmap, False)
+        if ref_casename:
+            diff_vmin, diff_vmax, diff_Ncolors, diff_this_cmap, diff_cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[2], axes[2], this_var, diff_cmap, True)
         else:
-            vmin = min(ticks_orig)
-            vmax = max(ticks_orig)
-            cbar_ticklabels = None
-        if abs_cmap:
-            this_cmap = cm.get_cmap(abs_cmap, Ncolors)
-        else:
-            this_cmap = cm.get_cmap("viridis", Ncolors)
-        units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap)
+            diff_vmin = None
+            diff_vmax = None
+            diff_Ncolors = None
+            diff_this_cmap = None
+            diff_cbar_ticklabels = None
+        units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange)
            
         # Redraw all-subplot colorbar 
         if not ref_casename:
@@ -1537,12 +1618,13 @@ for (this_var, var_info) in varList.items():
         
         plt.subplots_adjust(bottom=new_sp_bottom, left=new_sp_left)
         
-        # plt.show()
-        # break
+        plt.show()
+        break
         
         fig.savefig(fig_outfile,
                     bbox_inches='tight', facecolor='white', dpi=dpi)
         plt.close()
+    break
     
 print('Done making maps.')
 
@@ -1615,7 +1697,7 @@ for v, vegtype_str in enumerate(clm_types_rfir):
             map_yx = cc.get_reason_freq_map(Ngs, thisCrop_gridded, reason)
             ax = cc.make_axis(fig, ny, nx, i*nx + f+1)
             axes.append(ax)
-            im0 = make_map(ax, map_yx, fontsize, cmap=cmap, bounds=bounds, extend=extend, linewidth=0.3)
+            im0 = make_map(ax, map_yx, fontsize, cmap=cmap, bounds=bounds, extend_bounds=extend, linewidth=0.3)
                 
     # Add column labels
     topmost = np.arange(0, nx)
