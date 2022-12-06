@@ -70,8 +70,13 @@ def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_typ
     case = cases[casename]
     
     # Trim to included years
-    this_ds = case['ds'].sel({time_dim: slice(plot_y1, plot_yN)})
-    
+    try:
+        this_ds = case['ds'].sel({time_dim: slice(plot_y1, plot_yN)})
+    except:
+        # Try converting years to cftime
+        plot_y1 = cftime.DatetimeNoLeap(plot_y1, 1, 1)
+        plot_yN = cftime.DatetimeNoLeap(plot_yN, 1, 1)
+        this_ds = case['ds'].sel({time_dim: slice(plot_y1, plot_yN)})
     
     if this_var not in case['ds']:
         return xr.DataArray(), "continue"
