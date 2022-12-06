@@ -1446,7 +1446,7 @@ def get_yield_ann(ds, min_viable_hui=1.0, mxmats=None):
     # Save details
     ds["YIELD_ANN"].attrs['min_viable_hui'] = min_viable_hui
     ds["YIELD_ANN"].attrs['mxmat_limited'] = mxmat_limited
-    if 'locked_yield' in ds['YIELD'].attrs:
+    if 'locked_yield' in ds['YIELD_PERHARV'].attrs:
         ds["YIELD_ANN"].attrs['locked_yield'] = True
     
     return ds
