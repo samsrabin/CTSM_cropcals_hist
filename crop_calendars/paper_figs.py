@@ -65,10 +65,14 @@ fao_to_clm_dict = {"Maize": "Corn",
 
 plt.rc('font',**{'family':'sans-serif','sans-serif':['Arial']})
 
-def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_types):
+def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_types, plot_y1, plot_yN):
     time_dim = var_info['time_dim']
     case = cases[casename]
-    this_ds = case['ds']
+    
+    # Trim to included years
+    this_ds = case['ds'].sel({time_dim: slice(plot_y1, plot_yN)})
+    
+    
     if this_var not in case['ds']:
         return xr.DataArray(), "continue"
     elif ref_casename and ref_casename!="rx" and cases[ref_casename]['res'] != case['res']:
@@ -148,7 +152,7 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
     else:
         return im, None
 
-def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None):
+def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None):
     for i, casename in enumerate(fig_caselist):
         
         plotting_diffs = ref_casename and casename != ref_casename
@@ -165,12 +169,12 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 this_map = utils.grid_one_variable(this_ds, 'tmp')
                 
             # Apply LU mask
-            parent_map, parent_time_dim = get_non_rx_map(var_info, cases, rx_parent_casename, this_var, thisCrop_main, found_types)
+            parent_map, parent_time_dim = get_non_rx_map(var_info, cases, rx_parent_casename, this_var, thisCrop_main, found_types, plot_y1, plot_yN)
             if parent_time_dim == "continue":
                 raise RuntimeError("What should I do here?")
             this_map = this_map.where(~np.isnan(parent_map.mean(dim=parent_time_dim)))
         else:
-            this_map, time_dim = get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_types)
+            this_map, time_dim = get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_types, plot_y1, plot_yN)
             if time_dim == "continue":
                 continue
         c += 1
@@ -1237,6 +1241,9 @@ ref_casename = 'CLM Default'
 
 overwrite = True
 
+plot_y1 = 1980
+plot_yN = 2010
+
 varList = {
     'GDDHARV': {
         'suptitle':   'Mean harvest requirement',
@@ -1299,9 +1306,9 @@ else:
 for (this_var, var_info) in varList.items():
     
     if var_info['time_dim'] == "time":
-        yrange_str = f'{y1}-{yN}'
+        yrange_str = f'{plot_y1}-{plot_yN}'
     else:
-        yrange_str = f'{y1}-{yN-1} growing seasons'
+        yrange_str = f'{plot_y1}-{plot_yN-1} growing seasons'
     suptitle = var_info['suptitle'] + f' ({yrange_str})'
     
     print(f'Mapping {this_var}...')
@@ -1444,7 +1451,7 @@ for (this_var, var_info) in varList.items():
         ims = []
         axes = []
         cbs = []
-        units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, abs_cmap=abs_cmap, diff_cmap=diff_cmap)
+        units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, abs_cmap=abs_cmap, diff_cmap=diff_cmap)
 
         if ref_casename:
             extend = cc.equalize_colorbars(ims[:nx], this_var=this_var)
@@ -1513,7 +1520,7 @@ for (this_var, var_info) in varList.items():
             this_cmap = cm.get_cmap(abs_cmap, Ncolors)
         else:
             this_cmap = cm.get_cmap("viridis", Ncolors)
-        units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap)
+        units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap)
            
         # Redraw all-subplot colorbar 
         if not ref_casename:
