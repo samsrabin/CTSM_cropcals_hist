@@ -811,9 +811,8 @@ if not noFigs:
     f_scatter_yield_dt_shiftR, axes_scatter_yield_dt_shiftR = get_figs_axes(ny, nx, figsize)
 
 fig_caselist = ["FAOSTAT"]
-# this_earthstat_res = "f09_g17"
-# fig_caselist += [f"FAO EarthStat ({this_earthstat_res})"]
-fig_caselist += "EarthStat"
+this_earthstat_res = "f09_g17"
+fig_caselist += [f"EarthStat ({this_earthstat_res})"]
 for (casename, case) in cases.items():
     fig_caselist.append(casename)
 
