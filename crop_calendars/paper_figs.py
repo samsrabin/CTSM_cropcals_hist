@@ -1289,7 +1289,7 @@ print("Done.")
 abs_cmap_default = 'rainbow'
 
 # Yield settings
-min_viable_hui = 1.0
+min_viable_hui = "ggcmi3"
 mxmat_limited = True
 
 # Define reference case, if you want to plot differences
@@ -1497,6 +1497,8 @@ for (this_var, var_info) in varList.items():
         elif ref_casename:
             diff_txt = f" Diff {ref_casename}"
         fig_outfile = outDir_figs + "Map " + suptitle + diff_txt + f" {thisCrop_out}.png"
+        if any(x in this_var for x in ["YIELD", "PROD"]):
+            fig_outfile = fig_outfile.replace(".png", f" {min_viable_hui}-mat.png")
         if os.path.exists(fig_outfile) and not overwrite:
             print(f'    Skipping {thisCrop_out} (file exists).')
             continue
