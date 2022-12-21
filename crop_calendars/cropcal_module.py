@@ -1393,6 +1393,8 @@ def get_yield(ds, min_viable_hui=None, mxmats=None, forAnnual=False, force_updat
                 else:
                     # Need patch to be either first or last dimension to allow use of ellipses
                     raise RuntimeError(f"Temporarily rearrange min_viable_hui_touse so that patch dimension is first (0) or last ({ds[huifrac_var].ndim - 1}), instead of {patch_index}.")
+        elif isinstance(min_viable_hui, str):
+            raise RuntimeError(f"min_viable_hui {min_viable_hui} not recognized. Accepted strings are ggcmi3 or isimip3")
         else:
             min_viable_hui_touse = min_viable_hui
         if np.any(huifrac < min_viable_hui_touse):
