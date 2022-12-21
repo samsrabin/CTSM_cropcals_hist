@@ -1066,7 +1066,7 @@ for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
             case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp)
             yieldVar = "YIELD_ANN"
         else:
-            case['ds'] = cc.get_yield(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp)
+            case['ds'] = cc.zero_immatures(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp)
             yieldVar = "YIELD"
         case['ds']['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da2(case['ds'], lu_ds, yieldVar, cropList_combined_clm)
         if thisCrop_clm == "Total (no sgc)":
@@ -1343,6 +1343,11 @@ varList = {
         'time_dim':   'gs',
         'units':      'day of year',
         'multiplier': 1},
+    'MATURE': {
+        'suptitle':   'Mature harvests',
+        'time_dim':   'gs',
+        'units':      'fraction',
+        'multiplier': 1},
 }
 
 nx = 2
@@ -1359,6 +1364,11 @@ else:
     fontsize['axislabels'] = 24
     fontsize['ticklabels'] = 24
     fontsize['suptitle'] = 24
+    
+if mxmat_limited:
+    mxmats_tmp = mxmats
+else:
+    mxmats_tmp = None
 
 
 for (this_var, var_info) in varList.items():
@@ -1386,14 +1396,17 @@ for (this_var, var_info) in varList.items():
     for i, (casename, case) in enumerate(cases.items()):
         
         if this_var in ["YIELD_ANN", "PROD_ANN"]:
-            if mxmat_limited:
-                mxmats_tmp = mxmats
-            else:
-                mxmats_tmp = None
             case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp)
             
             if this_var == "PROD_ANN":
                 case['ds']['PROD_ANN'] = case['ds']['YIELD_ANN'] * lu_ds['AREA_CFT']
+        
+        elif this_var == "MATURE":
+            case['ds'] = cc.zero_immatures(case['ds'], out_var="MATURE", min_viable_hui=min_viable_hui, mxmats=mxmats_tmp)
+            
+        elif this_var == "MATURE_ANN":
+            raise RuntimeError("Need to add code for maturity on annual axis")
+            
         
         if ref_casename and ref_casename != "rx" and cases[ref_casename]['res'] != case['res']:
             # Not bothering with regridding (for now?)

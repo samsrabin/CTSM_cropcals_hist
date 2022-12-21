@@ -1348,29 +1348,32 @@ def get_window_radius(w):
     return int((w-1) / 2)
 
 
-def get_yield(ds, min_viable_hui=None, mxmats=None, forAnnual=False, force_update=False):
+def zero_immatures(ds, out_var="YIELD", min_viable_hui=None, mxmats=None, forAnnual=False, force_update=False):
     
     mxmat_limited = bool(mxmats)
     
-    yield_var = "YIELD"
-    grainc_var = "GRAINC_TO_FOOD"
+    if any(x in out_var for x in ["YIELD", "MATURE"]):
+        in_var = "GRAINC_TO_FOOD"
+    else:
+        raise RuntimeError(f"out_var {out_var} not recognized. Accepted values: *YIELD*, *MATURE*")
+    
     huifrac_var = "HUIFRAC"
     gddharv_var = "GDDHARV"
     gslen_var = "GSLEN"
     if forAnnual:
-        yield_var += "_PERHARV"
-        grainc_var += "_PERHARV"
+        out_var += "_PERHARV"
+        in_var += "_PERHARV"
         huifrac_var += "_PERHARV"
         gddharv_var += "_PERHARV"
         gslen_var += "_PERHARV"
     
-    if yield_var in ds and not force_update and all([x in ds[yield_var].attrs for x in ['min_viable_hui', 'mxmat_limited']]):
-        if ds[yield_var].attrs['min_viable_hui'] == min_viable_hui and ds[yield_var].attrs['mxmat_limited'] == mxmat_limited:
+    if out_var in ds and not force_update and all([x in ds[out_var].attrs for x in ['min_viable_hui', 'mxmat_limited']]):
+        if ds[out_var].attrs['min_viable_hui'] == min_viable_hui and ds[out_var].attrs['mxmat_limited'] == mxmat_limited:
             return ds
-        elif 'locked_yield' in ds[yield_var].attrs and ds[yield_var].attrs['locked_yield']:
+        elif 'locked_yield' in ds[out_var].attrs and ds[out_var].attrs['locked_yield']:
             return ds
     
-    ds[yield_var] = ds[grainc_var].copy()
+    ds[out_var] = ds[in_var].copy()
     
     # Set yield to zero where minimum viable HUI wasn't reached
     if min_viable_hui is not None:
@@ -1398,36 +1401,41 @@ def get_yield(ds, min_viable_hui=None, mxmats=None, forAnnual=False, force_updat
         else:
             min_viable_hui_touse = min_viable_hui
         if np.any(huifrac < min_viable_hui_touse):
-            print(f"Setting yield to zero where minimum viable HUI ({min_viable_hui}) wasn't reached")
-            tmp_da = ds[grainc_var]
+            print(f"Setting {out_var} to zero where minimum viable HUI ({min_viable_hui}) wasn't reached")
+            tmp_da = ds[in_var]
             tmp = tmp_da.copy().values
-            tmp[np.where((huifrac < min_viable_hui_touse) & (tmp > 0))] = 0
-            ds[yield_var] = xr.DataArray(data = tmp,
-                                        attrs = tmp_da.attrs,
-                                        coords = tmp_da.coords)
+            dont_include = (huifrac < min_viable_hui_touse) & (tmp > 0)
+            tmp[np.where(dont_include)] = 0
+            if "MATURE" in out_var:
+                tmp[np.where(~dont_include & ~np.isnan(tmp))] = 1
+                tmp_da.attrs['units'] = 'fraction'
+            ds[out_var] = xr.DataArray(data = tmp,
+                                       attrs = tmp_da.attrs,
+                                       coords = tmp_da.coords)
     
-    # Get GRAINC variants with values set to 0 if season was longer than CLM PFT parameter mxmat
+    # Get variants with values set to 0 if season was longer than CLM PFT parameter mxmat
     if mxmat_limited:
-        tmp_da = ds[yield_var]
+        tmp_da = ds[out_var]
         tmp_ra = tmp_da.copy().values
         for veg_str in np.unique(ds.patches1d_itype_veg_str.values):
             mxmat_veg_str = veg_str.replace("soybean", "temperate_soybean").replace("tropical_temperate", "tropical")
             mxmat = mxmats[mxmat_veg_str]
             tmp_ra[np.where((ds.patches1d_itype_veg_str.values == veg_str) & (ds[gslen_var].values > mxmat))] = 0
-        ds[yield_var] = xr.DataArray(data = tmp_ra,
+        ds[out_var] = xr.DataArray(data = tmp_ra,
                                    coords = tmp_da.coords,
                                    attrs = tmp_da.attrs)
     
     # Get *biomass* *actually harvested*
-    ds[yield_var] = adjust_grainC(ds[yield_var], ds.patches1d_itype_veg_str)
+    if "YIELD" in out_var:
+        ds[out_var] = adjust_grainC(ds[out_var], ds.patches1d_itype_veg_str)
     
     # Save details
-    ds[yield_var].attrs['min_viable_hui'] = min_viable_hui
-    ds[yield_var].attrs['mxmat_limited'] = mxmat_limited
+    ds[out_var].attrs['min_viable_hui'] = min_viable_hui
+    ds[out_var].attrs['mxmat_limited'] = mxmat_limited
     
     # Get dimensions in expected order (time/gs, patch)
     if not forAnnual:
-        ds[yield_var] = ds[yield_var].transpose("gs", "patch")
+        ds[out_var] = ds[out_var].transpose("gs", "patch")
     
     return ds
             
@@ -1442,7 +1450,7 @@ def get_yield_ann(ds, min_viable_hui=1.0, mxmats=None, force_update=False):
         elif 'locked_yield' in ds['YIELD_ANN'].attrs and ds['YIELD_ANN'].attrs['locked_yield']:
             return ds
     
-    ds = get_yield(ds, min_viable_hui=min_viable_hui, mxmats=mxmats, forAnnual=True, force_update=force_update)
+    ds = zero_immatures(ds, min_viable_hui=min_viable_hui, mxmats=mxmats, forAnnual=True, force_update=force_update)
     
     tmp = ds["YIELD_PERHARV"].sum(dim='mxharvests', skipna=True).values
     grainc_to_food_ann_orig = ds["GRAINC_TO_FOOD_ANN"]
