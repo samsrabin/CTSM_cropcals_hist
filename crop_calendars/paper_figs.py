@@ -1607,6 +1607,18 @@ for (this_var, var_info) in varList.items():
                     vmin = -cbin_width*Ncolors/2
                     vmax = cbin_width*Ncolors/2
                     cbar_ticklabels = np.arange(vmin, vmax+1, cbin_width)
+                if this_var == "GSLEN" and np.array_equal(cbar_ticklabels, [-315., -225., -135.,  -45.,   45.,  135.,  225.,  315.]):
+                    vmin = -330
+                    vmax = 330
+                    Ncolors = 11
+                    cbin_width = 60
+                    cbar_ticklabels = np.arange(vmin, vmax+1, cbin_width)
+                    if max(np.abs(ticks_orig)) < cbar_ticklabels[-2]:
+                        vmin = -270
+                        vmax = 270
+                        Ncolors = 9
+                        cbar_ticklabels = np.arange(vmin, vmax+1, cbin_width)
+                        
             elif "DATES" in this_var:
                 vmin = 0
                 vmax = 400
