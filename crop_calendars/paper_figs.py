@@ -748,8 +748,15 @@ for i, x in enumerate(np.unique(countries.gadm0.values)):
 # %% Compare area, production, and yield of individual crops
 importlib.reload(cc)
 
-min_viable_hui = 1.0
+# # GGCMI setup, for reference:
 # min_viable_hui = "ggcmi3"
+# w = 5
+# use_annual_yields = False
+# plot_y1 = 1980
+# plot_yN = 2010
+
+# min_viable_hui = 1.0
+min_viable_hui = "ggcmi3"
 
 mxmat_limited = False
 # mxmat_limited = True
@@ -760,8 +767,8 @@ equalize_scatter_axes = False
 # extra = "Total (no sgc)"
 extra = "Total (grains only)"
 
-w = 5
 # Window width for detrending (0 for signal.detrend())
+w = 5
 
 # Rounding precision for stats
 stats_round = 3
