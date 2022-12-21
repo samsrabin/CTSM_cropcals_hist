@@ -1296,46 +1296,46 @@ plot_y1 = 1980
 plot_yN = 2010
 
 varList = {
-    # 'GDDHARV': {
-    #     'suptitle':   'Mean harvest requirement',
-    #     'time_dim':   'gs',
-    #     'units':      'GDD',
-    #     'multiplier': 1},
-    # 'YIELD_ANN': {
-    #     'suptitle':   'Mean annual yield',
-    #     'time_dim':   'time',
-    #     'units':      't/ha',
-    #     'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
-    # 'PROD_ANN': {
-    #     'suptitle':   'Mean annual production',
-    #     'time_dim':   'time',
-    #     'units':      'Mt',
-    #     'multiplier': 1e-12}, # g to Mt
+    'GDDHARV': {
+        'suptitle':   'Mean harvest requirement',
+        'time_dim':   'gs',
+        'units':      'GDD',
+        'multiplier': 1},
+    'YIELD_ANN': {
+        'suptitle':   'Mean annual yield',
+        'time_dim':   'time',
+        'units':      't/ha',
+        'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
+    'PROD_ANN': {
+        'suptitle':   'Mean annual production',
+        'time_dim':   'time',
+        'units':      'Mt',
+        'multiplier': 1e-12}, # g to Mt
     'GSLEN': {
         'suptitle':   'Mean growing season length',
         'time_dim':   'gs',
         'units':      'days',
         'multiplier': 1},
-    # 'HDATES': {
-    #     'suptitle':   'Mean harvest date',
-    #     'time_dim':   'gs',
-    #     'units':      'day of year',
-    #     'multiplier': 1},
-    # 'HUI': {
-    #     'suptitle':   'Mean HUI at harvest',
-    #     'time_dim':   'gs',
-    #     'units':      'GDD',
-    #     'multiplier': 1},
-    # 'HUIFRAC': {
-    #     'suptitle':   'Mean HUI at harvest (fraction of required)',
-    #     'time_dim':   'gs',
-    #     'units':      'Fraction of required',
-    #     'multiplier': 1},
-    # 'SDATES': {
-    #     'suptitle':   'Mean sowing date',
-    #     'time_dim':   'gs',
-    #     'units':      'day of year',
-    #     'multiplier': 1},
+    'HDATES': {
+        'suptitle':   'Mean harvest date',
+        'time_dim':   'gs',
+        'units':      'day of year',
+        'multiplier': 1},
+    'HUI': {
+        'suptitle':   'Mean HUI at harvest',
+        'time_dim':   'gs',
+        'units':      'GDD',
+        'multiplier': 1},
+    'HUIFRAC': {
+        'suptitle':   'Mean HUI at harvest (fraction of required)',
+        'time_dim':   'gs',
+        'units':      'Fraction of required',
+        'multiplier': 1},
+    'SDATES': {
+        'suptitle':   'Mean sowing date',
+        'time_dim':   'gs',
+        'units':      'day of year',
+        'multiplier': 1},
 }
 
 nx = 2
@@ -1477,10 +1477,7 @@ for (this_var, var_info) in varList.items():
         raise ValueError(f"Set up for ny = {ny}")
 
     for thisCrop_main in clm_types:
-        
-        if "rice" not in thisCrop_main:
-            continue
-        
+                
         # Get the name we'll use in output text/filenames
         thisCrop_out = thisCrop_main
         if "soybean" in thisCrop_out and "tropical" not in thisCrop_out:
@@ -1626,14 +1623,10 @@ for (this_var, var_info) in varList.items():
                 cb.set_ticklabels(cbar_ticklabels)
         
         plt.subplots_adjust(bottom=new_sp_bottom, left=new_sp_left)
-        
-        plt.show()
-        break
-        
+                
         fig.savefig(fig_outfile,
                     bbox_inches='tight', facecolor='white', dpi=dpi)
         plt.close()
-    break
     
 print('Done making maps.')
 
