@@ -1592,12 +1592,12 @@ for (this_var, var_info) in varList.items():
                     Ncolors = 11
                     cbar_ticklabels = np.arange(vmin, vmax+1, 30)
                     force_diffmap_within_vrange = True
-                elif this_var == "HUIFRAC":
-                    vmin = -0.9
-                    vmax = 0.9
-                    Ncolors = 9
+                elif this_var == "HUIFRAC" or this_var == "MATURE":
+                    vmin = -1.1
+                    vmax = 1.1
+                    Ncolors = 11
                     cbar_ticklabels = np.arange(vmin, vmax+0.01, 0.2)
-                    force_diffmap_within_vrange = True
+                    force_diffmap_within_vrange = False
                 else:
                     cbar_width = max(ticks_orig) - min(ticks_orig)
                     cbin_width = cbar_width / Ncolors
