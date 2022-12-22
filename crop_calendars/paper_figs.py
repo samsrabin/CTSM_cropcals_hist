@@ -418,7 +418,7 @@ cases['Prescribed Calendars'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2
                                  'verbosename': 'Prescribed Calendars v4: Rx sdates+GDDs, lim-gs sim and GDDgen'}
 if which_cases == "diagnose":
     # My run with rx_crop_calendars2 code and GGCMI sowing dates but CLM maturity reqts
-    cases['Prescribed sowing'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.sdateforced_not_gdd/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.sdateforced_not_gdd.clm2.h1.1958-01-01-00000.nc',
+    cases['Prescribed Sowing'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.sdateforced_not_gdd/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.sdateforced_not_gdd.clm2.h1.1958-01-01-00000.nc',
                                   'constantVars': ["SDATES"],
                                   'constantGSs': None, # 'None' with constantVars specified means all should be constant
                                   'res': 'f19_g17',
@@ -427,7 +427,7 @@ if which_cases == "diagnose":
                                   'rx_gdds_file': None,
                                   'verbosename': 'Prescribed sowing: unlim-gs sim'}
     # My run with rx_crop_calendars2 code and CLM sowing dates but GGCMI maturity reqts
-    cases['Prescribed maturity reqts.'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced_not_sdate/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced_not_sdate.clm2.h1.1958-01-01-00000.nc',
+    cases['Prescribed Maturity'] = {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced_not_sdate.mxmat/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced_not_sdate.mxmat.clm2.h1.1958-01-01-00000.nc',
                                            'constantVars': ["GDDHARV"],
                                            'constantGSs': None, # 'None' with constantVars specified means all should be constant
                                            'res': 'f19_g17',
@@ -847,9 +847,13 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
             color = [x/255 for x in [92, 219, 219]]
         elif casename == "Prescribed Calendars":
             color = [x/255 for x in [250, 102, 240]]
+        elif casename == "Prescribed Sowing":
+            color = [x/255 for x in [150, 110, 0]]
+        elif casename == "Prescribed Maturity":
+            color = [x/255 for x in [128,0,0]]
         else:
             color = cm.Dark2(i-2)
-        if casename == "CLM Default" and "Original baseline" in caselist:
+        if (casename == "CLM Default" and "Original baseline" in caselist) or (casename in ["Prescribed Sowing", "Prescribed Maturity"]):
             linestyle = ":"
         else:
             linestyle = "-"
@@ -859,14 +863,21 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
     
     thisTitle = thisCrop_clm
     if stats2 is not None:
+        skip_this = False
         if len(stats2) != 2:
-            raise RuntimeError("len(stats2) != 2")
-        if stats_round is not None:
-            stats2 = np.round(stats2, stats_round)
-        if shift_symbols is None:
-            thisTitle += f" ({stats2[0]} → {stats2[1]})"
-        else:
-            thisTitle += f" ({shift_symbols[0]}{stats2[0]} → {shift_symbols[1]}{stats2[1]})"
+            if all(x in caselist for x in ["CLM Default", "Prescribed Calendars"]):
+                print(caselist)
+                stats2 = [stats2[caselist.index(y)-2] for y in ["CLM Default", "Prescribed Calendars"]]
+            else:
+                skip_this = True
+                print(f"Not adding stats to title because Nstats {len(stats2)} != 2")
+        if not skip_this:
+            if stats_round is not None:
+                stats2 = np.round(stats2, stats_round)
+            if shift_symbols is None:
+                thisTitle += f" ({stats2[0]} → {stats2[1]})"
+            else:
+                thisTitle += f" ({shift_symbols[0]}{stats2[0]} → {shift_symbols[1]}{stats2[1]})"
     
     ax_this.title.set_text(thisTitle)
     ax_this.title.set_size(32)
@@ -883,13 +894,21 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlab
             color = [x/255 for x in [92, 219, 219]]
         elif casename == "Prescribed Calendars":
             color = [x/255 for x in [250, 102, 240]]
+        elif casename == "Prescribed Sowing":
+            color = [x/255 for x in [150, 110, 0]]
+        elif casename == "Prescribed Maturity":
+            color = [x/255 for x in [128,0,0]]
         elif i==2:
             # Purple more distinct from my light gray
             color = [x/255 for x in [133, 92, 255]]
         else:
             color = cm.Dark2(i)
+        if casename in ["Prescribed Sowing", "Prescribed Maturity"]:
+            facecolors = 'none'
+        else:
+            facecolors = color
         plt.sca(ax_this)
-        plt.scatter(xdata, ydata_this[i,:], color=color, s=100, alpha=0.8)
+        plt.scatter(xdata, ydata_this[i,:], color=color, s=100, alpha=0.8, facecolors=facecolors)
         m, b = np.polyfit(xdata, ydata_this[i,:], 1)
         plt.plot(xdata, m*xdata+b, color=color)
     
@@ -902,14 +921,21 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlab
     
     thisTitle = thisCrop_clm
     if stats2 is not None:
+        skip_this = False
         if len(stats2) != 2:
-            raise RuntimeError("len(stats2) != 2")
-        if stats_round is not None:
-            stats2 = np.round(stats2, stats_round)
-        if shift_symbols is None:
-            thisTitle += f" ({stats2[0]} → {stats2[1]})"
-        else:
-            thisTitle += f" ({shift_symbols[0]}{stats2[0]} → {shift_symbols[1]}{stats2[1]})"
+            if all(x in caselist for x in ["CLM Default", "Prescribed Calendars"]):
+                print(caselist)
+                stats2 = [stats2[caselist.index(y)-2] for y in ["CLM Default", "Prescribed Calendars"]]
+            else:
+                skip_this = True
+                print(f"Not adding stats to title because Nstats {len(stats2)} != 2")
+        if not skip_this:
+            if stats_round is not None:
+                stats2 = np.round(stats2, stats_round)
+            if shift_symbols is None:
+                thisTitle += f" ({stats2[0]} → {stats2[1]})"
+            else:
+                thisTitle += f" ({shift_symbols[0]}{stats2[0]} → {shift_symbols[1]}{stats2[1]})"
     
     ax_this.title.set_text(thisTitle)
     ax_this.title.set_size(32)
@@ -935,7 +961,7 @@ def finishup_allcrops_lines(c, ny, nx, axes_this, f_this, suptitle, outDir_figs,
     f_this.legend(handles = axes_this[0].lines,
                   labels = fig_caselist,
                   loc = "upper center",
-                  ncol = int(np.floor(len(fig_caselist)/4))+1,
+                  ncol = int(np.floor(len(fig_caselist)/3))+1,
                   fontsize=28)
 
     f_this.savefig(outDir_figs + "Timeseries " + suptitle + " by crop.pdf",
