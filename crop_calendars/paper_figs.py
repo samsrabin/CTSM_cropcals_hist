@@ -40,7 +40,7 @@ import importlib
 import pandas as pd
 import cftime
 from fig_global_timeseries import global_timeseries
-from fig_maps_2caseDiff import *
+from fig_maps_allCrops import *
 
 # Ignore these annoying warnings
 import warnings
