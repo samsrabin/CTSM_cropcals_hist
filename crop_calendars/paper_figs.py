@@ -1950,7 +1950,15 @@ varList = {
     'PROD_ANN_DIFF': {
         'suptitle':   'Mean annual production',
         'units':      'Mt',
-        'multiplier': 1e-12} # g to Mt
+        'multiplier': 1e-12}, # g to Mt
+    'YIELD_ANN': {
+        'suptitle':   'Mean annual yield',
+        'units':      't/ha',
+        'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
+    'YIELD_ANN_DIFF': {
+        'suptitle':   'Mean annual yield',
+        'units':      't/ha',
+        'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
 }
 
 # Yield settings

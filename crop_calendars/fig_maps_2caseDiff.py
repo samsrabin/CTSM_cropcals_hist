@@ -40,13 +40,8 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
         # Which CFTs comprise this crop?
         where_thisCrop = np.where(this_ds['patches1d_itype_combinedCropCLM_str'] == crop)[0]
         theseCrops = np.unique(this_ds['patches1d_itype_veg_str'].isel(patch=where_thisCrop))
-
-        # Grid data for those CFTs, getting their sum
-        this_map = utils.grid_one_variable(this_ds.isel(patch=where_thisCrop), thisVar, vegtype=list(theseCrops))
-        this_map = this_map.sum(dim="ivt_str")
-        this_map *= varInfo['multiplier']
         
-        # Mask out cells with no area of these CFTs
+        # Get area of these CFTs
         lu_thiscrop = utils.xr_flexsel(lu_ds.sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")),
                                     vegtype=list(theseCrops))
         area_thiscrop_mean_da = lu_thiscrop['AREA_CFT'].mean(dim="time")
@@ -64,7 +59,15 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
                     'lat': lu_thiscrop.lat,
                     'ivt': this_ds.ivt})
         area_map = utils.grid_one_variable(area_thiscrop_ds, "area_thiscrop_mean")
-        area_map = area_map.sum(dim="ivt_str")
+        area_map_sum = area_map.sum(dim="ivt_str")
+        weights_map = area_map / area_map_sum
+
+        # Grid data for those CFTs, getting their sum
+        this_map = utils.grid_one_variable(this_ds.isel(patch=where_thisCrop), thisVar, vegtype=list(theseCrops))
+        if "YIELD" in thisVar:
+            this_map = this_map * weights_map
+        this_map = this_map.sum(dim="ivt_str")
+        this_map *= varInfo['multiplier']
         
         # Plot map
         if is_diff:
@@ -73,7 +76,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
         else:
             vmin = None
             vmax = None
-        im, cb = make_map(ax, this_map.where(area_map>1e4), fontsize, show_cbar=True, vmin=vmin, vmax=vmax, cmap=cmap, extend_nonbounds=None)
+        im, cb = make_map(ax, this_map.where(area_map_sum>1e4), fontsize, show_cbar=True, vmin=vmin, vmax=vmax, cmap=cmap, extend_nonbounds=None)
         cb.set_label(label=varInfo['units'], fontsize=fontsize['axislabels'])
         ax.set_title(crop, fontsize=fontsize['titles'])
         
@@ -115,9 +118,8 @@ def maps_2caseDiff(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cro
                 .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))\
                 .mean(dim="time")
 
-        
-        
         make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, lu_ds, this_ds, this_suptitle, fig_outfile, is_diff)
+    
     
     else:
         for this_case in these_cases:
@@ -130,8 +132,6 @@ def maps_2caseDiff(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cro
                 .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))\
                 .mean(dim="time")
                 
-            
-            
             this_suptitle = f"{varInfo['suptitle']}: {this_case}"
             fig_outfile = os.path.join(outDir_figs, f"Map {this_suptitle} {plot_y1}-{plot_yN}.png").replace('Mean annual ', '').replace(':', '')
             print(this_suptitle)
