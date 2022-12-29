@@ -1939,7 +1939,7 @@ for thisVar_orig in varList:
 print("Done.")
 
 
-# %% Make maps of two-case change in average production for all crops
+# %% Make maps of average production and/or yield for all crops
 
 these_cases = ['CLM Default', 'Prescribed Calendars']
 varList = {
@@ -1966,7 +1966,7 @@ min_viable_hui = "ggcmi3"
 
 
 for (this_var, var_info) in varList.items():
-    maps_2caseDiff(cases, these_cases, reses, this_var, var_info, outDir_figs, cropList_combined_clm_nototal, min_viable_hui=min_viable_hui)
+    maps_allCrops(cases, these_cases, reses, this_var, var_info, outDir_figs, cropList_combined_clm_nototal, min_viable_hui=min_viable_hui)
 
 print("Done.")
 
