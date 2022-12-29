@@ -19,6 +19,7 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
 import cropcal_module as cc
+from cropcal_figs_module import *
 
 # Import general CTSM Python utilities
 my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
@@ -39,6 +40,7 @@ import importlib
 import pandas as pd
 import cftime
 from fig_global_timeseries import global_timeseries
+from fig_maps_2caseDiff import *
 
 # Ignore these annoying warnings
 import warnings
@@ -50,8 +52,9 @@ warnings.filterwarnings("ignore", message="This figure includes Axes that are no
 
 # %% Define functions etc.
 
-cropList_combined_clm = ["Corn", "Rice", "Cotton", "Soybean", "Sugarcane", "Wheat"]
-cropList_combined_clm.sort()
+cropList_combined_clm_nototal = ["Corn", "Rice", "Cotton", "Soybean", "Sugarcane", "Wheat"]
+cropList_combined_clm_nototal.sort()
+cropList_combined_clm = cropList_combined_clm_nototal.copy()
 cropList_combined_clm.append("Total")
 # cropList_combined_faostat = ["Maize", "Rice, paddy", "Seed cotton", "Soybeans", "Sugar cane", "Wheat"]
 
@@ -94,70 +97,6 @@ def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_typ
     
     return this_map, time_dim
 
-
-def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend_bounds='both', vmin=None, vmax=None, cbar=None, ticklabels=None, extend_nonbounds='both'): 
-    
-    if bounds:
-        norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend_bounds)
-        im = ax.pcolormesh(this_map.lon.values, this_map.lat.values,
-                           this_map, shading="auto",
-                           norm=norm,
-                           cmap=cmap,
-                           vmin=vmin, vmax=vmax)
-    else:
-        im = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
-                           this_map, shading="auto",
-                           cmap=cmap,
-                           vmin=vmin, vmax=vmax)
-        if vrange:
-            im.set_clim(vrange[0], vrange[1])
-    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
-    ax.coastlines(linewidth=linewidth, color="white")
-    ax.coastlines(linewidth=linewidth*0.6)
-    if this_title:
-        ax.set_title(this_title, fontsize=fontsize['titles'])
-    if show_cbar:
-        if cbar:
-            cbar.remove()
-        cbar = plt.colorbar(im, ax=ax, orientation="horizontal", fraction=0.1, pad=0.02, extend=extend_nonbounds)
-        if ticklabels is not None:
-            cbar.set_ticks(ticklabels)
-        cbar.set_label(label=units, fontsize=fontsize['axislabels'])
-        cbar.ax.tick_params(labelsize=fontsize['ticklabels'])
-     
-    def set_ticks(lonlat_bin_width, fontsize, x_or_y):
-        
-        if x_or_y == "x":
-            ticks = np.arange(-180, 181, lonlat_bin_width)
-        else:
-            ticks = np.arange(-60, 91, lonlat_bin_width)
-            
-        ticklabels = [str(x) for x in ticks]
-        for i,x in enumerate(ticks):
-            if x%2:
-                ticklabels[i] = ''
-        
-        if x_or_y == "x":
-            plt.xticks(ticks, labels=ticklabels,
-                       fontsize=fontsize['ticklabels'])
-        else:
-            plt.yticks(ticks, labels=ticklabels,
-                       fontsize=fontsize['ticklabels'])
-    
-    if lonlat_bin_width:
-        set_ticks(lonlat_bin_width, fontsize, "y")
-        # set_ticks(lonlat_bin_width, fontsize, "x")
-    else:
-        # Need to do this for subplot row labels
-        set_ticks(-1, fontsize, "y")
-        plt.yticks([])
-    for x in ax.spines:
-        ax.spines[x].set_visible(False)
-    
-    if show_cbar:
-        return im, cbar
-    else:
-        return im, None
 
 def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False):
     for i, casename in enumerate(fig_caselist):
@@ -1998,3 +1937,18 @@ for thisVar_orig in varList:
                     bbox_inches='tight')
         plt.close()
 print("Done.")
+
+
+# %% Make maps of two-case change in average production for all crops
+
+these_cases = ['CLM Default', 'Prescribed Calendars']
+thisVar = {
+    'suptitle':   'Mean annual production',
+    'units':      'Mt',
+    'multiplier': 1e-12} # g to Mt
+
+# Yield settings
+min_viable_hui = "ggcmi3"
+
+
+maps_2caseDiff(cases, these_cases, reses, thisVar, outDir_figs, cropList_combined_clm_nototal, min_viable_hui=min_viable_hui)
