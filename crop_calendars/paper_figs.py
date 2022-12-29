@@ -1942,13 +1942,25 @@ print("Done.")
 # %% Make maps of two-case change in average production for all crops
 
 these_cases = ['CLM Default', 'Prescribed Calendars']
-thisVar = {
-    'suptitle':   'Mean annual production',
-    'units':      'Mt',
-    'multiplier': 1e-12} # g to Mt
+varList = {
+    'PROD_ANN': {
+        'suptitle':   'Mean annual production',
+        'units':      'Mt',
+        'multiplier': 1e-12}, # g to Mt
+    'PROD_ANN_DIFF': {
+        'suptitle':   'Mean annual production',
+        'units':      'Mt',
+        'multiplier': 1e-12} # g to Mt
+}
 
 # Yield settings
 min_viable_hui = "ggcmi3"
 
 
-maps_2caseDiff(cases, these_cases, reses, thisVar, outDir_figs, cropList_combined_clm_nototal, min_viable_hui=min_viable_hui)
+for (this_var, var_info) in varList.items():
+    maps_2caseDiff(cases, these_cases, reses, this_var, var_info, outDir_figs, cropList_combined_clm_nototal, min_viable_hui=min_viable_hui)
+
+print("Done.")
+
+
+# %%
