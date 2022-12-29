@@ -26,7 +26,7 @@ fontsize['ticklabels'] = 14
 fontsize['suptitle'] = 22
 
 
-def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, lu_ds, this_ds, this_suptitle, fig_outfile, is_diff):
+def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, ds_in, this_suptitle, fig_outfile, is_diff):
     fig = plt.figure(figsize=figsize)
     
     if is_diff:
@@ -38,36 +38,22 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
         ax = fig.add_subplot(ny,nx,c+1,projection=ccrs.PlateCarree())
         
         # Which CFTs comprise this crop?
-        where_thisCrop = np.where(this_ds['patches1d_itype_combinedCropCLM_str'] == crop)[0]
-        theseCrops = np.unique(this_ds['patches1d_itype_veg_str'].isel(patch=where_thisCrop))
+        where_thisCrop = np.where(ds_in['patches1d_itype_combinedCropCLM_str'] == crop)[0]
+        theseCrops = np.unique(ds_in['patches1d_itype_veg_str'].isel(patch=where_thisCrop))
+        this_ds = ds_in.isel(patch=where_thisCrop)
         
         # Get area of these CFTs
-        lu_thiscrop = utils.xr_flexsel(lu_ds.sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")),
-                                    vegtype=list(theseCrops))
-        area_thiscrop_mean_da = lu_thiscrop['AREA_CFT'].mean(dim="time")
-        area_thiscrop_ds = xr.Dataset(\
-            data_vars={'area_thiscrop_mean': area_thiscrop_mean_da,
-                    'patches1d_ixy': lu_thiscrop.patches1d_ixy,
-                    'patches1d_jxy': lu_thiscrop.patches1d_jxy,
-                    'patches1d_lon': lu_thiscrop.patches1d_lon,
-                    'patches1d_lat': lu_thiscrop.patches1d_lat,
-                    'patches1d_itype_veg': lu_thiscrop.patches1d_itype_veg,
-                    'patches1d_itype_veg_str': lu_thiscrop.patches1d_itype_veg_str,
-                    'vegtype_str': this_ds.vegtype_str},
-            coords={'patch': lu_thiscrop.patch,
-                    'lon': lu_thiscrop.lon,
-                    'lat': lu_thiscrop.lat,
-                    'ivt': this_ds.ivt})
-        area_map = utils.grid_one_variable(area_thiscrop_ds, "area_thiscrop_mean")
+        area_map = utils.grid_one_variable(this_ds.mean(dim="time"), "AREA_CFT", vegtype=list(theseCrops))
         area_map_sum = area_map.sum(dim="ivt_str")
         weights_map = area_map / area_map_sum
 
         # Grid data for those CFTs, getting their sum
-        this_map = utils.grid_one_variable(this_ds.isel(patch=where_thisCrop), thisVar, vegtype=list(theseCrops))
+        this_map = utils.grid_one_variable(this_ds, thisVar, vegtype=list(theseCrops))
         if "YIELD" in thisVar:
             this_map = this_map * weights_map
         this_map = this_map.sum(dim="ivt_str")
         this_map *= varInfo['multiplier']
+        this_map = this_map.mean(dim="time")
         
         # Plot map
         if is_diff:
@@ -114,11 +100,11 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
         this_ds = ds1.copy()
         this_ds['YIELD_ANN_DIFF'] = ds1['YIELD_ANN'] - ds0['YIELD_ANN']
         this_ds['PROD_ANN_DIFF'] = this_ds['YIELD_ANN_DIFF'] * lu_ds['AREA_CFT']
+        this_ds['AREA_CFT'] = lu_ds['AREA_CFT']
         this_ds = this_ds\
-                .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))\
-                .mean(dim="time")
+                .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
 
-        make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, lu_ds, this_ds, this_suptitle, fig_outfile, is_diff)
+        make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, is_diff)
     
     
     else:
@@ -128,12 +114,12 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             this_ds = case['ds']
             this_ds = cc.get_yield_ann(this_ds, min_viable_hui=min_viable_hui, mxmats=None)
             this_ds['PROD_ANN'] = this_ds['YIELD_ANN'] * lu_ds['AREA_CFT']
+            this_ds['AREA_CFT'] = lu_ds['AREA_CFT']
             this_ds = this_ds\
-                .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))\
-                .mean(dim="time")
+                .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
                 
             this_suptitle = f"{varInfo['suptitle']}: {this_case}"
             fig_outfile = os.path.join(outDir_figs, f"Map {this_suptitle} {plot_y1}-{plot_yN}.png").replace('Mean annual ', '').replace(':', '')
             print(this_suptitle)
             
-            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, lu_ds, this_ds, this_suptitle, fig_outfile, is_diff)
+            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, is_diff)
