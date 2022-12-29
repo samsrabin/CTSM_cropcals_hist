@@ -1316,7 +1316,7 @@ abs_cmap_default = 'rainbow'
 
 # Yield settings
 min_viable_hui = "ggcmi3"
-mxmat_limited = True
+mxmat_limited = False
 
 # Define reference case, if you want to plot differences
 # ref_casename = None
