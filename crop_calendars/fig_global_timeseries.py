@@ -63,7 +63,6 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
         skip_this = False
         if len(stats2) != 2:
             if all(x in caselist for x in ["CLM Default", "Prescribed Calendars"]):
-                print(caselist)
                 stats2 = [stats2[caselist.index(y)-2] for y in ["CLM Default", "Prescribed Calendars"]]
             else:
                 skip_this = True
@@ -122,7 +121,6 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlab
         skip_this = False
         if len(stats2) != 2:
             if all(x in caselist for x in ["CLM Default", "Prescribed Calendars"]):
-                print(caselist)
                 stats2 = [stats2[caselist.index(y)-2] for y in ["CLM Default", "Prescribed Calendars"]]
             else:
                 skip_this = True
