@@ -94,13 +94,12 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
         lu_ds = reses[case0['res']]['ds']
 
         # Get mean production over period of interest
-        ds0 = cc.get_yield_ann(ds0, min_viable_hui=min_viable_hui, mxmats=None)
-        ds1 = cc.get_yield_ann(ds1, min_viable_hui=min_viable_hui, mxmats=None)
+        ds0 = cc.get_yield_ann(ds0, min_viable_hui=min_viable_hui, mxmats=None, lu_ds=lu_ds)
+        ds1 = cc.get_yield_ann(ds1, min_viable_hui=min_viable_hui, mxmats=None, lu_ds=lu_ds)
 
         this_ds = ds1.copy()
         this_ds['YIELD_ANN_DIFF'] = ds1['YIELD_ANN'] - ds0['YIELD_ANN']
-        this_ds['PROD_ANN_DIFF'] = this_ds['YIELD_ANN_DIFF'] * lu_ds['AREA_CFT']
-        this_ds['AREA_CFT'] = lu_ds['AREA_CFT']
+        this_ds['PROD_ANN_DIFF'] = ds1['PROD_ANN'] - ds0['PROD_ANN']
         this_ds = this_ds\
                 .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
 
@@ -112,10 +111,8 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             case = cases[this_case]
             lu_ds = reses[case['res']]['ds']
             this_ds = case['ds']
-            this_ds = cc.get_yield_ann(this_ds, min_viable_hui=min_viable_hui, mxmats=None)
-            this_ds['PROD_ANN'] = this_ds['YIELD_ANN'] * lu_ds['AREA_CFT']
-            this_ds['AREA_CFT'] = lu_ds['AREA_CFT']
-            this_ds = this_ds\
+            this_ds = cc.get_yield_ann(this_ds, min_viable_hui=min_viable_hui, mxmats=None, lu_ds=lu_ds)
+            this_ds = this_ds.copy()\
                 .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
                 
             this_suptitle = f"{varInfo['suptitle']}: {this_case}"

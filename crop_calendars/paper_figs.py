@@ -398,7 +398,7 @@ for i, (casename, case) in enumerate(cases.items()):
         this_ds["YIELD"] = cc.adjust_grainC(this_ds.GRAINC_TO_FOOD, this_ds.patches1d_itype_veg)
         this_ds["YIELD"].attrs['min_viable_hui'] = 0.0
         this_ds["YIELD"].attrs['mxmat_limited'] = True
-        this_ds["YIELD"].attrs['locked_yield'] = True
+        this_ds["YIELD"].attrs['locked'] = True
         
         # Rework to match what we already have
         this_ds = this_ds.assign_coords({"ivt": np.arange(np.min(this_ds.patches1d_itype_veg.values),
@@ -846,10 +846,7 @@ for (this_var, var_info) in varList.items():
     for i, (casename, case) in enumerate(cases.items()):
         
         if this_var in ["YIELD_ANN", "PROD_ANN"]:
-            case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp)
-            
-            if this_var == "PROD_ANN":
-                case['ds']['PROD_ANN'] = case['ds']['YIELD_ANN'] * lu_ds['AREA_CFT']
+            case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp, lu_ds=lu_ds)
         
         elif this_var == "MATURE":
             case['ds'] = cc.zero_immatures(case['ds'], out_var="MATURE", min_viable_hui=min_viable_hui, mxmats=mxmats_tmp)

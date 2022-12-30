@@ -1365,30 +1365,54 @@ def get_yield(ds, **kwargs):
     return ds
 
 
-def get_yield_ann(ds, min_viable_hui=1.0, mxmats=None, force_update=False):
+def get_yield_ann(ds, min_viable_hui=1.0, mxmats=None, force_update=False, lu_ds=None):
     
     mxmat_limited = bool(mxmats)
     
-    if 'YIELD_ANN' in ds and not force_update:
-        if ds['YIELD_ANN'].attrs['min_viable_hui'] == min_viable_hui and ds['YIELD_ANN'].attrs['mxmat_limited'] == mxmat_limited:
-            return ds
-        elif 'locked_yield' in ds['YIELD_ANN'].attrs and ds['YIELD_ANN'].attrs['locked_yield']:
-            return ds
+    def do_calculate(thisVar, ds, force_update, min_viable_hui, mxmat_limited):
+        consider_skipping = (f'{thisVar}_ANN' in ds) and (not force_update)
+        if consider_skipping:
+            already_calculated = ds[f'{thisVar}_ANN'].attrs['min_viable_hui'] == min_viable_hui and ds[f'{thisVar}_ANN'].attrs['mxmat_limited'] == mxmat_limited
+            is_locked = 'locked' in ds[f'{thisVar}_ANN'].attrs and ds[f'{thisVar}_ANN'].attrs['locked']
+            do_calculate = not consider_skipping or not (already_calculated or is_locked)
+        else:
+            do_calculate = True
+        return do_calculate
     
-    ds = get_yield(ds, min_viable_hui=min_viable_hui, mxmats=mxmats, forAnnual=True, force_update=force_update)
+    #########
+    # YIELD #
+    #########
     
-    tmp = ds["YIELD_PERHARV"].sum(dim='mxharvests', skipna=True).values
-    grainc_to_food_ann_orig = ds["GRAINC_TO_FOOD_ANN"]
-    ds["YIELD_ANN"] = xr.DataArray(data = tmp,
-                                   attrs = grainc_to_food_ann_orig.attrs,
-                                   coords = grainc_to_food_ann_orig.coords
-                                   ).where(~np.isnan(grainc_to_food_ann_orig))
+    if do_calculate("YIELD", ds, force_update, min_viable_hui, mxmat_limited):
     
-    # Save details
-    ds["YIELD_ANN"].attrs['min_viable_hui'] = min_viable_hui
-    ds["YIELD_ANN"].attrs['mxmat_limited'] = mxmat_limited
-    if 'locked_yield' in ds['YIELD_PERHARV'].attrs:
-        ds["YIELD_ANN"].attrs['locked_yield'] = True
+        ds = get_yield(ds, min_viable_hui=min_viable_hui, mxmats=mxmats, forAnnual=True, force_update=force_update)
+        
+        tmp = ds["YIELD_PERHARV"].sum(dim='mxharvests', skipna=True).values
+        grainc_to_food_ann_orig = ds["GRAINC_TO_FOOD_ANN"]
+        ds["YIELD_ANN"] = xr.DataArray(data = tmp,
+                                    attrs = grainc_to_food_ann_orig.attrs,
+                                    coords = grainc_to_food_ann_orig.coords
+                                    ).where(~np.isnan(grainc_to_food_ann_orig))
+        
+        # Save details
+        ds["YIELD_ANN"].attrs['min_viable_hui'] = min_viable_hui
+        ds["YIELD_ANN"].attrs['mxmat_limited'] = mxmat_limited
+        if 'locked' in ds['YIELD_PERHARV'].attrs:
+            ds["YIELD_ANN"].attrs['locked'] = True
+    
+    ##############
+    # PRODUCTION #
+    ##############
+    
+    if lu_ds is not None and do_calculate("PROD", ds, force_update, min_viable_hui, mxmat_limited):
+        ds["PROD_ANN"] = ds["YIELD_ANN"] * lu_ds['AREA_CFT']
+        ds['AREA_CFT'] = lu_ds['AREA_CFT']
+        
+        # Save details
+        ds["PROD_ANN"].attrs['min_viable_hui'] = min_viable_hui
+        ds["PROD_ANN"].attrs['mxmat_limited'] = mxmat_limited
+        if 'locked' in ds['YIELD_PERHARV'].attrs:
+            ds["PROD_ANN"].attrs['locked'] = True
     
     return ds
 
@@ -2014,7 +2038,7 @@ def zero_immatures(ds, out_var="YIELD", min_viable_hui=None, mxmats=None, forAnn
     if out_var in ds and not force_update and all([x in ds[out_var].attrs for x in ['min_viable_hui', 'mxmat_limited']]):
         if ds[out_var].attrs['min_viable_hui'] == min_viable_hui and ds[out_var].attrs['mxmat_limited'] == mxmat_limited:
             return ds
-        elif 'locked_yield' in ds[out_var].attrs and ds[out_var].attrs['locked_yield']:
+        elif 'locked' in ds[out_var].attrs and ds[out_var].attrs['locked']:
             return ds
     
     ds[out_var] = ds[in_var].copy()
