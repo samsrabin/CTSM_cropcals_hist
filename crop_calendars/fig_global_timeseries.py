@@ -539,3 +539,4 @@ def global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao
         finishup_allcrops_scatter(c, ny, nx, axes_scatter_yield_dt_shiftR, f_scatter_yield_dt_shiftR, "Global crop yield (detrended) shiftR", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
 
     print("Done.")
+    return cases

@@ -731,7 +731,7 @@ nx = 4
 # figsize = (14, 7.5)
 figsize = (35, 18)
 
-global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList)
+cases = global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList)
 
 
 # %% Make maps of individual crops (rainfed, irrigated)
@@ -1966,7 +1966,7 @@ min_viable_hui = "ggcmi3"
 
 
 for (this_var, var_info) in varList.items():
-    maps_allCrops(cases, these_cases, reses, this_var, var_info, outDir_figs, cropList_combined_clm_nototal, min_viable_hui=min_viable_hui)
+    cases = maps_allCrops(cases, these_cases, reses, this_var, var_info, outDir_figs, cropList_combined_clm_nototal, min_viable_hui=min_viable_hui)
 
 print("Done.")
 

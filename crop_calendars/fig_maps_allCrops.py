@@ -123,3 +123,5 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             print(this_suptitle)
             
             make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, is_diff)
+    
+    return cases
