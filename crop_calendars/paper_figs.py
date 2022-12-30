@@ -641,8 +641,26 @@ earthstats['f19_g17'] = cc.ungrid(earthstats_gd['f19_g17'],
                                   lat='patches1d_jxy',
                                   crop='patches1d_itype_combinedCropCLM_str')
 
-
 print("Done importing FAO EarthStat.")
+
+
+# %% Get yields, including difference from EarthStat
+print("Getting yields...")
+
+# Yield settings
+min_viable_hui = "ggcmi3"
+mxmats_tmp = None
+
+# Get yields
+for i, (casename, case) in enumerate(cases.items()):
+    case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp, lu_ds=lu_ds)
+    case['ds']['YIELD_ANN_DIFFEARTHSTAT'] = (case['ds']['YIELD_ANN']*1e-6*1e4) - earthstats[case['res']]['Yield'].where(earthstats[case['res']]['PhysicalArea'] > 0)
+    case['ds']['YIELD_ANN_DIFFEARTHSTAT'].attrs['units'] = 'tons / ha'
+    case['ds']['PROD_ANN_DIFFEARTHSTAT'] = case['ds']['YIELD_ANN_DIFFEARTHSTAT'] * reses[case['res']]['ds']['AREA_CFT']*1e-4
+    case['ds']['PROD_ANN_DIFFEARTHSTAT'].attrs['units'] = 'tons'
+
+print("Done.")
+
 
 # %% Import country map and key
 
@@ -1956,6 +1974,22 @@ varList = {
         'suptitle':   'Mean annual yield',
         'units':      't/ha',
         'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
+    'YIELD_ANN_DIFFEARTHSTAT': {
+        'suptitle':   'Mean annual yield ∆ from EarthStat',
+        'units':      't/ha',
+        'multiplier': 1},
+    'YIELD_ANN_DIFFEARTHSTAT_DIFF': {
+        'suptitle':   'Mean annual yield ∆ from EarthStat',
+        'units':      'Change in abs. error (t/ha)',
+        'multiplier': 1},
+    'PROD_ANN_DIFFEARTHSTAT': {
+        'suptitle':   'Mean annual production ∆ from EarthStat',
+        'units':      'Mt',
+        'multiplier': 1e-6}, # t to Mt
+    'PROD_ANN_DIFFEARTHSTAT_DIFF': {
+        'suptitle':   'Mean annual production ∆ from EarthStat',
+        'units':      'Change in abs. error (Mt)',
+        'multiplier': 1e-6}, # t to Mt
 }
 
 # Yield settings

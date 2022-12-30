@@ -26,11 +26,14 @@ fontsize['ticklabels'] = 14
 fontsize['suptitle'] = 22
 
 
-def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, ds_in, this_suptitle, fig_outfile, is_diff):
+def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, ds_in, this_suptitle, fig_outfile, is_diff, is_diffdiff):
     fig = plt.figure(figsize=figsize)
     
     if is_diff:
-        cmap = "BrBG"
+        if is_diffdiff:
+            cmap = "RdBu_r"
+        else:
+            cmap = "BrBG"
     else:
         cmap = "viridis"
 
@@ -78,10 +81,11 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
 def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cropList_combined_clm_nototal, dpi=150, figsize=figsize, min_viable_hui="ggcmi3", mxmats=None, ny=2, nx=3, plot_y1=1980, plot_yN=2010):
     
     # Process variable info
-    is_diff = "DIFF" in thisVar
+    is_diff = thisVar[-5:] == "_DIFF"
     if is_diff:
         if len(these_cases) != 2:
             raise RuntimeError(f"You must provide exactly 2 cases in these_cases for DIFF variables")
+    is_diffdiff = is_diff and thisVar.count("DIFF") == 2
 
     if is_diff:
         this_suptitle = f"{varInfo['suptitle']}: {these_cases[1]} minus {these_cases[0]}"
@@ -98,12 +102,21 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
         ds1 = cc.get_yield_ann(ds1, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
 
         this_ds = ds1.copy()
-        this_ds['YIELD_ANN_DIFF'] = ds1['YIELD_ANN'] - ds0['YIELD_ANN']
-        this_ds['PROD_ANN_DIFF'] = ds1['PROD_ANN'] - ds0['PROD_ANN']
+        if is_diffdiff:
+            diff_yield_var = thisVar.replace("PROD", "YIELD")
+            undiff_yield_var = "".join(diff_yield_var.rsplit("_DIFF", 1)) # Delete last occurrence of "_DIFF"
+            diff_prod_var = diff_yield_var.replace("YIELD", "PROD")
+            undiff_prod_var = undiff_yield_var.replace("YIELD", "PROD")
+            this_ds[diff_yield_var] = np.fabs(ds1[undiff_yield_var]) - np.fabs(ds0[undiff_yield_var])
+            if undiff_prod_var in this_ds:
+                this_ds[diff_prod_var] = np.fabs(ds1[undiff_prod_var]) - np.fabs(ds0[undiff_prod_var])
+        else:
+            this_ds['YIELD_ANN_DIFF'] = ds1['YIELD_ANN'] - ds0['YIELD_ANN']
+            this_ds['PROD_ANN_DIFF'] = ds1['PROD_ANN'] - ds0['PROD_ANN']
         this_ds = this_ds\
                 .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
-
-        make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, is_diff)
+        
+        make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, is_diff, is_diffdiff)
     
     
     else:
@@ -119,6 +132,6 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             fig_outfile = os.path.join(outDir_figs, f"Map {this_suptitle} {plot_y1}-{plot_yN}.png").replace('Mean annual ', '').replace(':', '')
             print(this_suptitle)
             
-            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, is_diff)
+            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, "DIFF" in thisVar, False)
     
     return cases
