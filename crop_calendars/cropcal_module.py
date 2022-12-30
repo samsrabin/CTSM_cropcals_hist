@@ -1354,6 +1354,17 @@ def get_window_radius(w):
     return int((w-1) / 2)
 
 
+def get_yield(ds, **kwargs):
+    
+    # Fail if trying to get anything other than yield
+    for key, selection in kwargs.items():
+        if key=="out_var" and selection!="YIELD":
+            raise RuntimeError("get_yield() may only be called with out_var='YIELD'. Did you mean to call zero_immatures() instead?")
+    
+    ds = zero_immatures(ds, out_var="YIELD", **kwargs)
+    return ds
+
+
 def get_yield_ann(ds, min_viable_hui=1.0, mxmats=None, force_update=False):
     
     mxmat_limited = bool(mxmats)
@@ -1364,7 +1375,7 @@ def get_yield_ann(ds, min_viable_hui=1.0, mxmats=None, force_update=False):
         elif 'locked_yield' in ds['YIELD_ANN'].attrs and ds['YIELD_ANN'].attrs['locked_yield']:
             return ds
     
-    ds = zero_immatures(ds, min_viable_hui=min_viable_hui, mxmats=mxmats, forAnnual=True, force_update=force_update)
+    ds = get_yield(ds, min_viable_hui=min_viable_hui, mxmats=mxmats, forAnnual=True, force_update=force_update)
     
     tmp = ds["YIELD_PERHARV"].sum(dim='mxharvests', skipna=True).values
     grainc_to_food_ann_orig = ds["GRAINC_TO_FOOD_ANN"]
