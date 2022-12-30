@@ -700,6 +700,15 @@ fao_all_ctry = fao_all_ctry.replace({'China, mainland': 'China, mld.',
 for i, x in enumerate(np.unique(countries.gadm0.values)):
     if not np.isnan(x) and not np.any(countries_key.num.values == x):
         print(f'❗ {x} not found in key')
+        
+        
+        
+        
+# END OF IMPORT AND SETUP
+print('Done with import and setup.')
+
+
+
 
 
 # %% Compare area, production, and yield of individual crops
@@ -865,7 +874,7 @@ for (this_var, var_info) in varList.items():
         
         if this_var in ["YIELD_ANN", "PROD_ANN"]:
             case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp, lu_ds=lu_ds)
-        
+                    
         elif this_var == "MATURE":
             case['ds'] = cc.zero_immatures(case['ds'], out_var="MATURE", min_viable_hui=min_viable_hui, mxmats=mxmats_tmp)
             
