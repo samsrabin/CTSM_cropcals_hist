@@ -75,7 +75,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
     plt.close()
 
 
-def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cropList_combined_clm_nototal, dpi=150, figsize=figsize, min_viable_hui="ggcmi3", mxmats=None, ny=2, nx=3, plot_y1=1980, plot_yN=2010, use_annual_yields=False):
+def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cropList_combined_clm_nototal, dpi=150, figsize=figsize, min_viable_hui="ggcmi3", mxmats=None, ny=2, nx=3, plot_y1=1980, plot_yN=2010):
     
     # Process variable info
     is_diff = "DIFF" in thisVar
@@ -94,8 +94,8 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
         lu_ds = reses[case0['res']]['ds']
 
         # Get mean production over period of interest
-        ds0 = cc.get_yield_ann(ds0, min_viable_hui=min_viable_hui, mxmats=None, lu_ds=lu_ds)
-        ds1 = cc.get_yield_ann(ds1, min_viable_hui=min_viable_hui, mxmats=None, lu_ds=lu_ds)
+        ds0 = cc.get_yield_ann(ds0, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
+        ds1 = cc.get_yield_ann(ds1, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
 
         this_ds = ds1.copy()
         this_ds['YIELD_ANN_DIFF'] = ds1['YIELD_ANN'] - ds0['YIELD_ANN']
