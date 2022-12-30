@@ -879,6 +879,12 @@ def fao_data_preproc(fao):
     return fao
 
 
+def fullname_to_combinedCrop(fullnames, cropList_combined_clm):
+    x = [strip_cropname(y).capitalize() for y in fullnames]
+    z = [y if y in cropList_combined_clm else '' for y in x]
+    return z
+
+
 def get_earthstat_country_ts(earthstats, case, thisVar, countries_map, thisCrop_clm, i_theseYears_earthstat, country_id):
     tmp = earthstats[case['res']][thisVar]\
         .interp_like(countries_map)\
@@ -1347,98 +1353,6 @@ def get_window_radius(w):
         raise RuntimeError("Window width must be odd")
     return int((w-1) / 2)
 
-
-def zero_immatures(ds, out_var="YIELD", min_viable_hui=None, mxmats=None, forAnnual=False, force_update=False):
-    
-    mxmat_limited = bool(mxmats)
-    
-    if any(x in out_var for x in ["YIELD", "MATURE"]):
-        in_var = "GRAINC_TO_FOOD"
-    else:
-        raise RuntimeError(f"out_var {out_var} not recognized. Accepted values: *YIELD*, *MATURE*")
-    
-    huifrac_var = "HUIFRAC"
-    gddharv_var = "GDDHARV"
-    gslen_var = "GSLEN"
-    if forAnnual:
-        out_var += "_PERHARV"
-        in_var += "_PERHARV"
-        huifrac_var += "_PERHARV"
-        gddharv_var += "_PERHARV"
-        gslen_var += "_PERHARV"
-    
-    if out_var in ds and not force_update and all([x in ds[out_var].attrs for x in ['min_viable_hui', 'mxmat_limited']]):
-        if ds[out_var].attrs['min_viable_hui'] == min_viable_hui and ds[out_var].attrs['mxmat_limited'] == mxmat_limited:
-            return ds
-        elif 'locked_yield' in ds[out_var].attrs and ds[out_var].attrs['locked_yield']:
-            return ds
-    
-    ds[out_var] = ds[in_var].copy()
-    
-    # Set yield to zero where minimum viable HUI wasn't reached
-    if min_viable_hui is not None:
-        
-        huifrac = ds[huifrac_var].copy().values
-        huifrac[np.where(ds[gddharv_var].values==0)] = 1
-        if min_viable_hui == "isimip3" or min_viable_hui == "ggcmi3":
-            corn_value = 0.8
-            other_value = 0.9
-            min_viable_hui_touse = np.full_like(huifrac, fill_value=other_value)
-            for veg_str in np.unique(ds.patches1d_itype_veg_str.values):
-                if "corn" not in veg_str:
-                    continue
-                is_thistype = np.where((ds.patches1d_itype_veg_str.values == veg_str))[0]
-                patch_index = list(ds[huifrac_var].dims).index("patch")
-                if patch_index == 0:
-                    min_viable_hui_touse[is_thistype,...] = corn_value
-                elif patch_index == ds[huifrac_var].ndim - 1:
-                    min_viable_hui_touse[...,is_thistype] = corn_value
-                else:
-                    # Need patch to be either first or last dimension to allow use of ellipses
-                    raise RuntimeError(f"Temporarily rearrange min_viable_hui_touse so that patch dimension is first (0) or last ({ds[huifrac_var].ndim - 1}), instead of {patch_index}.")
-        elif isinstance(min_viable_hui, str):
-            raise RuntimeError(f"min_viable_hui {min_viable_hui} not recognized. Accepted strings are ggcmi3 or isimip3")
-        else:
-            min_viable_hui_touse = min_viable_hui
-        if np.any(huifrac < min_viable_hui_touse):
-            print(f"Setting {out_var} to zero where minimum viable HUI ({min_viable_hui}) wasn't reached")
-            tmp_da = ds[in_var]
-            tmp = tmp_da.copy().values
-            dont_include = (huifrac < min_viable_hui_touse) & (tmp > 0)
-            tmp[np.where(dont_include)] = 0
-            if "MATURE" in out_var:
-                tmp[np.where(~dont_include & ~np.isnan(tmp))] = 1
-                tmp_da.attrs['units'] = 'fraction'
-            ds[out_var] = xr.DataArray(data = tmp,
-                                       attrs = tmp_da.attrs,
-                                       coords = tmp_da.coords)
-    
-    # Get variants with values set to 0 if season was longer than CLM PFT parameter mxmat
-    if mxmat_limited:
-        tmp_da = ds[out_var]
-        tmp_ra = tmp_da.copy().values
-        for veg_str in np.unique(ds.patches1d_itype_veg_str.values):
-            mxmat_veg_str = veg_str.replace("soybean", "temperate_soybean").replace("tropical_temperate", "tropical")
-            mxmat = mxmats[mxmat_veg_str]
-            tmp_ra[np.where((ds.patches1d_itype_veg_str.values == veg_str) & (ds[gslen_var].values > mxmat))] = 0
-        ds[out_var] = xr.DataArray(data = tmp_ra,
-                                   coords = tmp_da.coords,
-                                   attrs = tmp_da.attrs)
-    
-    # Get *biomass* *actually harvested*
-    if "YIELD" in out_var:
-        ds[out_var] = adjust_grainC(ds[out_var], ds.patches1d_itype_veg_str)
-    
-    # Save details
-    ds[out_var].attrs['min_viable_hui'] = min_viable_hui
-    ds[out_var].attrs['mxmat_limited'] = mxmat_limited
-    
-    # Get dimensions in expected order (time/gs, patch)
-    if not forAnnual:
-        ds[out_var] = ds[out_var].transpose("gs", "patch")
-    
-    return ds
-            
 
 def get_yield_ann(ds, min_viable_hui=1.0, mxmats=None, force_update=False):
     
@@ -1983,11 +1897,6 @@ def strip_cropname(x):
         x = x.replace(y+"_", "")
     return x
 
-def fullname_to_combinedCrop(fullnames, cropList_combined_clm):
-    x = [strip_cropname(y).capitalize() for y in fullnames]
-    z = [y if y in cropList_combined_clm else '' for y in x]
-    return z
-
 
 def subtract_mean(in_ps):
    warnings.filterwarnings("ignore", message="Mean of empty slice") # Happens when you do np.nanmean() of an all-NaN 
@@ -2071,3 +1980,94 @@ def yield_anomalies(ps_in):
                               attrs = ps_in.attrs)
             
     return ps_out
+
+def zero_immatures(ds, out_var="YIELD", min_viable_hui=None, mxmats=None, forAnnual=False, force_update=False):
+    
+    mxmat_limited = bool(mxmats)
+    
+    if any(x in out_var for x in ["YIELD", "MATURE"]):
+        in_var = "GRAINC_TO_FOOD"
+    else:
+        raise RuntimeError(f"out_var {out_var} not recognized. Accepted values: *YIELD*, *MATURE*")
+    
+    huifrac_var = "HUIFRAC"
+    gddharv_var = "GDDHARV"
+    gslen_var = "GSLEN"
+    if forAnnual:
+        out_var += "_PERHARV"
+        in_var += "_PERHARV"
+        huifrac_var += "_PERHARV"
+        gddharv_var += "_PERHARV"
+        gslen_var += "_PERHARV"
+    
+    if out_var in ds and not force_update and all([x in ds[out_var].attrs for x in ['min_viable_hui', 'mxmat_limited']]):
+        if ds[out_var].attrs['min_viable_hui'] == min_viable_hui and ds[out_var].attrs['mxmat_limited'] == mxmat_limited:
+            return ds
+        elif 'locked_yield' in ds[out_var].attrs and ds[out_var].attrs['locked_yield']:
+            return ds
+    
+    ds[out_var] = ds[in_var].copy()
+    
+    # Set yield to zero where minimum viable HUI wasn't reached
+    if min_viable_hui is not None:
+        
+        huifrac = ds[huifrac_var].copy().values
+        huifrac[np.where(ds[gddharv_var].values==0)] = 1
+        if min_viable_hui == "isimip3" or min_viable_hui == "ggcmi3":
+            corn_value = 0.8
+            other_value = 0.9
+            min_viable_hui_touse = np.full_like(huifrac, fill_value=other_value)
+            for veg_str in np.unique(ds.patches1d_itype_veg_str.values):
+                if "corn" not in veg_str:
+                    continue
+                is_thistype = np.where((ds.patches1d_itype_veg_str.values == veg_str))[0]
+                patch_index = list(ds[huifrac_var].dims).index("patch")
+                if patch_index == 0:
+                    min_viable_hui_touse[is_thistype,...] = corn_value
+                elif patch_index == ds[huifrac_var].ndim - 1:
+                    min_viable_hui_touse[...,is_thistype] = corn_value
+                else:
+                    # Need patch to be either first or last dimension to allow use of ellipses
+                    raise RuntimeError(f"Temporarily rearrange min_viable_hui_touse so that patch dimension is first (0) or last ({ds[huifrac_var].ndim - 1}), instead of {patch_index}.")
+        elif isinstance(min_viable_hui, str):
+            raise RuntimeError(f"min_viable_hui {min_viable_hui} not recognized. Accepted strings are ggcmi3 or isimip3")
+        else:
+            min_viable_hui_touse = min_viable_hui
+        if np.any(huifrac < min_viable_hui_touse):
+            print(f"Setting {out_var} to zero where minimum viable HUI ({min_viable_hui}) wasn't reached")
+            tmp_da = ds[in_var]
+            tmp = tmp_da.copy().values
+            dont_include = (huifrac < min_viable_hui_touse) & (tmp > 0)
+            tmp[np.where(dont_include)] = 0
+            if "MATURE" in out_var:
+                tmp[np.where(~dont_include & ~np.isnan(tmp))] = 1
+                tmp_da.attrs['units'] = 'fraction'
+            ds[out_var] = xr.DataArray(data = tmp,
+                                       attrs = tmp_da.attrs,
+                                       coords = tmp_da.coords)
+    
+    # Get variants with values set to 0 if season was longer than CLM PFT parameter mxmat
+    if mxmat_limited:
+        tmp_da = ds[out_var]
+        tmp_ra = tmp_da.copy().values
+        for veg_str in np.unique(ds.patches1d_itype_veg_str.values):
+            mxmat_veg_str = veg_str.replace("soybean", "temperate_soybean").replace("tropical_temperate", "tropical")
+            mxmat = mxmats[mxmat_veg_str]
+            tmp_ra[np.where((ds.patches1d_itype_veg_str.values == veg_str) & (ds[gslen_var].values > mxmat))] = 0
+        ds[out_var] = xr.DataArray(data = tmp_ra,
+                                   coords = tmp_da.coords,
+                                   attrs = tmp_da.attrs)
+    
+    # Get *biomass* *actually harvested*
+    if "YIELD" in out_var:
+        ds[out_var] = adjust_grainC(ds[out_var], ds.patches1d_itype_veg_str)
+    
+    # Save details
+    ds[out_var].attrs['min_viable_hui'] = min_viable_hui
+    ds[out_var].attrs['mxmat_limited'] = mxmat_limited
+    
+    # Get dimensions in expected order (time/gs, patch)
+    if not forAnnual:
+        ds[out_var] = ds[out_var].transpose("gs", "patch")
+    
+    return ds
