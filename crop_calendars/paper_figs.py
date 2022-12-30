@@ -758,7 +758,13 @@ nx = 4
 # figsize = (14, 7.5)
 figsize = (35, 18)
 
-cases = global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList)
+
+if mxmat_limited:
+    mxmats_tmp = mxmats
+else:
+    mxmats_tmp = None
+
+cases = global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, equalize_scatter_axes=equalize_scatter_axes, extra=extra, figsize=figsize, min_viable_hui=min_viable_hui, mxmats=mxmats_tmp, noFigs=noFigs, ny=2, nx=4, obs_for_fig=obs_for_fig, plot_y1=plot_y1, plot_yN=plot_yN, stats_round=stats_round, use_annual_yields=use_annual_yields, w=w)
 
 
 # %% Make maps of individual crops (rainfed, irrigated)
