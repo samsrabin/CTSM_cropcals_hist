@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import matplotlib.colors as mcolors
+import cartopy.feature as cfeature
 
 def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend_bounds='both', vmin=None, vmax=None, cbar=None, ticklabels=None, extend_nonbounds='both'): 
     
@@ -20,8 +21,12 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
         if vrange:
             im.set_clim(vrange[0], vrange[1])
     ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
+    
+    # ax.add_feature(cfeature.BORDERS, linewidth=linewidth, edgecolor="white")
+    # ax.add_feature(cfeature.BORDERS, linewidth=linewidth*0.6)
     ax.coastlines(linewidth=linewidth, color="white")
     ax.coastlines(linewidth=linewidth*0.6)
+    
     if this_title:
         ax.set_title(this_title, fontsize=fontsize['titles'])
     if show_cbar:
