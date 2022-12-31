@@ -37,21 +37,23 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
     for i, casename in enumerate(caselist):
         if i <= 1:
             color = grays[i]
+        elif "CLM Default" in casename:
+            color = [x/255 for x in [92, 219, 219]]
+        elif "Prescribed Calendars" in casename:
+            color = [x/255 for x in [250, 102, 240]]
+        elif "Prescribed Sowing" in casename:
+            color = [x/255 for x in [150, 110, 0]]
+        elif "Prescribed Maturity" in casename:
+            color = [x/255 for x in [128,0,0]]
         elif i==4:
             # Purple more distinct from my light gray
             color = [x/255 for x in [133, 92, 255]]
-        elif casename == "CLM Default":
-            color = [x/255 for x in [92, 219, 219]]
-        elif casename == "Prescribed Calendars":
-            color = [x/255 for x in [250, 102, 240]]
-        elif casename == "Prescribed Sowing":
-            color = [x/255 for x in [150, 110, 0]]
-        elif casename == "Prescribed Maturity":
-            color = [x/255 for x in [128,0,0]]
         else:
             color = cm.Dark2(i-2)
-        if (casename == "CLM Default" and "Original baseline" in caselist) or (casename in ["Prescribed Sowing", "Prescribed Maturity"]):
+        if (casename == "CLM Default" and "Original baseline" in caselist) or (casename in ["Prescribed Sowing", "Prescribed Maturity"]) or "min. HUI 1" in casename:
             linestyle = ":"
+        elif "min. HUI 0" in casename:
+            linestyle = "--"
         else:
             linestyle = "-"
         da.isel(Case=i).plot.line(x=xlabel, ax=ax_this, 
@@ -240,7 +242,14 @@ def get_CLM_ts_prod_y(case, lu_ds, use_annual_yields, min_viable_hui, mxmats, th
 
 
 def global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, \
-    equalize_scatter_axes=False, extra="Total (grains only)", figsize=(35, 18), include_scatter=True, include_shiftsens=True, min_viable_hui="ggcmi3", mxmats=None, noFigs=False, ny=2, nx=4, obs_for_fig="FAOSTAT", plot_y1=1980, plot_yN=2010, stats_round=3, use_annual_yields=False, w=5):
+    equalize_scatter_axes=False, extra="Total (grains only)", figsize=(35, 18), include_scatter=True, include_shiftsens=True, min_viable_hui_list="ggcmi3", mxmats=None, noFigs=False, ny=2, nx=4, obs_for_fig="FAOSTAT", plot_y1=1980, plot_yN=2010, stats_round=3, use_annual_yields=False, w=5):
+    
+    if not isinstance(min_viable_hui_list, list):
+        min_viable_hui_list = [min_viable_hui_list]
+    
+    # Allow multiple min_viable_hui values only if this is the case list
+    if len(min_viable_hui_list) > 1 and [x for x in cases.keys()] != ['CLM Default', 'Prescribed Calendars']:
+        raise RuntimeError("Multiple min_viable_hui values allowed only for case list ['CLM Default', 'Prescribed Calendars']")
 
     if not noFigs:
         f_lines_area, axes_lines_area = get_figs_axes(ny, nx, figsize)
@@ -267,11 +276,16 @@ def global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao
                 f_scatter_yield_dt_shiftL, axes_scatter_yield_dt_shiftL = get_figs_axes(ny, nx, figsize)
                 f_scatter_yield_dt_shiftR, axes_scatter_yield_dt_shiftR = get_figs_axes(ny, nx, figsize)
 
+    # Get list 
     fig_caselist = ["FAOSTAT"]
     this_earthstat_res = "f09_g17"
     fig_caselist += [f"EarthStat ({this_earthstat_res})"]
-    for (casename, case) in cases.items():
-        fig_caselist.append(casename)
+    for min_viable_hui in min_viable_hui_list:
+        for (casename, case) in cases.items():
+            fig_casename = casename
+            if min_viable_hui != "ggcmi3":
+                fig_casename += f" (min. HUI {min_viable_hui})"
+            fig_caselist.append(fig_casename)
 
     mxmat_limited = mxmats is not None
     
@@ -334,30 +348,32 @@ def global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao
         ts_prod_y = 1e-6*prod_tyx.sum(dim=["lat","lon"]).values
         ydata_prod = np.stack((ydata_prod,
                             ts_prod_y))
-            
-        # CLM outputs
-        for i, (casename, case) in enumerate(cases.items()):
-            is_obs.append(False)
-            lu_ds = reses[case['res']]['ds']
-            
-            # Area
-            ts_area_y = get_CLM_ts_area_y(case, lu_ds, thisCrop_clm, cropList_combined_clm)
-            ydata_area = np.concatenate((ydata_area,
-                                        np.expand_dims(ts_area_y.values, axis=0)),
-                                        axis=0)
-            
-            # Production
-            get_CLM_ts_prod_y(case, lu_ds, use_annual_yields, min_viable_hui, mxmats, thisCrop_clm, cropList_combined_clm)
-            ydata_prod = np.concatenate((ydata_prod,
-                                        np.expand_dims(ts_prod_y.values, axis=0)),
-                                        axis=0)
-            
-            # Get yield time dimension name
-            non_Crop_dims = [x for x in case['ds']['ts_prod_yc'].dims if x != "Crop"]
-            if len(non_Crop_dims) != 1:
-                raise RuntimeError(f"Expected one non-Crop dimension of case['ds']['ts_prod_yc']; found {len(non_Crop_dims)}: {non_Crop_dims}")
-            yield_time_dim = non_Crop_dims[0]
         
+        # CLM outputs
+        for min_viable_hui in min_viable_hui_list:
+            
+            for i, (casename, case) in enumerate(cases.items()):
+                lu_ds = reses[case['res']]['ds']
+                is_obs.append(False)
+            
+                # Area
+                ts_area_y = get_CLM_ts_area_y(case, lu_ds, thisCrop_clm, cropList_combined_clm)
+                ydata_area = np.concatenate((ydata_area,
+                                            np.expand_dims(ts_area_y.values, axis=0)),
+                                            axis=0)
+                
+                # Production
+                ts_prod_y = get_CLM_ts_prod_y(case, lu_ds, use_annual_yields, min_viable_hui, mxmats, thisCrop_clm, cropList_combined_clm)
+                ydata_prod = np.concatenate((ydata_prod,
+                                            np.expand_dims(ts_prod_y.values, axis=0)),
+                                            axis=0)
+                
+                # Get yield time dimension name
+                non_Crop_dims = [x for x in case['ds']['ts_prod_yc'].dims if x != "Crop"]
+                if len(non_Crop_dims) != 1:
+                    raise RuntimeError(f"Expected one non-Crop dimension of case['ds']['ts_prod_yc']; found {len(non_Crop_dims)}: {non_Crop_dims}")
+                yield_time_dim = non_Crop_dims[0]
+
         # Convert ha to Mha
         ydata_area *= 1e-6
             

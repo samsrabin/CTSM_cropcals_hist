@@ -723,6 +723,11 @@ importlib.reload(cc)
 
 # min_viable_hui = 1.0
 min_viable_hui = "ggcmi3"
+include_scatter = True
+# min_viable_hui = ["ggcmi3", 0, 1]
+# include_scatter = False
+
+include_shiftsens = True
 
 # Window width for detrending (0 for signal.detrend())
 w = 5
@@ -764,7 +769,7 @@ if mxmat_limited:
 else:
     mxmats_tmp = None
 
-cases = global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, equalize_scatter_axes=equalize_scatter_axes, extra=extra, figsize=figsize, min_viable_hui=min_viable_hui, mxmats=mxmats_tmp, noFigs=noFigs, ny=2, nx=4, obs_for_fig=obs_for_fig, plot_y1=plot_y1, plot_yN=plot_yN, stats_round=stats_round, use_annual_yields=use_annual_yields, w=w)
+cases = global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, equalize_scatter_axes=equalize_scatter_axes, extra=extra, figsize=figsize, include_scatter=include_scatter, include_shiftsens=include_shiftsens, min_viable_hui_list=min_viable_hui, mxmats=mxmats_tmp, noFigs=noFigs, ny=2, nx=4, obs_for_fig=obs_for_fig, plot_y1=plot_y1, plot_yN=plot_yN, stats_round=stats_round, use_annual_yields=use_annual_yields, w=w)
 
 
 # %% Make maps of individual crops (rainfed, irrigated)
