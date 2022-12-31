@@ -1248,7 +1248,7 @@ def get_ts_prod_clm_yc_da(yield_gd, lu_ds, yearList, cropList_combined_clm):
                                                         "Crop": cropList_combined_clm})
     return ts_prod_clm_yc_da
 
-def get_ts_prod_clm_yc_da2(case_ds, lu_ds, yieldVar, cropList_combined_clm):
+def get_ts_prod_clm_yc_da2(case_ds, lu_ds, yieldVar, cropList_combined_clm, quiet=False):
     
    # Get time dimension names.
    # To match time dimension on lu_ds, rename anything other than "time" to that.
@@ -1265,7 +1265,8 @@ def get_ts_prod_clm_yc_da2(case_ds, lu_ds, yieldVar, cropList_combined_clm):
    else:
        raise RuntimeError(f"Unknown time_dim_out for time_dim_in {time_dim_in}")
    if time_dim_in != "time":
-       print(f"WARNING: Using calendar years from LU data with yield data of time dimension {time_dim_in}.")
+       if not quiet:
+           print(f"WARNING: Using calendar years from LU data with yield data of time dimension {time_dim_in}.")
        lu_ds = lu_ds.assign_coords({'time': case_ds[yieldVar].gs.values}).rename({'time': time_dim_in})
    
    prod_da = case_ds[yieldVar] * lu_ds['AREA_CFT']
