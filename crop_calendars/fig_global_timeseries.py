@@ -242,7 +242,7 @@ def get_CLM_ts_prod_y(case, lu_ds, use_annual_yields, min_viable_hui, mxmats, th
 
 
 def global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, \
-    equalize_scatter_axes=False, extra="Total (grains only)", figsize=(35, 18), include_scatter=True, include_shiftsens=True, min_viable_hui_list="ggcmi3", mxmats=None, noFigs=False, ny=2, nx=4, obs_for_fig="FAOSTAT", plot_y1=1980, plot_yN=2010, stats_round=3, use_annual_yields=False, w=5):
+    equalize_scatter_axes=False, extra="Total (grains only)", figsize=(35, 18), include_scatter=True, include_shiftsens=True, min_viable_hui_list="ggcmi3", mxmats=None, noFigs=False, ny=2, nx=4, obs_for_fig="FAOSTAT", plot_y1=1980, plot_yN=2010, stats_round=3, use_annual_yields=False, verbose=False, w=5):
     
     if not isinstance(min_viable_hui_list, list):
         min_viable_hui_list = [min_viable_hui_list]
@@ -290,6 +290,7 @@ def global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao
     mxmat_limited = mxmats is not None
     
     for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
+        print(f"{thisCrop_clm}...")
         is_obs = []
         
         if not noFigs:
@@ -439,13 +440,15 @@ def global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao
             this_obs = fig_caselist[o]
             if this_obs != obs_for_fig:
                 continue
-            print(f"Comparing to {this_obs}:")
+            if verbose:
+                print(f"Comparing to {this_obs}:")
             
             bias = cc.get_timeseries_bias(ydata_yield_dt[inds_sim,:], ydata_yield_dt[o,:], fig_caselist, weights=ydata_prod[o,:])
             if this_obs == obs_for_fig:
                 bias0 = bias
-            for i, casename in enumerate(fig_caselist[2:]):
-                print(f"   {thisCrop_clm} bias MM window={w} weighted {casename}: {np.round(bias[i], stats_round)}")
+            if verbose:
+                for i, casename in enumerate(fig_caselist[2:]):
+                    print(f"   {thisCrop_clm} bias MM window={w} weighted {casename}: {np.round(bias[i], stats_round)}")
             
             # corrcoeff = [stats.linregress(ydata_yield[o,:], ydata_yield[x,:]) for x in np.arange(2, ydata_yield.shape[0])]
             # for i, casename in enumerate(fig_caselist[2:]):
@@ -459,20 +462,23 @@ def global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao
             weights = ydata_prod[o,:]
             
             corrcoeff = [cc.weighted_pearsons_r(ydata_yield_dt[o,:], ydata_yield_dt[x,:], weights) for x in inds_sim]
-            for i, casename in enumerate(fig_caselist[2:]):
-                print(f"   {thisCrop_clm} r MM window={w} weighted {casename}: {np.round(corrcoeff[i], stats_round)}")
+            if verbose:
+                for i, casename in enumerate(fig_caselist[2:]):
+                    print(f"   {thisCrop_clm} r MM window={w} weighted {casename}: {np.round(corrcoeff[i], stats_round)}")
             if this_obs == obs_for_fig:
                 corrcoef_ref = corrcoeff
                 
             corrcoeffL = [cc.weighted_pearsons_r(ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[x,:], weights) for x in inds_sim]
-            for i, casename in enumerate(fig_caselist[2:]):
-                print(f"   {thisCrop_clm} r MM window={w} unweighted shift LEFT {casename}: {np.round(corrcoeffL[i], stats_round)}")
+            if verbose:
+                for i, casename in enumerate(fig_caselist[2:]):
+                    print(f"   {thisCrop_clm} r MM window={w} unweighted shift LEFT {casename}: {np.round(corrcoeffL[i], stats_round)}")
             if this_obs == obs_for_fig:
                 corrcoefL_ref = corrcoeffL
             
             corrcoeffR = [cc.weighted_pearsons_r(ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[x,:], weights) for x in inds_sim]
-            for i, casename in enumerate(fig_caselist[2:]):
-                print(f"   {thisCrop_clm} r MM window={w} unweighted shift RIGHT {casename}: {np.round(corrcoeffR[i], stats_round)}")
+            if verbose:
+                for i, casename in enumerate(fig_caselist[2:]):
+                    print(f"   {thisCrop_clm} r MM window={w} unweighted shift RIGHT {casename}: {np.round(corrcoeffR[i], stats_round)}")
             if this_obs == obs_for_fig:
                 corrcoefR_ref = corrcoeffR
         
@@ -491,7 +497,8 @@ def global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao
                 else:
                     Lshift_better = False
             if Lshift_better:
-                print(f"Shifting {fig_caselist[s]} sim yield 1 year left")
+                if verbose:
+                    print(f"Shifting {fig_caselist[s]} sim yield 1 year left")
                 ydata_area_touse[s,:] = ydata_area_shiftL[s,:]
                 ydata_prod_touse[s,:] = ydata_prod_shiftL[s,:]
                 ydata_yield_touse[s,:] = ydata_yield_shiftL[s,:]
@@ -499,7 +506,8 @@ def global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao
                 corrcoef_ref_touse[i] = corrcoefL_ref[i]
                 shift_symbols.append("$^L$")
             elif Rshift_better:
-                print(f"Shifting {fig_caselist[s]} sim yield 1 year right")
+                if verbose:
+                    print(f"Shifting {fig_caselist[s]} sim yield 1 year right")
                 ydata_area_touse[s,:] = ydata_area_shiftR[s,:]
                 ydata_prod_touse[s,:] = ydata_prod_shiftR[s,:]
                 ydata_yield_touse[s,:] = ydata_yield_shiftR[s,:]
