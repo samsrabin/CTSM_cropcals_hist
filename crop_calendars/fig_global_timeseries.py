@@ -190,6 +190,52 @@ def finishup_allcrops_scatter(c, ny, nx, axes_this, f_this, suptitle, outDir_fig
                    bbox_inches='tight')
     plt.close(f_this)
 
+def get_CLM_ts_area_y(case, lu_ds, thisCrop_clm, cropList_combined_clm):
+        
+        dummy_y_da = lu_ds.AREA_CFT.isel(patch=0, drop=True)
+        area_y = np.full(dummy_y_da.shape, 0.0)
+        if "Total" in thisCrop_clm:
+            incl_crops = [x for x in case['ds'].vegtype_str.values if x.replace('irrigated_','').replace('temperate_','').replace('tropical_','').replace('spring_','') in [y.lower() for y in cropList_combined_clm]]
+            if thisCrop_clm == "Total (no sgc)":
+                incl_crops = [x for x in incl_crops if "sugarcane" not in x]
+            elif thisCrop_clm == "Total (grains only)":
+                incl_crops = [x for x in incl_crops if "sugarcane" not in x and "cotton" not in x]
+            elif thisCrop_clm == "Total":
+                pass
+            else:
+                raise RuntimeError("???")
+            incl_crops_int = [utils.ivt_str2int(x) for x in incl_crops]
+            isel_list = [i for i, x in enumerate(lu_ds.patches1d_itype_veg.values) if x in incl_crops_int]
+            area_y = lu_ds.AREA_CFT.isel(patch=isel_list).sum(dim="patch").values
+        else:
+            for pft_str in case['ds'].vegtype_str.values:
+                if thisCrop_clm.lower() not in pft_str:
+                    continue
+                pft_int = utils.ivt_str2int(pft_str)
+                where_thisCrop = np.where(lu_ds['patches1d_itype_veg'] == pft_int)[0]
+                area_y += lu_ds.AREA_CFT.isel(patch=where_thisCrop).sum(dim="patch").values
+        area_y *= 1e-4 # m2 to ha
+        ts_area_y = xr.DataArray(data=area_y, coords=dummy_y_da.coords)
+        
+        return ts_area_y
+
+
+def get_CLM_ts_prod_y(case, lu_ds, use_annual_yields, min_viable_hui, mxmats, thisCrop_clm, cropList_combined_clm):
+    if use_annual_yields:
+        case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats)
+        yieldVar = "YIELD_ANN"
+    else:
+        case['ds'] = cc.zero_immatures(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats)
+        yieldVar = "YIELD"
+    case['ds']['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da2(case['ds'], lu_ds, yieldVar, cropList_combined_clm)
+    if thisCrop_clm == "Total (no sgc)":
+        ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Total'])['ts_prod_yc'].sum(dim="Crop").copy()
+    elif thisCrop_clm == "Total (grains only)":
+        ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Cotton', 'Total'])['ts_prod_yc'].sum(dim="Crop").copy()
+    else:
+        ts_prod_y = case['ds']['ts_prod_yc'].sel(Crop=thisCrop_clm).copy()
+    
+    return ts_prod_y
 
 
 
@@ -287,51 +333,16 @@ def global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao
         # CLM outputs
         for i, (casename, case) in enumerate(cases.items()):
             is_obs.append(False)
+            lu_ds = reses[case['res']]['ds']
             
             # Area
-            lu_ds = reses[case['res']]['ds']
-            dummy_y_da = lu_ds.AREA_CFT.isel(patch=0, drop=True)
-            area_y = np.full(dummy_y_da.shape, 0.0)
-            if "Total" in thisCrop_clm:
-                incl_crops = [x for x in case['ds'].vegtype_str.values if x.replace('irrigated_','').replace('temperate_','').replace('tropical_','').replace('spring_','') in [y.lower() for y in cropList_combined_clm]]
-                if thisCrop_clm == "Total (no sgc)":
-                    incl_crops = [x for x in incl_crops if "sugarcane" not in x]
-                elif thisCrop_clm == "Total (grains only)":
-                    incl_crops = [x for x in incl_crops if "sugarcane" not in x and "cotton" not in x]
-                elif thisCrop_clm == "Total":
-                    pass
-                else:
-                    raise RuntimeError("???")
-                incl_crops_int = [utils.ivt_str2int(x) for x in incl_crops]
-                isel_list = [i for i, x in enumerate(lu_ds.patches1d_itype_veg.values) if x in incl_crops_int]
-                area_y = lu_ds.AREA_CFT.isel(patch=isel_list).sum(dim="patch").values
-            else:
-                for pft_str in case['ds'].vegtype_str.values:
-                    if thisCrop_clm.lower() not in pft_str:
-                        continue
-                    pft_int = utils.ivt_str2int(pft_str)
-                    where_thisCrop = np.where(lu_ds['patches1d_itype_veg'] == pft_int)[0]
-                    area_y += lu_ds.AREA_CFT.isel(patch=where_thisCrop).sum(dim="patch").values
-            area_y *= 1e-4 # m2 to ha
-            ts_area_y = xr.DataArray(data=area_y, coords=dummy_y_da.coords)
+            ts_area_y = get_CLM_ts_area_y(case, lu_ds, thisCrop_clm, cropList_combined_clm)
             ydata_area = np.concatenate((ydata_area,
                                         np.expand_dims(ts_area_y.values, axis=0)),
                                         axis=0)
             
             # Production
-            if use_annual_yields:
-                case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats)
-                yieldVar = "YIELD_ANN"
-            else:
-                case['ds'] = cc.zero_immatures(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats)
-                yieldVar = "YIELD"
-            case['ds']['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da2(case['ds'], lu_ds, yieldVar, cropList_combined_clm)
-            if thisCrop_clm == "Total (no sgc)":
-                ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Total'])['ts_prod_yc'].sum(dim="Crop").copy()
-            elif thisCrop_clm == "Total (grains only)":
-                ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Cotton', 'Total'])['ts_prod_yc'].sum(dim="Crop").copy()
-            else:
-                ts_prod_y = case['ds']['ts_prod_yc'].sel(Crop=thisCrop_clm).copy()
+            get_CLM_ts_prod_y(case, lu_ds, use_annual_yields, min_viable_hui, mxmats, thisCrop_clm, cropList_combined_clm)
             ydata_prod = np.concatenate((ydata_prod,
                                         np.expand_dims(ts_prod_y.values, axis=0)),
                                         axis=0)
@@ -341,6 +352,7 @@ def global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao
             if len(non_Crop_dims) != 1:
                 raise RuntimeError(f"Expected one non-Crop dimension of case['ds']['ts_prod_yc']; found {len(non_Crop_dims)}: {non_Crop_dims}")
             yield_time_dim = non_Crop_dims[0]
+        
         # Convert ha to Mha
         ydata_area *= 1e-6
             
