@@ -157,7 +157,7 @@ def finishup_allcrops_lines(c, ny, nx, axes_this, f_this, suptitle, outDir_figs,
     f_this.legend(handles = axes_this[0].lines,
                   labels = fig_caselist,
                   loc = "upper center",
-                  ncol = int(np.floor(len(fig_caselist)/3))+1,
+                  ncol = int(np.ceil(len(fig_caselist)/2)),
                   fontsize=28)
 
     f_this.savefig(outDir_figs + "Timeseries " + suptitle + " by crop.pdf",
@@ -183,7 +183,7 @@ def finishup_allcrops_scatter(c, ny, nx, axes_this, f_this, suptitle, outDir_fig
     f_this.legend(handles = legend_handles,
                   labels = [fig_caselist[x] for x in inds_sim],
                   loc = "upper center",
-                  ncol = int(np.floor(len(fig_caselist)/4))+1,
+                  ncol = int(np.ceil(len(fig_caselist)/2)),
                   fontsize=28)
 
     f_this.savefig(outDir_figs + "Scatter " + suptitle + " by crop.pdf",
