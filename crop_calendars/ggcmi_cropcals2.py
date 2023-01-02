@@ -35,7 +35,7 @@ import utils
 # %% Setup
 
 # Where to save output files
-outdir = "/Users/Shared/CESM_work/crop_dates/"
+outdir = "/Users/Shared/CESM_work/crop_dates_mostrice/"
 
 # Files/directories to use for inputs
 ### f10_f10_mg37
@@ -110,8 +110,8 @@ crop_dict = {
     "irrigated_pulses": set_crop_dict(58, "pea_ir"),
     "rapeseed": set_crop_dict(59, "rap_rf"),
     "irrigated_rapeseed": set_crop_dict(60, "rap_ir"),
-    "rice": set_crop_dict(61, "ri1_rf"),
-    "irrigated_rice": set_crop_dict(62, "ri1_ir"),
+    "rice": set_crop_dict(61, "ric_rf"),
+    "irrigated_rice": set_crop_dict(62, "ric_ir"),
     "sorghum": set_crop_dict(63, "sor_rf"),
     "irrigated_sorghum": set_crop_dict(64, "sor_ir"),
     "sugarbeet": set_crop_dict(65, "sgb_rf"),
