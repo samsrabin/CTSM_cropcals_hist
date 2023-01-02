@@ -109,6 +109,35 @@ def adjust_gridded_lonlats(patches1d_lonlat, patches1d_ij, lu_dsg_lonlat_da, thi
         return lu_dsg_lonlat_da, patches1d_ij
    
 
+def annual_mean_from_monthly(ds, var):
+    """
+    weight by days in each month
+    """
+    # Determine the month length
+    month_length = ds.time.dt.days_in_month
+
+    # Calculate the weights
+    wgts = month_length.groupby("time.year") / month_length.groupby("time.year").sum()
+
+    # Make sure the weights in each year add up to 1
+    np.testing.assert_allclose(wgts.groupby("time.year").sum(xr.ALL_DIMS), 1.0)
+
+    # Subset our dataset for our variable
+    obs = ds[var]
+
+    # Setup our masking for nan values
+    cond = obs.isnull()
+    ones = xr.where(cond, 0.0, 1.0)
+
+    # Calculate the numerator
+    obs_sum = (obs * wgts).resample(time="AS").sum(dim="time")
+
+    # Calculate the denominator
+    ones_out = (ones * wgts).resample(time="AS").sum(dim="time")
+
+    # Return the weighted average
+    return obs_sum / ones_out
+
 
 # After importing a file, restrict it to years of interest.
 def check_and_trim_years(y1, yN, ds_in):
@@ -1611,7 +1640,65 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
     # Convert time axis to integer year
     this_ds_gs = this_ds_gs.assign_coords({"time": [t.year for t in this_ds.time_bounds.values[:,0]]})
         
-    return this_ds_gs
+    # Import monthly irrigation outputs, if present
+    pattern = os.path.join(os.path.dirname(filename), "*irrig_monthly.nc")
+    irrig_file = glob.glob(pattern)
+    if irrig_file:
+        if len(irrig_file) > 1:
+            raise RuntimeError(f"Expected at most 1 *irrig_monthly.nc; found {len(irrig_file)}")
+        irrig_file = irrig_file[0]
+        tmp = xr.open_dataset(irrig_file)
+        new_time = [x[0] for x in tmp.time_bounds.values]
+        tmp = tmp.assign_coords(time=new_time)
+        tmp = tmp.sel(time=slice(f"{y1}-01-01", f"{yN}-12-31"))
+        
+        # Calculate limited irrigation
+        mms_to_m3d = (tmp['area']*1e6 * tmp['landfrac']) * 1e-3 * 60*60*24
+        days_in_month = tmp.time.dt.days_in_month
+        qirrig = np.expand_dims((tmp["QIRRIG_FROM_SURFACE"] * 60*60*24*days_in_month * mms_to_m3d).values, axis=3) 
+        avail = np.expand_dims(0.9*tmp["VOLRMCH"], axis=3)
+        concatted = np.concatenate((qirrig, avail), axis=3)
+        qirrig_lim = np.min(concatted, axis=3)
+        qirrig_lim = xr.DataArray(data = qirrig_lim,
+                                coords = tmp["QIRRIG_FROM_SURFACE"].coords,
+                                attrs = tmp["QIRRIG_FROM_SURFACE"].attrs)
+        qirrig_lim = qirrig_lim / (60*60*24*days_in_month) / mms_to_m3d
+        qirrig_lim.attrs = tmp["QIRRIG_FROM_SURFACE"].attrs
+        qirrig_lim.attrs['long_name'] = "water added through surface water irrigation, limited by 90% of available"
+        tmp["QIRRIG_FROM_SURFACE_LIM"] = qirrig_lim
+        
+        # Calculate unfulfilled demand
+        tmp['UNFULFILLED_DEMAND'] = tmp['QIRRIG_FROM_SURFACE'] - tmp['QIRRIG_FROM_SURFACE_LIM']
+        tmp['UNFULFILLED_DEMAND'].attrs = tmp['QIRRIG_FROM_SURFACE'].attrs
+        tmp['UNFULFILLED_DEMAND'].attrs['long_name'] = 'irrigation demand unable to be filled based on limitation (90% of VOLRMCH)'
+
+        # Calculate irrigation as fraction of available water
+        for v in ["QIRRIG_FROM_SURFACE", "QIRRIG_FROM_SURFACE_LIM", "UNFULFILLED_DEMAND"]:
+            v2 = v + "_FRAC"
+            tmp[v2] = (tmp[v] * 60*60*24*days_in_month * mms_to_m3d) / tmp["VOLRMCH"]
+            tmp[v2].attrs = tmp[v].attrs
+            tmp[v2].attrs['units'] = "fraction of available"
+            tmp[v2].attrs['long_name'] = tmp[v2].attrs['long_name'] + " as frac. available"
+        
+        irrig_ds = xr.Dataset()
+        for x in tmp:
+            if "time" not in tmp[x].dims or x=="time_bounds":
+                if x != "time_bounds":
+                    irrig_ds[x] = tmp[x]
+                continue
+            irrig_ds[x] = annual_mean_from_monthly(tmp, x)
+            irrig_ds[x].attrs = tmp[x].attrs
+            
+            # Convert mm/s to m3/yr
+            if irrig_ds[x].attrs['units'] == "mm/s":
+                irrig_ds[x] = (tmp['area']*1e6 * tmp['landfrac']) * irrig_ds[x] * 60*60*24*365 * 1e-3
+                irrig_ds[x].attrs = tmp[x].attrs
+                irrig_ds[x].attrs['units'] = "m3/yr"
+
+    else:
+        irrig_ds = None
+        
+    return this_ds_gs, irrig_ds
 
 
 def make_axis(fig, ny, nx, n):
