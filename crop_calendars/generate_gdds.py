@@ -448,7 +448,7 @@ def main(argv):
         if args.land_use_file:
             y1_lu = y1 if args.first_land_use_year == None else args.first_land_use_year
             yN_lu = yN if args.last_land_use_year == None else args.last_land_use_year
-            lu_ds = cc.open_lu_ds(args.land_use_file, y1_lu, yN_lu, gdd_maps_ds)
+            lu_ds = cc.open_lu_ds(args.land_use_file, y1_lu, yN_lu, gdd_maps_ds, ungrid=False)
             lu_years_text = f" (masked by {y1_lu}-{yN_lu} area)"
             lu_years_file = f"_mask{y1_lu}-{yN_lu}"
         else:

@@ -1719,7 +1719,7 @@ def mask_immature(this_ds, this_vegtype, gridded_da):
     return gridded_da
 
 
-def open_lu_ds(filename, y1, yN, existing_ds):
+def open_lu_ds(filename, y1, yN, existing_ds, ungrid=True):
     # Open and trim to years of interest
     dsg = xr.open_dataset(filename).sel(time=slice(y1,yN))
     
@@ -1732,6 +1732,9 @@ def open_lu_ds(filename, y1, yN, existing_ds):
     dsg['AREA_CFT'] = dsg.AREA*1e6 * dsg.LANDFRAC_PFT * dsg.PCT_CROP/100 * dsg.PCT_CFT/100
     dsg['AREA_CFT'].attrs = {'units': 'm2'}
     dsg['AREA_CFT'].load()
+    
+    if not ungrid:
+        return dsg
     
     # Un-grid
     query_ilons = [int(x)-1 for x in existing_ds['patches1d_ixy'].values]
