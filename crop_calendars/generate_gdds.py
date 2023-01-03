@@ -312,8 +312,8 @@ def main(argv):
         return map_ds.assign_attrs({'incl_vegtypes_str': incl_vegtypes_str,
                                     'dummy_fill': dummy_fill,
                                     'outdir_figs': outdir_figs,
-                                    'args.first_season': args.first_season,
-                                    'args.last_season': args.last_season})
+                                    'y1': args.first_season,
+                                    'yN': args.last_season})
     
     if save_figs and not args.only_make_figs:
         if not os.path.exists(outdir_figs):
@@ -441,9 +441,13 @@ def main(argv):
         dummy_fill = gdd_maps_ds.attrs['dummy_fill']
         if not outdir_figs:
             outdir_figs = gdd_maps_ds.attrs['outdir_figs']
-        y1 = gdd_maps_ds.attrs['y1']
-        yN = gdd_maps_ds.attrs['yN']
-        
+        try:
+            y1 = gdd_maps_ds.attrs['y1']
+            yN = gdd_maps_ds.attrs['yN']
+        # Backwards compatibility with a bug (fixed 2023-01-03)
+        except:
+            y1 = gdd_maps_ds.attrs['args.first_season']
+            yN = gdd_maps_ds.attrs['args.last_season']
         # Import LU data, if doing so
         if args.land_use_file:
             y1_lu = y1 if args.first_land_use_year == None else args.first_land_use_year
