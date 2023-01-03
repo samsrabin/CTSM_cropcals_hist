@@ -339,8 +339,10 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 cbar_units += ": None!"
             
         rainfed_types = [x for x in found_types if "irrigated" not in x]
+        subplot_num = nx*c+1
+        subplot_str = chr(ord('`') + subplot_num) # or ord('@') for capital
         if new_axes:
-            ax = fig.add_subplot(ny,nx,nx*c+1,projection=ccrs.PlateCarree(), ylabel="mirntnt")
+            ax = fig.add_subplot(ny,nx,subplot_num,projection=ccrs.PlateCarree(), ylabel="mirntnt")
             axes.append(ax)
             cb = None
         else:
@@ -359,7 +361,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 extend = "both"
         elif extend is None:
             extend = "neither"
-        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend)
+        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, subplot_label=subplot_str)
         if new_axes:
             ims.append(im)
             cbs.append(cb)
@@ -368,8 +370,10 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
             cbs[i*2] = cb
 
         irrigated_types = [x for x in found_types if "irrigated" in x]
+        subplot_num = nx*c+2
+        subplot_str = chr(ord('`') + subplot_num) # or ord('@') for capital
         if new_axes:
-            ax = fig.add_subplot(ny,nx,nx*c+2,projection=ccrs.PlateCarree())
+            ax = fig.add_subplot(ny,nx,subplot_num,projection=ccrs.PlateCarree())
             axes.append(ax)
             cb = None
         else:
@@ -391,7 +395,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 extend = "neither"
         if cmap_to_use is None:
             cmap_to_use = cmap
-        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend)
+        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, subplot_label=subplot_str)
         if new_axes:
             ims.append(im)
             cbs.append(cb)
@@ -401,7 +405,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
     return units, vrange, fig, ims, axes, cbs, manual_colors
 
 
-def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend_bounds='both', vmin=None, vmax=None, cbar=None, ticklabels=None, extend_nonbounds='both'): 
+def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend_bounds='both', vmin=None, vmax=None, cbar=None, ticklabels=None, extend_nonbounds='both', subplot_label=None): 
     
     if bounds is not None:
         norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend_bounds)
@@ -418,6 +422,10 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
         if vrange:
             im.set_clim(vrange[0], vrange[1])
     ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
+    
+    if subplot_label is not None:
+        plt.text(0, 0.95, f"({subplot_label})", transform=ax.transAxes,
+             fontsize=fontsize['axislabels'])
     
     # ax.add_feature(cfeature.BORDERS, linewidth=linewidth, edgecolor="white")
     # ax.add_feature(cfeature.BORDERS, linewidth=linewidth*0.6)
