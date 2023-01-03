@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 # Import shared functions
 import os
@@ -253,6 +254,13 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
         # Get mean, set colormap
         diverging_map = "PiYG_r"
         units = var_info['units']
+        bounds = None
+        vrange = None
+        vmin_to_use = None
+        vmax_to_use = None
+        ticklabels_to_use = None
+        manual_colors = False
+        extend = None
         if units == "day of year":
             if time_dim in this_map.dims:
                 ar = stats.circmean(this_map, high=365, low=1, axis=this_map.dims.index(time_dim), nan_policy='omit')
@@ -274,19 +282,24 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                     cmap = diff_cmap
                 else:
                     cmap = diverging_map
-                    
-                vrange = [-165, 165]
+                
+                manual_colors = True
+                bounds = np.arange(-165, 165+1, 30)
+                ticklabels_to_use = bounds
                 units = "days"
+                cmap_to_use = cm.get_cmap(cmap)
+                extend = "both"
             else:
                 if abs_cmap:
                     cmap = abs_cmap
                 else:
                     cmap = 'twilight_shifted'
-                vrange = [1, 365]
-                if vmin != None:
-                    vrange[0] = vmin_to_use
-                if vmax != None:
-                    vrange[1] = vmax_to_use
+                
+                manual_colors = True
+                bounds = np.append(np.append(1, np.arange(50, 350+1, 50)), 365)
+                cmap_to_use = cm.get_cmap(cmap)
+                units = "Day of year"
+                extend = "neither"
         else:
             if time_dim in this_map.dims:
                 this_map = this_map.mean(dim=time_dim)
@@ -342,10 +355,11 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
             this_map_sel = xr.DataArray(data=this_map_sel_vals,
                                         coords=this_map_sel.coords,
                                         attrs=this_map_sel.attrs)
-            extend = "both"
-        else:
+            if extend is None:
+                extend = "both"
+        elif extend is None:
             extend = "neither"
-        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend)
+        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend)
         if new_axes:
             ims.append(im)
             cbs.append(cb)
@@ -370,22 +384,26 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
             this_map_sel = xr.DataArray(data=this_map_sel_vals,
                                         coords=this_map_sel.coords,
                                         attrs=this_map_sel.attrs)
-            extend = "both"
+            if extend is None:
+                extend = "both"
         else:
-            extend = "neither"
-        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend)
+            if extend is None:
+                extend = "neither"
+        if cmap_to_use is None:
+            cmap_to_use = cmap
+        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend)
         if new_axes:
             ims.append(im)
             cbs.append(cb)
         else:
             ims[i*2 + 1] = im
             cbs[i*2 + 1] = cb
-    return units, vrange, fig, ims, axes, cbs
+    return units, vrange, fig, ims, axes, cbs, manual_colors
 
 
 def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend_bounds='both', vmin=None, vmax=None, cbar=None, ticklabels=None, extend_nonbounds='both'): 
     
-    if bounds:
+    if bounds is not None:
         norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend_bounds)
         im = ax.pcolormesh(this_map.lon.values, this_map.lat.values,
                            this_map, shading="auto",
@@ -411,7 +429,12 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
     if show_cbar:
         if cbar:
             cbar.remove()
-        cbar = plt.colorbar(im, ax=ax, orientation="horizontal", fraction=0.1, pad=0.02, extend=extend_nonbounds)
+        
+        if bounds is not None:
+            cbar = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), orientation='horizontal', fraction=0.1, pad=0.02)
+        else:    
+            cbar = plt.colorbar(im, ax=ax, orientation="horizontal", fraction=0.1, pad=0.02, extend=extend_nonbounds)
+        
         if ticklabels is not None:
             cbar.set_ticks(ticklabels)
         cbar.set_label(label=units, fontsize=fontsize['axislabels'])
@@ -530,13 +553,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
             ims = []
             axes = []
             cbs = []
-            units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, abs_cmap=abs_cmap, diff_cmap=diff_cmap)
-
-            if ref_casename:
-                extend = cc.equalize_colorbars(ims[:nx], this_var=this_var)
-                extend = cc.equalize_colorbars(ims[nx:], this_var=this_var)
-            elif not vrange:
-                extend = cc.equalize_colorbars(ims, this_var=this_var)
+            units, vrange, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, abs_cmap=abs_cmap, diff_cmap=diff_cmap)
 
             fig.suptitle(suptitle,
                             x = suptitle_xpos,
@@ -554,30 +571,36 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                 cb.ax.tick_params(labelsize=fontsize['ticklabels'])
                 cb.set_label(units, fontsize=fontsize['titles'])
             
-            # Chunk colorbar
-            vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[0], axes[0], this_var, abs_cmap, False)
-            if ref_casename:
-                diff_vmin, diff_vmax, diff_Ncolors, diff_this_cmap, diff_cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[2], axes[2], this_var, diff_cmap, True)
-            else:
-                diff_vmin = None
-                diff_vmax = None
-                diff_Ncolors = None
-                diff_this_cmap = None
-                diff_cbar_ticklabels = None
-            units, vrange, fig, ims, axes, cbs = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange)
-            
-            # Redraw all-subplot colorbar 
-            if not ref_casename:
-                cbar_ax = fig.add_axes(cbar_pos)
-                fig.tight_layout()
-                cb.remove()
-                cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=units,
-                                extend = extend)
-                cb.ax.tick_params(labelsize=fontsize['ticklabels'])
-                cb.set_label(units, fontsize=fontsize['titles'])
-                if cbar_ticklabels:
-                    cb.set_ticks(cb.get_ticks()) # Does nothing except to avoid "FixedFormatter should only be used together with FixedLocator" warning in call of cb.set_ticklabels() below
-                    cb.set_ticklabels(cbar_ticklabels)
+            if not manual_colors:
+                if ref_casename:
+                    extend = cc.equalize_colorbars(ims[:nx], this_var=this_var)
+                    extend = cc.equalize_colorbars(ims[nx:], this_var=this_var)
+                elif not vrange:
+                    extend = cc.equalize_colorbars(ims, this_var=this_var)
+                
+                # Chunk colorbar
+                vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[0], axes[0], this_var, abs_cmap, False)
+                if ref_casename:
+                    diff_vmin, diff_vmax, diff_Ncolors, diff_this_cmap, diff_cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[2], axes[2], this_var, diff_cmap, True)
+                else:
+                    diff_vmin = None
+                    diff_vmax = None
+                    diff_Ncolors = None
+                    diff_this_cmap = None
+                    diff_cbar_ticklabels = None
+                units, vrange, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange)
+                
+                # Redraw all-subplot colorbar 
+                if not ref_casename:
+                    cbar_ax = fig.add_axes(cbar_pos)
+                    fig.tight_layout()
+                    cb.remove()
+                    cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=units, extend = extend)
+                    cb.ax.tick_params(labelsize=fontsize['ticklabels'])
+                    cb.set_label(units, fontsize=fontsize['titles'])
+                    if cbar_ticklabels:
+                        cb.set_ticks(cb.get_ticks()) # Does nothing except to avoid "FixedFormatter should only be used together with FixedLocator" warning in call of cb.set_ticklabels() below
+                        cb.set_ticklabels(cbar_ticklabels)
             
             plt.subplots_adjust(bottom=new_sp_bottom, left=new_sp_left)
             
