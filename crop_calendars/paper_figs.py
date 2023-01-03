@@ -1821,3 +1821,141 @@ print("Done.")
 
 
 # %%
+
+tmp = xr.open_dataset("/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars3.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced4.mxmat/cropcals3.f19-g17.rx_crop_calendars3.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced4.mxmat.clm2.irrig_monthly.nc")
+
+new_time = [x[0] for x in tmp.time_bounds.values]
+tmp = tmp.assign_coords(time=new_time)
+
+def weighted_temporal_mean(ds, var):
+  """
+  weight by days in each month
+  """
+  # Determine the month length
+  month_length = ds.time.dt.days_in_month
+
+  # Calculate the weights
+  wgts = month_length.groupby("time.year") / month_length.groupby("time.year").sum()
+
+  # Make sure the weights in each year add up to 1
+  np.testing.assert_allclose(wgts.groupby("time.year").sum(xr.ALL_DIMS), 1.0)
+
+  # Subset our dataset for our variable
+  obs = ds[var]
+
+  # Setup our masking for nan values
+  cond = obs.isnull()
+  ones = xr.where(cond, 0.0, 1.0)
+
+  # Calculate the numerator
+  obs_sum = (obs * wgts).resample(time="AS").sum(dim="time")
+
+  # Calculate the denominator
+  ones_out = (ones * wgts).resample(time="AS").sum(dim="time")
+
+  # Return the weighted average
+  return obs_sum / ones_out
+
+mms_to_m3d = (tmp['area']*1e6 * tmp['landfrac']) * 1e-3 * 60*60*24
+days_in_month = tmp.time.dt.days_in_month
+
+qirrig = np.expand_dims((tmp["QIRRIG_FROM_SURFACE"] * 60*60*24*days_in_month * mms_to_m3d).values, axis=3) 
+    
+avail = np.expand_dims(0.9*tmp["VOLRMCH"], axis=3)
+concatted = np.concatenate((qirrig, avail), axis=3)
+qirrig_lim = np.min(concatted, axis=3)
+qirrig_lim = xr.DataArray(data = qirrig_lim,
+                          coords = tmp["QIRRIG_FROM_SURFACE"].coords,
+                          attrs = tmp["QIRRIG_FROM_SURFACE"].attrs)
+qirrig_lim = qirrig_lim / (60*60*24*days_in_month) / mms_to_m3d
+qirrig_lim.attrs = tmp["QIRRIG_FROM_SURFACE"].attrs
+qirrig_lim.attrs['long_name'] = "water added through surface water irrigation, limited by available"
+tmp["QIRRIG_FROM_SURFACE_LIM"] = qirrig_lim
+
+tmp['UNFULFILLED_DEMAND'] = tmp['QIRRIG_FROM_SURFACE'] - tmp['QIRRIG_FROM_SURFACE_LIM']
+tmp['UNFULFILLED_DEMAND'].attrs = tmp['QIRRIG_FROM_SURFACE'].attrs
+tmp['UNFULFILLED_DEMAND'].attrs['long_name'] = 'irrigation demand unable to be filled based on limitation (90% of VOLRMCH)'
+
+for v in ["QIRRIG_FROM_SURFACE", "QIRRIG_FROM_SURFACE_LIM", "UNFULFILLED_DEMAND"]:
+    v2 = v + "_FRAC"
+    tmp[v2] = (tmp[v] * 60*60*24*days_in_month * mms_to_m3d) / tmp["VOLRMCH"]
+    tmp[v2].attrs = tmp[v].attrs
+    tmp[v2].attrs['units'] = "fraction of available"
+    tmp[v2].attrs['long_name'] = tmp[v2].attrs['long_name'] + " as frac. available"
+
+tmp2 = xr.Dataset()
+for x in tmp:
+    if "time" not in tmp[x].dims or x=="time_bounds":
+        if x != "time_bounds":
+            tmp2[x] = tmp[x]
+        continue
+    tmp2[x] = utils.weighted_annual_mean(tmp[x])
+    tmp2[x].attrs = tmp[x].attrs
+    
+    # Convert mm/s to m3/yr
+    if tmp2[x].attrs['units'] == "mm/s":
+        tmp2[x] = (tmp['area']*1e6 * tmp['landfrac']) * tmp2[x] * 60*60*24*365 * 1e-3
+        tmp2[x].attrs = tmp[x].attrs
+        tmp2[x].attrs['units'] = "m3/yr"
+
+thediff = (tmp2['VOLRMCH'] - tmp2['QIRRIG_FROM_SURFACE_LIM'])
+thediff = tmp2['UNFULFILLED_DEMAND']
+print(np.nanmin(thediff))
+print(np.nanmax(thediff))
+thediff.isel(time=0).plot()
+
+
+# %%
+fig_caselist = []
+for i, (casename, case) in enumerate(cases.items()):
+    if case['irrig_ds'] is None:
+        continue
+    fig_caselist.append(casename)
+    
+    qirrig_from_surface = case['irrig_ds']['QIRRIG_FROM_SURFACE'].sum(dim=["lon", "lat"]).plot()
+
+# %%
+
+plot_y1 = 1980
+plot_yN = 2010
+thisVar = "QIRRIG_FROM_SURFACE"
+# thisVar = "UNFULFILLED_DEMAND"
+
+v1 = cases['Prescribed Calendars']['irrig_ds'][thisVar].sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+v0 = cases['CLM Default']['irrig_ds'][thisVar].sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+
+# (100*(v1 - v0).sum(dim=["lon", "lat"]) / v0.sum(dim=["lon", "lat"])).plot()
+v0.sum(dim=["lon", "lat"]).plot()
+v1.sum(dim=["lon", "lat"]).plot()
+
+# %%
+
+plot_y1 = 1980
+plot_yN = 2010
+
+d1 = cases['Prescribed Calendars']['irrig_ds'].sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+d0 = cases['CLM Default']['irrig_ds'].sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+
+# (100*(v1 - v0).sum(dim=["lon", "lat"]) / v0.sum(dim=["lon", "lat"])).plot()
+(d0['UNFULFILLED_DEMAND'].sum(dim=["lon", "lat"]) / d0['QIRRIG_FROM_SURFACE_LIM'].sum(dim=["lon", "lat"])).plot()
+(d1['UNFULFILLED_DEMAND'].sum(dim=["lon", "lat"]) / d1['QIRRIG_FROM_SURFACE_LIM'].sum(dim=["lon", "lat"])).plot()
+
+# %%
+
+plot_y1 = 1980
+plot_yN = 2010
+
+d1 = cases['Prescribed Calendars']['irrig_ds'].sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+d0 = cases['CLM Default']['irrig_ds'].sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+
+v0 = (d0['UNFULFILLED_DEMAND'] / d0['QIRRIG_FROM_SURFACE'])
+v1 = (d1['UNFULFILLED_DEMAND'] / d1['QIRRIG_FROM_SURFACE'])
+(v0-v1).isel(time=0).plot()
+
+
+# %%
+
+ri1_rf = xr.open_dataset("/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar/ri1_rf_ggcmi_crop_calendar_phase3_v1.01.nc4")
+ri1_ir = xr.open_dataset("/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar/ri1_ir_ggcmi_crop_calendar_phase3_v1.01.nc4")
+ri2_rf = xr.open_dataset("/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar/ri2_rf_ggcmi_crop_calendar_phase3_v1.01.nc4")
+ri2_ir = xr.open_dataset("/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar/ri2_ir_ggcmi_crop_calendar_phase3_v1.01.nc4")
