@@ -1655,14 +1655,14 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
         # Calculate limited irrigation
         mms_to_m3d = (tmp['area']*1e6 * tmp['landfrac']) * 1e-3 * 60*60*24
         days_in_month = tmp.time.dt.days_in_month
-        qirrig = np.expand_dims((tmp["QIRRIG_FROM_SURFACE"] * 60*60*24*days_in_month * mms_to_m3d).values, axis=3) 
+        qirrig = np.expand_dims((tmp["QIRRIG_FROM_SURFACE"] * days_in_month * mms_to_m3d).values, axis=3) 
         avail = np.expand_dims(0.9*tmp["VOLRMCH"], axis=3)
         concatted = np.concatenate((qirrig, avail), axis=3)
         qirrig_lim = np.min(concatted, axis=3)
         qirrig_lim = xr.DataArray(data = qirrig_lim,
                                 coords = tmp["QIRRIG_FROM_SURFACE"].coords,
                                 attrs = tmp["QIRRIG_FROM_SURFACE"].attrs)
-        qirrig_lim = qirrig_lim / (60*60*24*days_in_month) / mms_to_m3d
+        qirrig_lim = qirrig_lim / days_in_month / mms_to_m3d
         qirrig_lim.attrs = tmp["QIRRIG_FROM_SURFACE"].attrs
         qirrig_lim.attrs['long_name'] = "water added through surface water irrigation, limited by 90% of available"
         tmp["QIRRIG_FROM_SURFACE_LIM"] = qirrig_lim
@@ -1675,7 +1675,7 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
         # Calculate irrigation as fraction of available water
         for v in ["QIRRIG_FROM_SURFACE", "QIRRIG_FROM_SURFACE_LIM", "UNFULFILLED_DEMAND"]:
             v2 = v + "_FRAC"
-            tmp[v2] = (tmp[v] * 60*60*24*days_in_month * mms_to_m3d) / tmp["VOLRMCH"]
+            tmp[v2] = (tmp[v] * days_in_month * mms_to_m3d) / tmp["VOLRMCH"]
             tmp[v2].attrs = tmp[v].attrs
             tmp[v2].attrs['units'] = "fraction of available"
             tmp[v2].attrs['long_name'] = tmp[v2].attrs['long_name'] + " as frac. available"
