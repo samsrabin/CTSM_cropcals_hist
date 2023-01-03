@@ -503,8 +503,6 @@ def main(argv):
                     print(f"   No area of {vegtype_str}; skipping.")
                     continue
             
-            print(f"   {vegtype_str_title} ({vegtype_int})...")
-            
             # Maps #####################
             
             gdd_map = gdd_maps_ds[thisVar].isel(time=0, drop=True)
