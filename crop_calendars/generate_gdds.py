@@ -31,6 +31,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
+from matplotlib.transforms import Bbox
 import warnings
 import cartopy.crs as ccrs
 import datetime as dt
@@ -617,6 +618,12 @@ def main(argv):
             else:
                 error(logger, f"layout {layout} not recognized")
     
+            # Shift bottom of plot up to make room for legend
+            ax_pos = ax.get_position()
+            ax.set_position(Bbox.from_extents(ax_pos.x0, 0.19, ax_pos.x1, ax_pos.y1))
+            # Define legend position
+            legend_bbox_to_anchor = (0, -0.15, 1, 0.2)
+            
             bpl = make_plot(gdd_bybin_old, -1, linewidth)
             bpr = make_plot(gdd_bybin_new, 1, linewidth)
             set_boxplot_props(bpl, color_old, linewidth)
@@ -625,7 +632,11 @@ def main(argv):
             # draw temporary lines to create a legend
             plt.plot([], c=color_old, label=args.run1_name, linewidth=linewidth)
             plt.plot([], c=color_new, label=args.run2_name, linewidth=linewidth)
-            plt.legend(fontsize=fontsize_titles)
+            plt.legend(fontsize=fontsize_titles,
+                       bbox_to_anchor=legend_bbox_to_anchor,
+                       ncol = 2,
+                       loc='lower left',
+                       mode = 'expand')
             
             plt.xticks(range(0, len(bin_names) * 2, 2), bin_names,
                        fontsize=fontsize_ticklabels)
