@@ -34,13 +34,13 @@ def add_rowcol_labels(axes, fig_caselist, fontsize, nx, ny, rx_row_label, thisCr
 
     # Add column labels
     topmost = np.arange(nx)
-    column_labels = ['rainfed', 'irrigated']
+    column_labels = ['Rainfed', 'Irrigated']
     for a, ax in enumerate(axes):
         if a not in topmost:
             nearest_topmost = a % nx
             axes[a].sharex(axes[nearest_topmost])
     for i, a in enumerate(topmost):
-        axes[a].set_title(f"{thisCrop_out} ({column_labels[i]})",
+        axes[a].set_title(f"{column_labels[i]}",
                         fontsize=fontsize['titles'],
                         y=1.1)
 
@@ -526,6 +526,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
         cbar_pos, figsize, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos = get_figure_info(ny, ref_casename)
 
         for thisCrop_main in clm_types:
+            this_suptitle = thisCrop_main.capitalize() + ": " + suptitle
                     
             # Get the name we'll use in output text/filenames
             thisCrop_out = thisCrop_main
@@ -555,7 +556,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
             cbs = []
             units, vrange, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, abs_cmap=abs_cmap, diff_cmap=diff_cmap)
 
-            fig.suptitle(suptitle,
+            fig.suptitle(this_suptitle,
                             x = suptitle_xpos,
                             y = suptitle_ypos,
                             fontsize = fontsize['suptitle'])
