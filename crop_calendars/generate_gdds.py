@@ -61,7 +61,7 @@ def main(argv):
     # Set arguments
     parser = argparse.ArgumentParser(description="ADD DESCRIPTION HERE")
     parser.add_argument("-r", "--run-dir", 
-                        help="Directory where run outputs can be found (and where outputs will go)",
+                        help="Directory where run outputs can be found (and where outputs will go). If --only-make-figs, this is the directory with the preprocessed files (e.g., *.pickle file).",
                         required=True)
     parser.add_argument("-1", "--first-season", 
                         help="First growing season to include in calculation of mean",
@@ -115,10 +115,13 @@ def main(argv):
 
     # Directories to save output files and figures
     if not args.output_dir:
-        args.output_dir = os.path.join(args.run_dir, "generate_gdds")
-        if not args.unlimited_season_length:
-            args.output_dir += ".mxmat"
-        args.output_dir += "." + dt.datetime.now().strftime('%Y-%m-%d-%H%M%S')
+        if args.only_make_figs:
+            args.output_dir = args.run_dir
+        else:
+            args.output_dir = os.path.join(args.run_dir, "generate_gdds")
+            if not args.unlimited_season_length:
+                args.output_dir += ".mxmat"
+            args.output_dir += "." + dt.datetime.now().strftime('%Y-%m-%d-%H%M%S')
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
     outdir_figs = os.path.join(args.output_dir, "figs")
@@ -651,8 +654,8 @@ def main(argv):
     
     if save_figs: 
         if args.only_make_figs:
-            gdd_maps_ds = xr.open_dataset(os.path.join(args.run_dir, "generate_gdds", "figs", "gdd_maps.nc"))
-            gddharv_maps_ds = xr.open_dataset(os.path.join(args.run_dir, "generate_gdds", "figs", "gddharv_maps.nc"))
+            gdd_maps_ds = xr.open_dataset(os.path.join(args.run_dir, "figs", "gdd_maps.nc"))
+            gddharv_maps_ds = xr.open_dataset(os.path.join(args.run_dir, "figs", "gddharv_maps.nc"))
         make_figures(args, gdd_maps_ds=gdd_maps_ds, gddharv_maps_ds=gddharv_maps_ds, outdir_figs=outdir_figs, linewidth=linewidth)
 
 
