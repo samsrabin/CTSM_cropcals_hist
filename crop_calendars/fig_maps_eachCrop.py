@@ -177,6 +177,7 @@ def get_rx_case(cases, fig_caselist, ny, this_var):
 
 
 def get_figure_info(ny, ref_casename):
+    hspace = None
     if ny == 1:
         print("WARNING: Check that the layout looks good for ny == 1")
         figsize = (24, 7.5)	  # width, height
@@ -194,11 +195,12 @@ def get_figure_info(ny, ref_casename):
         new_sp_left = None
     elif ny == 3:
         figsize = (14, 10)	 # width, height
-        suptitle_xpos = 0.55
-        suptitle_ypos = 1
+        suptitle_xpos = 0.5
+        suptitle_ypos = 0.96
         cbar_pos = [0.2, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
         new_sp_bottom = 0.11 # default: 0.1
         new_sp_left = 0.125
+        hspace = 0.3
     elif ny == 4:
         figsize = (22, 16)	 # width, height
         suptitle_xpos = 0.55
@@ -208,8 +210,7 @@ def get_figure_info(ny, ref_casename):
         new_sp_left = 0.125
     else:
         raise ValueError(f"Set up for ny = {ny}")
-    
-    return cbar_pos, figsize, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos
+    return cbar_pos, figsize, hspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos
 
 
 def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False):
@@ -531,7 +532,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
             fig_caselist = [ref_casename] + [x for x in fig_caselist if x != ref_casename]
         
         # Now set some figure parameters based on # cases
-        cbar_pos, figsize, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos = get_figure_info(ny, ref_casename)
+        cbar_pos, figsize, hspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos = get_figure_info(ny, ref_casename)
 
         for thisCrop_main in clm_types:
             this_suptitle = thisCrop_main.capitalize() + ": " + suptitle
@@ -612,6 +613,10 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                         cb.set_ticklabels(cbar_ticklabels)
             
             plt.subplots_adjust(bottom=new_sp_bottom, left=new_sp_left)
+            if hspace is not None:
+                plt.subplots_adjust(hspace=hspace)
+            
+            # plt.show()
             
             fig.savefig(fig_outfile,
                         bbox_inches='tight', facecolor='white', dpi=dpi)
