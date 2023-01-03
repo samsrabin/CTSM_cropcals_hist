@@ -564,7 +564,7 @@ def main(argv):
                 ax = fig.add_subplot(spec[2,0],projection=ccrs.PlateCarree())
                 thisMin = int(np.round(np.nanmin(gdd_map_yx)))
                 thisMax = int(np.round(np.nanmax(gdd_map_yx)))
-                thisTitle = "ISIMIP3 minus CLM"
+                thisTitle = f"{args.run2_name} minus {args.run1_name}"
                 diff_map_yx = gdd_map_yx - gddharv_map_yx
                 diff_map_yx.attrs['units'] = gdd_units
                 
