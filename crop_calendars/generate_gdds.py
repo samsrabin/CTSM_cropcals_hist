@@ -31,6 +31,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
+from matplotlib.transforms import Bbox
 import warnings
 import cartopy.crs as ccrs
 import datetime as dt
@@ -61,7 +62,7 @@ def main(argv):
     # Set arguments
     parser = argparse.ArgumentParser(description="ADD DESCRIPTION HERE")
     parser.add_argument("-r", "--run-dir", 
-                        help="Directory where run outputs can be found (and where outputs will go)",
+                        help="Directory where run outputs can be found (and where outputs will go). If --only-make-figs, this is the directory with the preprocessed files (e.g., *.pickle file).",
                         required=True)
     parser.add_argument("-1", "--first-season", 
                         help="First growing season to include in calculation of mean",
@@ -115,10 +116,13 @@ def main(argv):
 
     # Directories to save output files and figures
     if not args.output_dir:
-        args.output_dir = os.path.join(args.run_dir, "generate_gdds")
-        if not args.unlimited_season_length:
-            args.output_dir += ".mxmat"
-        args.output_dir += "." + dt.datetime.now().strftime('%Y-%m-%d-%H%M%S')
+        if args.only_make_figs:
+            args.output_dir = args.run_dir
+        else:
+            args.output_dir = os.path.join(args.run_dir, "generate_gdds")
+            if not args.unlimited_season_length:
+                args.output_dir += ".mxmat"
+            args.output_dir += "." + dt.datetime.now().strftime('%Y-%m-%d-%H%M%S')
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
     outdir_figs = os.path.join(args.output_dir, "figs")
@@ -312,8 +316,8 @@ def main(argv):
         return map_ds.assign_attrs({'incl_vegtypes_str': incl_vegtypes_str,
                                     'dummy_fill': dummy_fill,
                                     'outdir_figs': outdir_figs,
-                                    'args.first_season': args.first_season,
-                                    'args.last_season': args.last_season})
+                                    'y1': args.first_season,
+                                    'yN': args.last_season})
     
     if save_figs and not args.only_make_figs:
         if not os.path.exists(outdir_figs):
@@ -441,14 +445,18 @@ def main(argv):
         dummy_fill = gdd_maps_ds.attrs['dummy_fill']
         if not outdir_figs:
             outdir_figs = gdd_maps_ds.attrs['outdir_figs']
-        y1 = gdd_maps_ds.attrs['y1']
-        yN = gdd_maps_ds.attrs['yN']
-        
+        try:
+            y1 = gdd_maps_ds.attrs['y1']
+            yN = gdd_maps_ds.attrs['yN']
+        # Backwards compatibility with a bug (fixed 2023-01-03)
+        except:
+            y1 = gdd_maps_ds.attrs['args.first_season']
+            yN = gdd_maps_ds.attrs['args.last_season']
         # Import LU data, if doing so
         if args.land_use_file:
             y1_lu = y1 if args.first_land_use_year == None else args.first_land_use_year
             yN_lu = yN if args.last_land_use_year == None else args.last_land_use_year
-            lu_ds = cc.open_lu_ds(args.land_use_file, y1_lu, yN_lu, gdd_maps_ds)
+            lu_ds = cc.open_lu_ds(args.land_use_file, y1_lu, yN_lu, gdd_maps_ds, ungrid=False)
             lu_years_text = f" (masked by {y1_lu}-{yN_lu} area)"
             lu_years_file = f"_mask{y1_lu}-{yN_lu}"
         else:
@@ -495,8 +503,6 @@ def main(argv):
                 if np.nansum(crop_area_yx.values) == 0:
                     print(f"   No area of {vegtype_str}; skipping.")
                     continue
-            
-            print(f"   {vegtype_str_title} ({vegtype_int})...")
             
             # Maps #####################
             
@@ -557,7 +563,7 @@ def main(argv):
                 ax = fig.add_subplot(spec[2,0],projection=ccrs.PlateCarree())
                 thisMin = int(np.round(np.nanmin(gdd_map_yx)))
                 thisMax = int(np.round(np.nanmax(gdd_map_yx)))
-                thisTitle = "ISIMIP3 minus CLM"
+                thisTitle = f"{args.run2_name} minus {args.run1_name}"
                 diff_map_yx = gdd_map_yx - gddharv_map_yx
                 diff_map_yx.attrs['units'] = gdd_units
                 
@@ -612,6 +618,12 @@ def main(argv):
             else:
                 error(logger, f"layout {layout} not recognized")
     
+            # Shift bottom of plot up to make room for legend
+            ax_pos = ax.get_position()
+            ax.set_position(Bbox.from_extents(ax_pos.x0, 0.19, ax_pos.x1, ax_pos.y1))
+            # Define legend position
+            legend_bbox_to_anchor = (0, -0.15, 1, 0.2)
+            
             bpl = make_plot(gdd_bybin_old, -1, linewidth)
             bpr = make_plot(gdd_bybin_new, 1, linewidth)
             set_boxplot_props(bpl, color_old, linewidth)
@@ -620,7 +632,11 @@ def main(argv):
             # draw temporary lines to create a legend
             plt.plot([], c=color_old, label=args.run1_name, linewidth=linewidth)
             plt.plot([], c=color_new, label=args.run2_name, linewidth=linewidth)
-            plt.legend(fontsize=fontsize_titles)
+            plt.legend(fontsize=fontsize_titles,
+                       bbox_to_anchor=legend_bbox_to_anchor,
+                       ncol = 2,
+                       loc='lower left',
+                       mode = 'expand')
             
             plt.xticks(range(0, len(bin_names) * 2, 2), bin_names,
                        fontsize=fontsize_ticklabels)
@@ -647,8 +663,8 @@ def main(argv):
     
     if save_figs: 
         if args.only_make_figs:
-            gdd_maps_ds = xr.open_dataset(os.path.join(args.run_dir, "generate_gdds", "figs", "gdd_maps.nc"))
-            gddharv_maps_ds = xr.open_dataset(os.path.join(args.run_dir, "generate_gdds", "figs", "gddharv_maps.nc"))
+            gdd_maps_ds = xr.open_dataset(os.path.join(args.run_dir, "figs", "gdd_maps.nc"))
+            gddharv_maps_ds = xr.open_dataset(os.path.join(args.run_dir, "figs", "gddharv_maps.nc"))
         make_figures(args, gdd_maps_ds=gdd_maps_ds, gddharv_maps_ds=gddharv_maps_ds, outdir_figs=outdir_figs, linewidth=linewidth)
 
 

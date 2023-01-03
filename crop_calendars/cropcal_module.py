@@ -23,91 +23,120 @@ import glob
 
 
 def adjust_grainC(da_in, patches1d_itype_veg_str):
-   # Parameters from Danica's 2020 paper
-   fyield = 0.85 # 85% harvest efficiency (Kucharik & Brye, 2003)
-   cgrain = 0.45 # 45% of dry biomass is C (Monfreda et al., 2008)
-   
-   # Dry matter fraction from Wirsenius (2000) Table A1.II except as noted
-   drymatter_fractions = {
-      'corn': 0.88,
-      'cotton': 0.912, # Table A1.III, "Seed cotton", incl. lint, seed, and "other (ginning waste)"
-      'miscanthus': 0.0,  # Not included in Wirsenius, but also not simulated, so I don't care
-      'rice': 0.87,
-      'soybean': 0.91,
-      'sugarcane': 1-0.745, # Irvine, Cane Sugar Handbook, 10th ed., 1977, P. 16. (see sugarcane.py)
-      'wheat': 0.88,
-   }
-   
-   # Convert patches1d_itype_veg_str to needed format
-   if isinstance(patches1d_itype_veg_str, xr.DataArray):
-      patches1d_itype_veg_str = patches1d_itype_veg_str.values
-   if not isinstance(patches1d_itype_veg_str[0], str):
-      patches1d_itype_veg_int = patches1d_itype_veg_str
-      patches1d_itype_veg_str = [utils.ivt_int2str(x) for x in patches1d_itype_veg_int]
-   
-   # Create new array with patch as the first dimension. This allows us to use Ellipsis when filling.
-   patch_dim = da_in.dims.index('patch')
-   wet_tp = np.full(da_in.shape, np.nan)
-   wet_tp = np.moveaxis(wet_tp, patch_dim, 0)
-   
-   # Fill new array, increasing to include water weight
-   drymatter_cropList = []
-   da_in.load()
-   for thisCrop, dm_frac in drymatter_fractions.items():
-      drymatter_cropList.append(thisCrop)
-      i_thisCrop = [i for i,x in enumerate(patches1d_itype_veg_str) if thisCrop in x]
-      
-      tmp = da_in.isel(patch=i_thisCrop).values
-      if dm_frac != None:
-         tmp /= dm_frac
-      elif np.any(tmp > 0):
-         raise RuntimeError(f"You need to get a real dry-matter fraction for {thisCrop}")
-      
-      # For sugarcane, also account for the fact that sugar is only 43% of dry matter
-      if thisCrop == "sugarcane":
-         tmp /= 1 - 0.43
-      
-      wet_tp[i_thisCrop, ...] = np.moveaxis(tmp, patch_dim, 0)
-   
-   # Move patch dimension (now in 0th position) back to where it should be.
-   wet_tp = np.moveaxis(wet_tp, 0, patch_dim)
-   
-   # Make sure NaN mask is unchanged
-   if not np.array_equal(np.isnan(wet_tp), np.isnan(da_in.values)):
-      missing_croptypes = [x for x in np.unique(patches1d_itype_veg_str) if x not in drymatter_cropList]
-      raise RuntimeError(f'Failed to completely fill wet_tp. Missing crop types: {missing_croptypes}')
+    # Parameters from Danica's 2020 paper
+    fyield = 0.85 # 85% harvest efficiency (Kucharik & Brye, 2003)
+    cgrain = 0.45 # 45% of dry biomass is C (Monfreda et al., 2008)
+    
+    # Dry matter fraction from Wirsenius (2000) Table A1.II except as noted
+    drymatter_fractions = {
+        'corn': 0.88,
+        'cotton': 0.912, # Table A1.III, "Seed cotton", incl. lint, seed, and "other (ginning waste)"
+        'miscanthus': 0.0,  # Not included in Wirsenius, but also not simulated, so I don't care
+        'rice': 0.87,
+        'soybean': 0.91,
+        'sugarcane': 1-0.745, # Irvine, Cane Sugar Handbook, 10th ed., 1977, P. 16. (see sugarcane.py)
+        'wheat': 0.88,
+    }
+    
+    # Convert patches1d_itype_veg_str to needed format
+    if isinstance(patches1d_itype_veg_str, xr.DataArray):
+        patches1d_itype_veg_str = patches1d_itype_veg_str.values
+    if not isinstance(patches1d_itype_veg_str[0], str):
+        patches1d_itype_veg_int = patches1d_itype_veg_str
+        patches1d_itype_veg_str = [utils.ivt_int2str(x) for x in patches1d_itype_veg_int]
+    
+    # Create new array with patch as the first dimension. This allows us to use Ellipsis when filling.
+    patch_dim = da_in.dims.index('patch')
+    wet_tp = np.full(da_in.shape, np.nan)
+    wet_tp = np.moveaxis(wet_tp, patch_dim, 0)
+    
+    # Fill new array, increasing to include water weight
+    drymatter_cropList = []
+    da_in.load()
+    for thisCrop, dm_frac in drymatter_fractions.items():
+        drymatter_cropList.append(thisCrop)
+        i_thisCrop = [i for i,x in enumerate(patches1d_itype_veg_str) if thisCrop in x]
+        
+        tmp = da_in.isel(patch=i_thisCrop).values
+        if dm_frac != None:
+            tmp[np.where(~np.isnan(tmp))] /= dm_frac
+        elif np.any(tmp > 0):
+            raise RuntimeError(f"You need to get a real dry-matter fraction for {thisCrop}")
+        
+        # For sugarcane, also account for the fact that sugar is only 43% of dry matter
+        if thisCrop == "sugarcane":
+            tmp /= 1 - 0.43
+        
+        wet_tp[i_thisCrop, ...] = np.moveaxis(tmp, patch_dim, 0)
+    
+    # Move patch dimension (now in 0th position) back to where it should be.
+    wet_tp = np.moveaxis(wet_tp, 0, patch_dim)
+    
+    # Make sure NaN mask is unchanged
+    if not np.array_equal(np.isnan(wet_tp), np.isnan(da_in.values)):
+        missing_croptypes = [x for x in np.unique(patches1d_itype_veg_str) if x not in drymatter_cropList]
+        raise RuntimeError(f'Failed to completely fill wet_tp. Missing crop types: {missing_croptypes}')
 
-   # Save to output DataArray
-   da_out = xr.DataArray(data = wet_tp * fyield / cgrain,
-                         coords = da_in.coords,
-                         attrs = da_in.attrs)
-   return da_out
+    # Save to output DataArray
+    da_out = xr.DataArray(data = wet_tp * fyield / cgrain,
+                          coords = da_in.coords,
+                          attrs = da_in.attrs)
+    return da_out
 
 
 # Rounding errors can result in differences of up to lon/lat_tolerance. Tolerate those by replacing the value in the gridded dataset.
 def adjust_gridded_lonlats(patches1d_lonlat, patches1d_ij, lu_dsg_lonlat_da, this_tolerance, i_or_j_str):
-      missing_lonlats = np.unique(patches1d_lonlat.values[np.isnan(patches1d_ij)])
-      new_gridded_lonlats = lu_dsg_lonlat_da.values
-      for m in missing_lonlats:
-         # Find closest value in gridded lonlat
-         min_diff = np.inf
-         for i, n in enumerate(np.sort(lu_dsg_lonlat_da)):
-            this_diff = n - m
-            if np.abs(this_diff) < min_diff:
-               min_diff = np.abs(this_diff)
-               closest_i = i
-               closest_n = n
-            if this_diff > 0:
-               break
-         if min_diff > this_tolerance:
-            raise ValueError(f"NaN in patches1d_{i_or_j_str}xy; closest value is {min_diff}° off.")
-         print(f"Replacing {m} with {closest_n}")
-         new_gridded_lonlats[closest_i] = closest_n
-         patches1d_ij[patches1d_lonlat.values == m] = closest_i + 1
-      lu_dsg_lonlat_da = xr.DataArray(data = new_gridded_lonlats,
-                                      coords = {"lat": new_gridded_lonlats})
-      return lu_dsg_lonlat_da, patches1d_ij
+        missing_lonlats = np.unique(patches1d_lonlat.values[np.isnan(patches1d_ij)])
+        new_gridded_lonlats = lu_dsg_lonlat_da.values
+        for m in missing_lonlats:
+            # Find closest value in gridded lonlat
+            min_diff = np.inf
+            for i, n in enumerate(np.sort(lu_dsg_lonlat_da)):
+                this_diff = n - m
+                if np.abs(this_diff) < min_diff:
+                    min_diff = np.abs(this_diff)
+                    closest_i = i
+                    closest_n = n
+                if this_diff > 0:
+                    break
+            if min_diff > this_tolerance:
+                raise ValueError(f"NaN in patches1d_{i_or_j_str}xy; closest value is {min_diff}° off.")
+            print(f"Replacing {m} with {closest_n}")
+            new_gridded_lonlats[closest_i] = closest_n
+            patches1d_ij[patches1d_lonlat.values == m] = closest_i + 1
+        lu_dsg_lonlat_da = xr.DataArray(data = new_gridded_lonlats,
+                                        coords = {"lat": new_gridded_lonlats})
+        return lu_dsg_lonlat_da, patches1d_ij
    
+
+def annual_mean_from_monthly(ds, var):
+    """
+    weight by days in each month
+    """
+    # Determine the month length
+    month_length = ds.time.dt.days_in_month
+
+    # Calculate the weights
+    wgts = month_length.groupby("time.year") / month_length.groupby("time.year").sum()
+
+    # Make sure the weights in each year add up to 1
+    np.testing.assert_allclose(wgts.groupby("time.year").sum(xr.ALL_DIMS), 1.0)
+
+    # Subset our dataset for our variable
+    obs = ds[var]
+
+    # Setup our masking for nan values
+    cond = obs.isnull()
+    ones = xr.where(cond, 0.0, 1.0)
+
+    # Calculate the numerator
+    obs_sum = (obs * wgts).resample(time="AS").sum(dim="time")
+
+    # Calculate the denominator
+    ones_out = (ones * wgts).resample(time="AS").sum(dim="time")
+
+    # Return the weighted average
+    return obs_sum / ones_out
 
 
 # After importing a file, restrict it to years of interest.
@@ -188,7 +217,7 @@ def check_constant_vars(this_ds, case, ignore_nan, constantGSs=None, verbose=Tru
         rx_ds = None
         if isinstance(case, dict):
             if v == "GDDHARV" and 'rx_gdds_file' in case:
-                rx_ds = import_rx_dates("gdd", case['rx_gdds_file'], this_ds).squeeze()
+                rx_ds = import_rx_dates("gdd", case['rx_gdds_file'], this_ds, set_neg1_to_nan=False).squeeze()
 
         for t1 in np.arange(this_ds.dims[time_coord]-1):
             
@@ -401,7 +430,7 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
                 if "GDDHARV" in output_var and np.nanmax(abs(diff_array)) <= gdd_tolerance:
                     if all_ok > 0:
                         all_ok = 1
-                        diff_str_list.append(f"   {diffs_eg_txt}")
+                        diff_str_list.append(f"	  {diffs_eg_txt}")
                 else:
                     all_ok = 0
                     if verbose:
@@ -439,6 +468,24 @@ def check_v0_le_v1(this_ds, vars, msg_txt=" ", both_nan_ok = False, throw_error=
             print(msg)
         else:
             raise RuntimeError(msg)
+
+
+def christoph_detrend(x, w, center0=False):
+    if w==0:
+        raise RuntimeError("Don't use christoph_detrend() with w=0")
+
+    moving_average = get_moving_average(x, w)
+
+    r = get_window_radius(w)
+    result = x[..., r:-r] - moving_average
+    
+    if not center0:
+        ma_mean = np.mean(moving_average, axis=x.ndim-1)
+        if x.ndim == 2:
+            ma_mean = np.expand_dims(ma_mean, axis=1)
+        result += ma_mean
+    
+    return result
 
 
 # Convert time*mxharvests axes to growingseason axis
@@ -485,8 +532,8 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     first_season_before_first_year_py[:,0] = first_season_before_first_year_p
     sown_prerun_or_inactive_py = first_season_before_first_year_py | sown_inactive_py
     sown_prerun_or_inactive_pym = np.concatenate((np.expand_dims(sown_prerun_or_inactive_py, axis=2),
-                                            np.full((Npatch, Ngs+1, mxharvests-1), False)),
-                                           axis=2)
+                                                  np.full((Npatch, Ngs+1, mxharvests-1), False)),
+                                                 axis=2)
     where_sown_prerun_or_inactive_pym = np.where(sown_prerun_or_inactive_pym)
     hdates_pym[where_sown_prerun_or_inactive_pym] = np.nan
     sdates_pym[where_sown_prerun_or_inactive_pym] = np.nan
@@ -696,82 +743,89 @@ def convert_axis_time2gs_old(this_ds, myVars):
 
 
 def cropnames_fao2clm(cropList_in):
-   def convert1(thisCrop):
-      thisCrop = thisCrop.lower().replace(' ', '')
-      thisCrop = thisCrop.replace(',paddy', '')
-      thisCrop = thisCrop.replace('seed', '')
-      thisCrop = thisCrop.replace('beans', 'bean')
-      thisCrop = thisCrop.replace('maize', 'corn')
-      return thisCrop
-   
-   if isinstance(cropList_in, (list, np.ndarray)):
-      cropList_out = [convert1(x) for x in cropList_in]
-      if isinstance(cropList_in, np.ndarray):
-         cropList_out = np.array(cropList_out)
-   else:
-      cropList_out = convert1(cropList_in)
-   
-   return cropList_out
+    def convert1(thisCrop):
+        thisCrop = thisCrop.lower().replace(' ', '')
+        thisCrop = thisCrop.replace(',paddy', '')
+        thisCrop = thisCrop.replace('seed', '')
+        thisCrop = thisCrop.replace('beans', 'bean')
+        thisCrop = thisCrop.replace('maize', 'corn')
+        return thisCrop
+    
+    if isinstance(cropList_in, (list, np.ndarray)):
+        cropList_out = [convert1(x) for x in cropList_in]
+        if isinstance(cropList_in, np.ndarray):
+            cropList_out = np.array(cropList_out)
+    else:
+        cropList_out = convert1(cropList_in)
+    
+    return cropList_out
 
 
 def detrend(ps_in):
-   # Can't detrend if NaNs are present, so...
-   
-   if isinstance(ps_in, xr.DataArray):
-      ps_out = ps_in.values
-   else:
-      ps_out = ps_in
-   
-   unique_Nnans = np.unique(np.sum(np.isnan(ps_out), axis=1))
-   Ngs = ps_in.shape[1]
+    # Can't detrend if NaNs are present, so...
+    
+    if isinstance(ps_in, xr.DataArray):
+        ps_out = ps_in.values
+    else:
+        ps_out = ps_in
+    
+    unique_Nnans = np.unique(np.sum(np.isnan(ps_out), axis=1))
+    Ngs = ps_in.shape[1]
 
-   for n in unique_Nnans:
-      
-      # Don't need to detrend patches with <2 non-NaN seasons, and "detrending" 2 points will just set them both to zero.
-      if n >= Ngs-2:
-         continue
-      
-      # Get the patches with this number of NaN seasons
-      ok = np.where(np.sum(np.isnan(ps_out), axis=1)==n)[0]
-      Nok = len(ok)
-      thisNok_ps = ps_out[ok,:]
-      where_notnan = np.where(~np.isnan(thisNok_ps))
-      
-      # Get the non-NaN seasons of each such patch
-      thisNok_notnan = thisNok_ps[where_notnan]
-      thisNok_notnan_ps = np.reshape(thisNok_notnan, (Nok, Ngs-n))
-      
-      # Detrend these patches
-      thisNok_notnan_dt_ps = signal.detrend(thisNok_notnan_ps, axis=1)
-      
-      # Save the detrended time series back to our output
-      thisNok_dt_ps = np.copy(thisNok_ps)
-      thisNok_dt_ps[where_notnan] = np.reshape(thisNok_notnan_dt_ps, (-1))
-      ps_out[ok,:] = thisNok_dt_ps
-   
-   if isinstance(ps_in, xr.DataArray):
-      ps_out = xr.DataArray(data = ps_out,
-                            coords = ps_in.coords,
-                            attrs = ps_in.attrs)
-         
-   return ps_out
+    for n in unique_Nnans:
+        
+        # Don't need to detrend patches with <2 non-NaN seasons, and "detrending" 2 points will just set them both to zero.
+        if n >= Ngs-2:
+            continue
+        
+        # Get the patches with this number of NaN seasons
+        ok = np.where(np.sum(np.isnan(ps_out), axis=1)==n)[0]
+        Nok = len(ok)
+        thisNok_ps = ps_out[ok,:]
+        where_notnan = np.where(~np.isnan(thisNok_ps))
+        
+        # Get the non-NaN seasons of each such patch
+        thisNok_notnan = thisNok_ps[where_notnan]
+        thisNok_notnan_ps = np.reshape(thisNok_notnan, (Nok, Ngs-n))
+        
+        # Detrend these patches
+        thisNok_notnan_dt_ps = signal.detrend(thisNok_notnan_ps, axis=1)
+        
+        # Save the detrended time series back to our output
+        thisNok_dt_ps = np.copy(thisNok_ps)
+        thisNok_dt_ps[where_notnan] = np.reshape(thisNok_notnan_dt_ps, (-1))
+        ps_out[ok,:] = thisNok_dt_ps
+    
+    if isinstance(ps_in, xr.DataArray):
+        ps_out = xr.DataArray(data = ps_out,
+                              coords = ps_in.coords,
+                              attrs = ps_in.attrs)
+            
+    return ps_out
 
 
-def equalize_colorbars(ims, center0=False):
-   vmin = np.inf
-   vmax = -np.inf
-   nims = len(ims)
-   for im in ims:
-      vmin = min(vmin, im.get_clim()[0])
-      vmax = max(vmax, im.get_clim()[1])
-   
-   if center0:
-       v = np.max(np.abs([vmin, vmax]))
-       vmin = -v
-       vmax = v
-   
-   for i in np.arange(nims):
-      ims[i].set_clim(vmin, vmax)
+def equalize_colorbars(ims, center0=False, this_var=None):
+    vmin = np.inf
+    vmax = -np.inf
+    nims = len(ims)
+    for im in ims:
+        vmin = min(vmin, im.get_clim()[0])
+        vmax = max(vmax, im.get_clim()[1])
+    
+    extend = "neither"
+    if this_var == "HUIFRAC" and vmax > 1:
+            vmax = 1
+            extend = "max"
+    
+    if center0:
+            v = np.max(np.abs([vmin, vmax]))
+            vmin = -v
+            vmax = v
+    
+    for i in np.arange(nims):
+        ims[i].set_clim(vmin, vmax)
+    
+    return extend
 
 
 # For backwards compatibility with files missing SDATES_PERHARV.
@@ -802,47 +856,62 @@ def extract_gs_timeseries(this_ds, this_var, in_da, include_these, Npatches, Ngs
     return this_ds
 
 
-def fao_data_get(fao_all, element, y1, yN):
-   fao_this = fao_all.copy().query(f"Element == '{element}'")
+def fao_data_get(fao_all, element, y1, yN, fao_to_clm_dict, cropList_combined_clm):
+    fao_this = fao_all.copy().query(f"Element == '{element}'")
 
-   # Convert t to Mt
-   if element == 'Production':
-      fao_this.Value *= 1e-6
+    # Convert t to Mt
+    if element == 'Production':
+        fao_this.Value *= 1e-6
 
-   # Pivot and add Total column
-   fao_this = fao_this.copy().pivot(index="Year", columns="Crop", values="Value")
-   fao_this['Total'] = fao_this.sum(numeric_only=True, axis=1)
+    # Pivot and add Total column
+    fao_this = fao_this.copy().pivot(index="Year", columns="Crop", values="Value")
+    fao_this['Total'] = fao_this.sum(numeric_only=True, axis=1)
 
-   # Remove unneeded years
-   fao_this = fao_this.filter(items=np.arange(y1,yN+1), axis=0)
+    # Remove unneeded years
+    fao_this = fao_this.filter(items=np.arange(y1,yN+1), axis=0)
+    
+    # Reorder to match CLM
+    if len(fao_to_clm_dict) != len(cropList_combined_clm):
+        raise RuntimeError(f"fao_to_clm_dict and are different lengths ({len(cropList_combined_clm)} vs {len(cropList_combined_clm)})")
+    if len(fao_this.columns) != len(cropList_combined_clm):
+        raise RuntimeError(f"fao_this.columns and are different lengths ({len(fao_this.columns)} vs {len(cropList_combined_clm)})")
+    new_order = [cropList_combined_clm.index(fao_to_clm_dict[x]) for x in fao_this.columns]
+    new_cols = fao_this.columns[new_order]
+    fao_this = fao_this[new_cols]
 
-   # Make no-sugarcane version
-   fao_this_nosgc = fao_this.drop(columns = ["Sugar cane", "Total"])
-   fao_this_nosgc['Total'] = fao_this_nosgc.sum(numeric_only=True, axis=1)
-   
-   return fao_this, fao_this_nosgc
+    # Make no-sugarcane version
+    fao_this_nosgc = fao_this.drop(columns = ["Sugar cane", "Total"])
+    fao_this_nosgc['Total'] = fao_this_nosgc.sum(numeric_only=True, axis=1)
+    
+    return fao_this, fao_this_nosgc
 
 
 def fao_data_preproc(fao):
-   
-   # Because I always confuse Item vs. Element
-   fao.rename(columns={"Item": "Crop"}, inplace=True, errors="raise")
-   
-   # Combine "Maize" and "Maize, green"
-   fao.Crop.replace("Maize.*", "Maize", regex=True, inplace=True)
-   fao = fao.groupby(by=["Crop","Year","Element","Area","Unit"], as_index=False).agg("sum")
+    
+    # Because I always confuse Item vs. Element
+    fao.rename(columns={"Item": "Crop"}, inplace=True, errors="raise")
+    
+    # Combine "Maize" and "Maize, green"
+    fao.Crop.replace("Maize.*", "Maize", regex=True, inplace=True)
+    fao = fao.groupby(by=["Crop","Year","Element","Area","Unit"], as_index=False).agg("sum")
 
-   # Pick one rice
-   rice_to_keep = "Rice, paddy"
-   rice_to_drop = "Rice, paddy (rice milled equivalent)"
-   drop_this = [x == rice_to_drop for x in fao.Crop]
-   fao = fao.drop(fao[drop_this].index)
-   
-   # Filter out "China," which includes all Chinas
-   if "China" in fao.Area.values:
-      fao = fao.query('Area != "China"')
-   
-   return fao
+    # Pick one rice
+    rice_to_keep = "Rice, paddy"
+    rice_to_drop = "Rice, paddy (rice milled equivalent)"
+    drop_this = [x == rice_to_drop for x in fao.Crop]
+    fao = fao.drop(fao[drop_this].index)
+    
+    # Filter out "China," which includes all Chinas
+    if "China" in fao.Area.values:
+        fao = fao.query('Area != "China"')
+    
+    return fao
+
+
+def fullname_to_combinedCrop(fullnames, cropList_combined_clm):
+    x = [strip_cropname(y).capitalize() for y in fullnames]
+    z = [y if y in cropList_combined_clm else '' for y in x]
+    return z
 
 
 def get_earthstat_country_ts(earthstats, case, thisVar, countries_map, thisCrop_clm, i_theseYears_earthstat, country_id):
@@ -898,6 +967,23 @@ def get_mean_byCountry(fao, top_y1, top_yN):
    return fao.query(f'Year>={top_y1} & Year<={top_yN}').groupby(['Crop','Element','Area'])['Value'].mean()
 
 
+# w is total window width (not radius)
+def get_moving_average(x, w):
+    if w==0:
+        return x
+    
+    if x.ndim == 2:
+        Ncases = x.shape[0]
+        r = get_window_radius(w)
+        result = np.full((Ncases, x.shape[1] - 2*r), fill_value=np.nan)
+        for c in np.arange(0, (Ncases)):
+            result[c,:] = get_moving_average(x[c,:], w)
+    else:
+        return np.convolve(x, np.ones(w), 'valid') / w
+    
+    return result
+
+
 # For backwards compatibility with files missing SDATES_PERHARV.
 def get_Nharv(array_in, these_dims):
     # Sum over time and mxevents to get number of events in time series for each patch
@@ -925,219 +1011,312 @@ def get_reason_freq_map(Ngs, thisCrop_gridded, reason):
 
 def get_reason_list_text():
     return [ \
-        "???",                   # 0; should never actually be saved
-        "Crop mature",           # 1
+        "???",					 # 0; should never actually be saved
+        "Crop mature",			 # 1
         "Max CLM season length", # 2
-        "Bad Dec31 sowing",      # 3
-        "Sowing today",          # 4
-        "Sowing tomorrow",       # 5
-        "Sown a yr ago tmrw.",   # 6
-        "Sowing tmrw. (Jan 1)"   # 7
+        "Bad Dec31 sowing",		 # 3
+        "Sowing today",			 # 4
+        "Sowing tomorrow",		 # 5
+        "Sown a yr ago tmrw.",	 # 6
+        "Sowing tmrw. (Jan 1)"	 # 7
         ]
 
 
+def get_timeseries_bias(sim, obs, fig_caselist, weights=None):
+    
+    weights_provided = weights is not None
+    
+    # The 1st dimension of sim array is case and the 2nd is year. Additional dimensions (e.g., country) should be collapsed into the second.
+    if sim.ndim > 2:
+        raise RuntimeError("Need to collapse all dimensions of sim after the first into the second.")
+    if obs.ndim > 1:
+        raise RuntimeError("Need to collapse all dimensions of obs into the first.")
+    if weights_provided and weights.ndim > 1:
+        raise RuntimeError("Need to collapse all dimensions of weights into the first.")
+    
+    # Simulations should be Ncases x Npoints
+    if sim.ndim < 2:
+        raise RuntimeError("sim array must have at least 2 dimensions (Ncases x Npoints)")    
+    
+    # Weights and obs should be the same shape
+    if weights_provided and obs.shape != weights.shape:
+        raise RuntimeError("weights array must be the same shape as obs array")
+    
+    # Weights must not be negative
+    if weights_provided and np.any(weights < 0):
+        raise RuntimeError("Negative weights not allowed")
+    
+    if weights_provided:
+        weights = weights / np.sum(weights) # Ensure sum to 1
+        bias = np.sum((sim - obs) * weights, axis=1)
+    else:
+        Npoints = sim.shape[1]
+        bias = 1/Npoints * np.sum(sim - obs, axis=1)
+    
+    return bias
+
+
 # Get yield dataset for top N countries (plus World)
-def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_all_ctry, earthstats):
+def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_all_ctry, earthstats, min_viable_hui, mxmats):
 
-   top_y1 = topYears[0]
-   top_yN = topYears[-1]
-   fao_mean_byCountry = get_mean_byCountry(fao_all_ctry, top_y1, top_yN)
-   topN = fao_mean_byCountry[thisCrop_fao]['Production'].nlargest(Ntop)
-   
-   topN_countries = topN.keys().values
-   topN_countries = np.concatenate((topN_countries, np.array(['World'])))
-   Ntop += 1
-   
-   # Which countries are not found in our countries map?
-   any_ctry_notfound = False
-   for thisCountry in list(topN_countries):
-      if thisCountry not in countries_key.name.values and thisCountry != "World":
-         print(f'❗ {thisCountry} not in countries_key')
-         any_ctry_notfound = True
-   if any_ctry_notfound:
-      raise RuntimeError('At least one country in FAO not found in key')
+    top_y1 = topYears[0]
+    top_yN = topYears[-1]
+    fao_mean_byCountry = get_mean_byCountry(fao_all_ctry, top_y1, top_yN)
+    topN = fao_mean_byCountry[thisCrop_fao]['Production'].nlargest(Ntop)
+    
+    topN_countries = topN.keys().values
+    topN_countries = np.concatenate((topN_countries, np.array(['World'])))
+    Ntop += 1
+    
+    # Which countries are not found in our countries map?
+    any_ctry_notfound = False
+    for thisCountry in list(topN_countries):
+        if thisCountry not in countries_key.name.values and thisCountry != "World":
+            print(f'❗ {thisCountry} not in countries_key')
+            any_ctry_notfound = True
+    if any_ctry_notfound:
+        raise RuntimeError('At least one country in FAO not found in key')
 
-   NtopYears = len(topYears)
-   
-   thisCrop_clm = cropnames_fao2clm(thisCrop_fao)
-   i_theseYears_earthstat = [i for i, x in enumerate(earthstats['f09_g17'].time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
-   caselist = [k for k,v in cases.items()]
-   
-   prod_ar = np.full((len(cases), NtopYears, Ntop), np.nan)
-   area_ar = np.full((len(cases), NtopYears, Ntop), np.nan)
-   prod_faostat_yc = np.full((NtopYears, Ntop), np.nan)
-   area_faostat_yc = np.full((NtopYears, Ntop), np.nan)
-   prod_earthstat_yc = np.full((NtopYears, Ntop), np.nan)
-   area_earthstat_yc = np.full((NtopYears, Ntop), np.nan)
-   
-   for i_case, (casename, case) in enumerate(cases.items()):
-      case_ds = case['ds']
-      lu_ds = reses[case['res']]['dsg']
-      countries_map = lu_ds['countries'].load()
+    NtopYears = len(topYears)
+    
+    thisCrop_clm = cropnames_fao2clm(thisCrop_fao)
+    i_theseYears_earthstat = [i for i, x in enumerate(earthstats['f19_g17'].time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
+    caselist = [k for k,v in cases.items()]
+    
+    prod_ar = np.full((len(cases), NtopYears, Ntop), np.nan)
+    area_ar = np.full((len(cases), NtopYears, Ntop), np.nan)
+    prod_faostat_yc = np.full((NtopYears, Ntop), np.nan)
+    area_faostat_yc = np.full((NtopYears, Ntop), np.nan)
+    prod_earthstat_yc = np.full((NtopYears, Ntop), np.nan)
+    area_earthstat_yc = np.full((NtopYears, Ntop), np.nan)
+    
+    for i_case, (casename, case) in enumerate(cases.items()):
+        case_ds = case['ds']
+        lu_ds = reses[case['res']]['ds']
+        countries = lu_ds['countries'].load()
+        countries_map = reses[case['res']]['dsg']['countries'].load()
 
-      i_theseYears_case = [i for i, x in enumerate(case_ds.time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
-      i_theseYears_lu = [i for i, x in enumerate(lu_ds.time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
+        i_theseYears_case = [i for i, x in enumerate(case_ds.time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
+        i_theseYears_lu = [i for i, x in enumerate(lu_ds.time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
+        
+        # Find this crop in production and area data
+        i_thisCrop_case = [i for i, x in enumerate(case_ds.patches1d_itype_veg_str.values) if thisCrop_clm in x]
+        if len(i_thisCrop_case) == 0:
+            raise RuntimeError(f'No matches found for {thisCrop_fao} in case_ds.vegtype_str')
+        i_thisCrop_lu = [i for i, x in enumerate(lu_ds.patches1d_itype_veg.values) if thisCrop_clm in utils.ivt_int2str(x)]
+        if len(i_thisCrop_lu) == 0:
+            raise RuntimeError(f'No matches found for {thisCrop_fao} in lu_ds.patches1d_itype_veg')
       
-      # Find this crop in production and area data
-      i_thisCrop_case = [i for i, x in enumerate(case_ds.vegtype_str.values) if thisCrop_clm in x]
-      if len(i_thisCrop_case) == 0:
-         raise RuntimeError(f'No matches found for {thisCrop_fao} in case_ds.vegtype_str')
-      i_thisCrop_lu = [i for i, x in enumerate(lu_ds.cft.values) if thisCrop_clm in utils.ivt_int2str(x)]
-      if len(i_thisCrop_lu) == 0:
-         raise RuntimeError(f'No matches found for {thisCrop_fao} in lu_ds.cft')
-      
-      # Get each top-N country's time series for this crop
-      for c, country in enumerate(topN_countries):
-         
-         # Yield...
-         yield_da = case_ds['GRAIN_TO_FOOD_ANN_GD']\
-            .isel(ivt_str=i_thisCrop_case, time=i_theseYears_case)\
-            .sum(dim='ivt_str')\
+        # Yield...
+        case_ds = get_yield_ann(case_ds, min_viable_hui=min_viable_hui, mxmats=mxmats)
+        tmp_ds = case_ds.isel(patch=i_thisCrop_case, time=i_theseYears_case)
+        yield_da = tmp_ds['YIELD_ANN']\
+            .groupby(tmp_ds['patches1d_gi'])\
+            .apply(xr.DataArray.sum, dim='patch', skipna=True)\
+            .rename({'time': 'Year'})\
             * 1e-6 * 1e4 # g/m2 to tons/ha
-                     
-         # Area...
-         area_da = lu_ds['AREA_CFT']\
-            .isel(cft=i_thisCrop_lu, time=i_theseYears_lu)\
-            .sum(dim='cft')\
+        
+        # Area...
+        tmp_ds = lu_ds.isel(patch=i_thisCrop_lu, time=i_theseYears_lu)
+        area_da = tmp_ds['AREA_CFT']\
+            .groupby(tmp_ds['patches1d_gi'])\
+            .apply(xr.DataArray.sum, dim='patch', skipna=True)\
+            .rename({'time': 'Year'})\
             * 1e-4 # m2 to ha
         
-         if country == "World":
-            country_id = None
-         else:
-            country_id = countries_key.query(f'name == "{country}"')['num'].values
-            if len(country_id) != 1:
-                raise RuntimeError(f'Expected 1 match of {country} in countries_key; got {len(country_id)}')
-            yield_da = yield_da.where(countries_map == country_id)
-            area_da = area_da.where(countries_map == country_id)
+        # Countries
+        countries_da = countries.isel(patch=i_thisCrop_lu)\
+            .groupby(tmp_ds['patches1d_gi'])\
+            .apply(xr.DataArray.mean, dim='patch', skipna=True)
+        
+        # Get each top-N country's time series for this crop
+        for c, country in enumerate(topN_countries):			  
+            if country == "World":
+                country_id = None
+                yield_thisCountry_da = yield_da
+                area_thisCountry_da = area_da
+            else:
+                country_id = countries_key.query(f'name == "{country}"')['num'].values
+                if len(country_id) != 1:
+                    raise RuntimeError(f'Expected 1 match of {country} in countries_key; got {len(country_id)}')
+                yield_thisCountry_da = yield_da.where(countries_da == country_id)
+                area_thisCountry_da = area_da.where(countries_da == country_id)
+                
+            area_ar[i_case,:,c] = area_thisCountry_da.sum(dim='patches1d_gi').values 
             
-         area_ar[i_case,:,c] = area_da.sum(dim=['lon', 'lat']).values 
-         
-         # Production (tons)
-         prod_ar[i_case,:,c] = (yield_da * area_da).sum(dim=['lon', 'lat'])
+            # Production (tons)
+            prod_ar[i_case,:,c] = (yield_thisCountry_da * area_thisCountry_da).sum(dim='patches1d_gi')
+                
+            # FAOSTAT production (tons) and area (ha)
+            if i_case == 0:
+                prod_faostat_yc[:,c] = get_faostat_country_ts(fao_all_ctry, thisCrop_fao, top_y1, top_yN, country, "Production")
+                area_faostat_yc[:,c] = get_faostat_country_ts(fao_all_ctry, thisCrop_fao, top_y1, top_yN, country, "Area harvested")
             
-         # FAOSTAT production (tons) and area (ha)
-         if i_case == 0:
-            prod_faostat_yc[:,c] = get_faostat_country_ts(fao_all_ctry, thisCrop_fao, top_y1, top_yN, country, "Production")
-            area_faostat_yc[:,c] = get_faostat_country_ts(fao_all_ctry, thisCrop_fao, top_y1, top_yN, country, "Area harvested")
-         
-         # EarthStat
-         if np.all(np.isnan(prod_earthstat_yc[:,c])) and case['res']=='f09_g17':
-            prod_earthstat_yc[:,c] = get_earthstat_country_ts(earthstats, case, 'Production', countries_map, thisCrop_clm, i_theseYears_earthstat, country_id)
-            area_earthstat_yc[:,c] = get_earthstat_country_ts(earthstats, case, 'HarvestArea', countries_map, thisCrop_clm, i_theseYears_earthstat, country_id)
-
-   new_coords = {'Case': caselist,
-                 'Year': topYears,
-                 'Country': topN_countries}
-   prod_da = xr.DataArray(data = prod_ar,
-                          coords = new_coords,
-                          attrs = {'units': 'tons'})
-   area_da = xr.DataArray(data = area_ar,
-                          coords = new_coords,
-                          attrs = {'units': 'tons'})
-   yield_da = prod_da / area_da
-   yield_da = yield_da.assign_attrs({'units': 'tons/ha'})
-   prod_faostat_da = xr.DataArray(data = prod_faostat_yc,
-                                  coords = {'Year': topYears,
-                                            'Country': topN_countries},
+            # EarthStat
+            if np.all(np.isnan(prod_earthstat_yc[:,c])) and case['res']=='f09_g17':
+                prod_earthstat_yc[:,c] = get_earthstat_country_ts(earthstats, case, 'Production', countries_map, thisCrop_clm, i_theseYears_earthstat, country_id)
+                area_earthstat_yc[:,c] = get_earthstat_country_ts(earthstats, case, 'HarvestArea', countries_map, thisCrop_clm, i_theseYears_earthstat, country_id)
+    
+    if np.any(np.isnan(prod_ar)):
+        raise RuntimeError("NaN in prod_ar")
+    if np.any(np.isnan(area_ar)):
+        raise RuntimeError("NaN in area_ar")
+    if np.any(area_ar==0):
+        raise RuntimeError("0 in area_ar")
+    
+    new_coords = {'Case': caselist,
+                      'Year': topYears,
+                      'Country': topN_countries}
+    prod_da = xr.DataArray(data = prod_ar,
+                                  coords = new_coords,
                                   attrs = {'units': 'tons'})
-   area_faostat_da = xr.DataArray(data = area_faostat_yc,
-                                  coords = {'Year': topYears,
-                                            'Country': topN_countries},
-                                  attrs = {'units': 'ha'})
-   yield_faostat_da = prod_faostat_da / area_faostat_da
-   yield_faostat_da = yield_faostat_da.assign_attrs({'units': 'tons/ha'})
-   prod_earthstat_da = xr.DataArray(data = prod_earthstat_yc,
-                                    coords = {'Year': topYears,
-                                              'Country': topN_countries},)
-   area_earthstat_da = xr.DataArray(data = area_earthstat_yc,
-                                    coords = {'Year': topYears,
-                                              'Country': topN_countries})
-   yield_earthstat_da = prod_earthstat_da / area_earthstat_da
-   
-   topN_ds = xr.Dataset(data_vars = {'Production': prod_da,
-                                     'Production (FAOSTAT)': prod_faostat_da,
-                                     'Production (EarthStat)': prod_earthstat_da,
-                                     'Area': area_da,
-                                     'Area (FAOSTAT)': area_faostat_da,
-                                     'Area (EarthStat)': area_earthstat_da,
-                                     'Yield': yield_da,
-                                     'Yield (FAOSTAT)': yield_faostat_da,
-                                     'Yield (EarthStat)': yield_earthstat_da})
-   
-   # Detrend and get yield anomalies
-   topN_dt_ds = xr.Dataset()
-   topN_ya_ds = xr.Dataset()
-   for i, v in enumerate(topN_ds):
-      # Could make this cleaner by being smart in detrend()
-      if "Case" in topN_ds[v].dims:
-         tmp_dt_cyC = topN_ds[v].copy().values
-         tmp_ya_cyC = topN_ds[v].copy().values
-         for C, country in enumerate(topN_countries):
-            tmp_dt_cy = tmp_dt_cyC[:,:,C]
-            tmp_dt_cy = detrend(tmp_dt_cy)
-            tmp_dt_cyC[:,:,C] = tmp_dt_cy
-         topN_dt_ds[v] = xr.DataArray(data = tmp_dt_cyC,
-                                      coords = topN_ds[v].coords,
-                                      attrs = topN_ds[v].attrs)
-         for C, country in enumerate(topN_countries):
-            tmp_ya_cy = tmp_ya_cyC[:,:,C]
-            tmp_ya_cy = yield_anomalies(tmp_ya_cy)
-            tmp_ya_cyC[:,:,C] = tmp_ya_cy
-         topN_ya_ds[v] = xr.DataArray(data = tmp_ya_cyC,
-                                      coords = topN_ds[v].coords,
-                                      attrs = topN_ds[v].attrs)
-      else:
-         tmp_dt_Cy = np.transpose(topN_ds[v].copy().values)
-         tmp_dt_Cy = detrend(tmp_dt_Cy)
-         topN_dt_ds[v] = xr.DataArray(data = np.transpose(tmp_dt_Cy),
-                                      coords = topN_ds[v].coords,
-                                      attrs = topN_ds[v].attrs)
-         tmp_ya_Cy = np.transpose(topN_ds[v].copy().values)
-         tmp_ya_Cy = yield_anomalies(tmp_ya_Cy)
-         topN_ya_ds[v] = xr.DataArray(data = np.transpose(tmp_ya_Cy),
-                                      coords = topN_ds[v].coords,
-                                      attrs = topN_ds[v].attrs)
-   
-   topN_ya_ds[v].attrs['units'] = 'anomalies (unitless)'
-   
-   return topN_ds, topN_dt_ds, topN_ya_ds
+    area_da = xr.DataArray(data = area_ar,
+                                  coords = new_coords,
+                                  attrs = {'units': 'tons'})
+    yield_da = prod_da / area_da
+    yield_da = yield_da.assign_attrs({'units': 'tons/ha'})
+    prod_faostat_da = xr.DataArray(data = prod_faostat_yc,
+                                   coords = {'Year': topYears,
+                                             'Country': topN_countries},
+                                   attrs = {'units': 'tons'})
+    area_faostat_da = xr.DataArray(data = area_faostat_yc,
+                                   coords = {'Year': topYears,
+                                             'Country': topN_countries},
+                                   attrs = {'units': 'ha'})
+    yield_faostat_da = prod_faostat_da / area_faostat_da
+    yield_faostat_da = yield_faostat_da.assign_attrs({'units': 'tons/ha'})
+    prod_earthstat_da = xr.DataArray(data = prod_earthstat_yc,
+                                     coords = {'Year': topYears,
+                                               'Country': topN_countries},)
+    area_earthstat_da = xr.DataArray(data = area_earthstat_yc,
+                                     coords = {'Year': topYears,
+                                               'Country': topN_countries})
+    yield_earthstat_da = prod_earthstat_da / area_earthstat_da
+    
+    topN_ds = xr.Dataset(data_vars = {'Production': prod_da,
+                                      'Production (FAOSTAT)': prod_faostat_da,
+                                      'Production (EarthStat)': prod_earthstat_da,
+                                      'Area': area_da,
+                                      'Area (FAOSTAT)': area_faostat_da,
+                                      'Area (EarthStat)': area_earthstat_da,
+                                      'Yield': yield_da,
+                                      'Yield (FAOSTAT)': yield_faostat_da,
+                                      'Yield (EarthStat)': yield_earthstat_da})
+    
+    # Detrend and get yield anomalies
+    topN_dt_ds = xr.Dataset()
+    topN_ya_ds = xr.Dataset()
+    for i, v in enumerate(topN_ds):
+        # Could make this cleaner by being smart in detrend()
+        if "Case" in topN_ds[v].dims:
+            tmp_dt_cyC = topN_ds[v].copy().values
+            tmp_ya_cyC = topN_ds[v].copy().values
+            for C, country in enumerate(topN_countries):
+                tmp_dt_cy = tmp_dt_cyC[:,:,C]
+                tmp_dt_cy = detrend(tmp_dt_cy)
+                tmp_dt_cyC[:,:,C] = tmp_dt_cy
+            topN_dt_ds[v] = xr.DataArray(data = tmp_dt_cyC,
+                                                  coords = topN_ds[v].coords,
+                                                  attrs = topN_ds[v].attrs)
+            for C, country in enumerate(topN_countries):
+                tmp_ya_cy = tmp_ya_cyC[:,:,C]
+                tmp_ya_cy = yield_anomalies(tmp_ya_cy)
+                tmp_ya_cyC[:,:,C] = tmp_ya_cy
+            topN_ya_ds[v] = xr.DataArray(data = tmp_ya_cyC,
+                                                  coords = topN_ds[v].coords,
+                                                  attrs = topN_ds[v].attrs)
+        else:
+            tmp_dt_Cy = np.transpose(topN_ds[v].copy().values)
+            tmp_dt_Cy = detrend(tmp_dt_Cy)
+            topN_dt_ds[v] = xr.DataArray(data = np.transpose(tmp_dt_Cy),
+                                                  coords = topN_ds[v].coords,
+                                                  attrs = topN_ds[v].attrs)
+            tmp_ya_Cy = np.transpose(topN_ds[v].copy().values)
+            tmp_ya_Cy = yield_anomalies(tmp_ya_Cy)
+            topN_ya_ds[v] = xr.DataArray(data = np.transpose(tmp_ya_Cy),
+                                                  coords = topN_ds[v].coords,
+                                                  attrs = topN_ds[v].attrs)
+    
+    topN_ya_ds[v].attrs['units'] = 'anomalies (unitless)'
+    
+    return topN_ds, topN_dt_ds, topN_ya_ds
 
  
 def get_ts_prod_clm_yc_da(yield_gd, lu_ds, yearList, cropList_combined_clm):
 
-   # Convert km2 to m2
-   allCropArea = lu_ds.AREA*1e6 * lu_ds.LANDFRAC_PFT * lu_ds.PCT_CROP/100
+    # Convert km2 to m2
+    allCropArea = lu_ds.AREA*1e6 * lu_ds.LANDFRAC_PFT * lu_ds.PCT_CROP/100
 
-   # Combined rainfed+irrigated
+    # Combined rainfed+irrigated
+    
+    cftList_str_clm = [] # Will fill during loop below
+    cftList_int_clm = [] # Will fill during loop below
+    ts_prod_clm_yc = np.full((len(yield_gd.time), len(cropList_combined_clm)), 0.0)
+    for c, thisCrop in enumerate(cropList_combined_clm[:-1]):
+        # print(f"{thisCrop}")
+        for pft_str in yield_gd.ivt_str.values:
+            if thisCrop.lower() not in pft_str:
+                continue
+            pft_int = utils.ivt_str2int(pft_str)
+            cftList_str_clm.append(pft_str)
+            cftList_int_clm.append(pft_int)
+            # print(f"{pft_str}: {pft_int}")
+            map_yield_thisCrop_clm = yield_gd.sel(ivt_str=pft_str)
+            map_area_thisCrop_clm = allCropArea * lu_ds.PCT_CFT.sel(cft=pft_int)/100
+            map_prod_thisCrop_clm = map_yield_thisCrop_clm * map_area_thisCrop_clm
+            map_prod_thisCrop_clm = map_prod_thisCrop_clm * 1e-12
+            if map_prod_thisCrop_clm.shape != map_yield_thisCrop_clm.shape:
+                raise RuntimeError(f"Error getting production map {map_yield_thisCrop_clm.dims}: expected shape {map_yield_thisCrop_clm.shape} but got {map_prod_thisCrop_clm.shape}")
+            ts_prod_thisCrop_clm = map_prod_thisCrop_clm.sum(dim=["lon","lat"])
+            ts_prod_clm_yc[:,c] += ts_prod_thisCrop_clm.values
+            # Total
+            ts_prod_clm_yc[:,-1] += ts_prod_thisCrop_clm.values
+            
+    ts_prod_clm_yc_da = xr.DataArray(ts_prod_clm_yc,
+                                                coords={"Year": yearList,
+                                                        "Crop": cropList_combined_clm})
+    return ts_prod_clm_yc_da
+
+def get_ts_prod_clm_yc_da2(case_ds, lu_ds, yieldVar, cropList_combined_clm, quiet=False):
+    
+   # Get time dimension names.
+   # To match time dimension on lu_ds, rename anything other than "time" to that.
+   non_patch_dims = [x for x in case_ds[yieldVar].dims if x != "patch"]
+   if len(non_patch_dims) != 1:
+       raise RuntimeError(f"Expected one non-patch dimension of case_ds['{yieldVar}']; found {len(non_patch_dims)}: {non_patch_dims}")
+   time_dim_in = non_patch_dims[0]
+   if time_dim_in == "time":
+       time_dim_out = "Year"
+       yearList = [x.year for x in case_ds[yieldVar].time.values]
+   elif time_dim_in == "gs":
+       time_dim_out = "Growing season"
+       yearList = case_ds[yieldVar].gs.values
+   else:
+       raise RuntimeError(f"Unknown time_dim_out for time_dim_in {time_dim_in}")
+   if time_dim_in != "time":
+       if not quiet:
+           print(f"WARNING: Using calendar years from LU data with yield data of time dimension {time_dim_in}.")
+       lu_ds = lu_ds.assign_coords({'time': case_ds[yieldVar].gs.values}).rename({'time': time_dim_in})
    
-   cftList_str_clm = [] # Will fill during loop below
-   cftList_int_clm = [] # Will fill during loop below
-   ts_prod_clm_yc = np.full((len(yield_gd.time), len(cropList_combined_clm)), 0.0)
-   for c, thisCrop in enumerate(cropList_combined_clm[:-1]):
-      # print(f"{thisCrop}")
-      for pft_str in yield_gd.ivt_str.values:
-         if thisCrop.lower() not in pft_str:
-            continue
-         pft_int = utils.ivt_str2int(pft_str)
-         cftList_str_clm.append(pft_str)
-         cftList_int_clm.append(pft_int)
-         # print(f"{pft_str}: {pft_int}")
-         map_yield_thisCrop_clm = yield_gd.sel(ivt_str=pft_str)
-         map_area_thisCrop_clm = allCropArea * lu_ds.PCT_CFT.sel(cft=pft_int)/100
-         map_prod_thisCrop_clm = map_yield_thisCrop_clm * map_area_thisCrop_clm
-         map_prod_thisCrop_clm = map_prod_thisCrop_clm * 1e-12
-         if map_prod_thisCrop_clm.shape != map_yield_thisCrop_clm.shape:
-            raise RuntimeError(f"Error getting production map {map_yield_thisCrop_clm.dims}: expected shape {map_yield_thisCrop_clm.shape} but got {map_prod_thisCrop_clm.shape}")
-         ts_prod_thisCrop_clm = map_prod_thisCrop_clm.sum(dim=["lon","lat"])
-         ts_prod_clm_yc[:,c] += ts_prod_thisCrop_clm.values
-         # Total
-         ts_prod_clm_yc[:,-1] += ts_prod_thisCrop_clm.values
-         
-   ts_prod_clm_yc_da = xr.DataArray(ts_prod_clm_yc,
-                                    coords={"Year": yearList,
-                                          "Crop": cropList_combined_clm})
+   prod_da = case_ds[yieldVar] * lu_ds['AREA_CFT']
+   
+   ts_prod_clm_yc_da = prod_da.groupby(case_ds['patches1d_itype_combinedCropCLM_str'])\
+                       .apply(xr.DataArray.sum, dim='patch', skipna=True)\
+                       .rename({time_dim_in: time_dim_out,
+                                'patches1d_itype_combinedCropCLM_str': 'Crop'})\
+                       .isel(Crop=slice(1,len(cropList_combined_clm)))\
+                       * 1e-12
+   ts_prod_clm_ySUM = ts_prod_clm_yc_da.sum(dim="Crop")\
+                      .expand_dims(dim='Crop',
+                                   axis=list(ts_prod_clm_yc_da.dims).index('Crop'))
+   ts_prod_clm_yc_da = xr.concat((ts_prod_clm_yc_da,
+                                  ts_prod_clm_ySUM),
+                                  dim="Crop")\
+                       .assign_coords({'Crop': cropList_combined_clm,
+                                       time_dim_out: yearList})
+   
    return ts_prod_clm_yc_da
-
+   
 
 def get_vegtype_str_figfile(vegtype_str_in):
     vegtype_str_out = vegtype_str_in
@@ -1198,6 +1377,76 @@ def get_vegtype_str_paramfile(vegtype_str_in):
         vegtype_str_out = vegtype_str_in
     return vegtype_str_out
 
+
+def get_window_radius(w):
+    if not w % 2:
+        raise RuntimeError("Window width must be odd")
+    return int((w-1) / 2)
+
+
+def get_yield(ds, **kwargs):
+    
+    # Fail if trying to get anything other than yield
+    for key, selection in kwargs.items():
+        if key=="out_var" and selection!="YIELD":
+            raise RuntimeError("get_yield() may only be called with out_var='YIELD'. Did you mean to call zero_immatures() instead?")
+    
+    ds = zero_immatures(ds, out_var="YIELD", **kwargs)
+    return ds
+
+
+def get_yield_ann(ds, min_viable_hui=1.0, mxmats=None, force_update=False, lu_ds=None):
+    
+    mxmat_limited = bool(mxmats)
+    
+    def do_calculate(thisVar, ds, force_update, min_viable_hui, mxmat_limited):
+        consider_skipping = (f'{thisVar}_ANN' in ds) and (not force_update)
+        if consider_skipping:
+            already_calculated = ds[f'{thisVar}_ANN'].attrs['min_viable_hui'] == min_viable_hui and ds[f'{thisVar}_ANN'].attrs['mxmat_limited'] == mxmat_limited
+            is_locked = 'locked' in ds[f'{thisVar}_ANN'].attrs and ds[f'{thisVar}_ANN'].attrs['locked']
+            do_calculate = not consider_skipping or not (already_calculated or is_locked)
+        else:
+            do_calculate = True
+        return do_calculate
+    
+    #########
+    # YIELD #
+    #########
+    
+    if do_calculate("YIELD", ds, force_update, min_viable_hui, mxmat_limited):
+    
+        ds = get_yield(ds, min_viable_hui=min_viable_hui, mxmats=mxmats, forAnnual=True, force_update=force_update)
+        
+        tmp = ds["YIELD_PERHARV"].sum(dim='mxharvests', skipna=True).values
+        grainc_to_food_ann_orig = ds["GRAINC_TO_FOOD_ANN"]
+        ds["YIELD_ANN"] = xr.DataArray(data = tmp,
+                                    attrs = grainc_to_food_ann_orig.attrs,
+                                    coords = grainc_to_food_ann_orig.coords
+                                    ).where(~np.isnan(grainc_to_food_ann_orig))
+        
+        # Save details
+        ds["YIELD_ANN"].attrs['min_viable_hui'] = min_viable_hui
+        ds["YIELD_ANN"].attrs['mxmat_limited'] = mxmat_limited
+        if 'locked' in ds['YIELD_PERHARV'].attrs:
+            ds["YIELD_ANN"].attrs['locked'] = True
+    
+    ##############
+    # PRODUCTION #
+    ##############
+    
+    if lu_ds is not None and do_calculate("PROD", ds, force_update, min_viable_hui, mxmat_limited):
+        ds["PROD_ANN"] = ds["YIELD_ANN"] * lu_ds['AREA_CFT']
+        ds['AREA_CFT'] = lu_ds['AREA_CFT']
+        
+        # Save details
+        ds["PROD_ANN"].attrs['min_viable_hui'] = min_viable_hui
+        ds["PROD_ANN"].attrs['mxmat_limited'] = mxmat_limited
+        if 'locked' in ds['YIELD_PERHARV'].attrs:
+            ds["PROD_ANN"].attrs['locked'] = True
+    
+    return ds
+
+
 def import_max_gs_length(paramfile_dir, my_clm_ver, my_clm_subver):
     # Get parameter file
     pattern = os.path.join(paramfile_dir, f"*{my_clm_ver}_params.{my_clm_subver}.nc")
@@ -1224,7 +1473,7 @@ def import_max_gs_length(paramfile_dir, my_clm_ver, my_clm_subver):
     return mxmat_dict
 
 # E.g. import_rx_dates("sdate", sdates_rx_file, dates_ds0_orig)
-def import_rx_dates(var_prefix, date_inFile, dates_ds):
+def import_rx_dates(var_prefix, date_inFile, dates_ds, set_neg1_to_nan=True):
     # Get run info:
     # Max number of growing seasons per year
     if "mxsowings" in dates_ds:
@@ -1243,180 +1492,213 @@ def import_rx_dates(var_prefix, date_inFile, dates_ds):
 
     ds = utils.import_ds(date_inFile, myVars=date_varList)
     
+    did_warn = False
     for v in ds:
-        ds = ds.rename({v: v.replace(var_prefix,"gs")})
+        v_new = v.replace(var_prefix,"gs")
+        ds = ds.rename({v: v_new})
+        
+        # Set -1 prescribed GDD values to NaN. Only warn the first time.
+        if set_neg1_to_nan and var_prefix == "gdd" and v_new != v and np.any(ds[v_new].values < 0):
+            if np.any((ds[v_new].values < 0) & (ds[v_new].values != -1)):
+                raise RuntimeError(f"Unexpected negative value in {v}")
+            if not did_warn:
+                print(f"Setting -1 rx GDD values to NaN")
+                did_warn = True
+            ds[v_new] = ds[v_new].where(ds[v_new] != -1)
     
     return ds
 
 
 def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mgdcrop_list(), 
-                  sdates_rx_ds=None, gdds_rx_ds=None, verbose=False, mxmats=None):
-   
-   # Minimum harvest threshold allowed in PlantCrop()
-   gdd_min = 50
-   
-   # Import
-   this_ds = utils.import_ds(filename,
-                             myVars=myVars,
-                             myVegtypes=myVegtypes)
-   
-   # Trim to years of interest (do not include extra year needed for finishing last growing season)
-   if y1 and yN:
-      this_ds = check_and_trim_years(y1, yN, this_ds)
-   else: # Assume including all growing seasons except last complete one are "of interest"
-      y1 = this_ds.time.values[0].year
-      yN = this_ds.time.values[-1].year - 2
-      this_ds = check_and_trim_years(y1, yN, this_ds)
-      
-   # What vegetation types are included?
-   vegtype_list = [x for x in this_ds.vegtype_str.values if x in this_ds.patches1d_itype_veg_str.values]
-   
-   # Check for consistency among sowing/harvest date/year info
-   date_vars = ["SDATES_PERHARV", "SYEARS_PERHARV", "HDATES", "HYEARS"]
-   all_nan = np.full(this_ds[date_vars[0]].shape, True)
-   all_nonpos = np.full(this_ds[date_vars[0]].shape, True)
-   all_pos = np.full(this_ds[date_vars[0]].shape, True)
-   for v in date_vars:
-      all_nan = all_nan & np.isnan(this_ds[v].values)
-      all_nonpos = all_nonpos & (this_ds[v].values <= 0)
-      all_pos = all_pos & (this_ds[v].values > 0)
-   if np.any(np.bitwise_not(all_nan | all_nonpos | all_pos)):
-      raise RuntimeError("Inconsistent missing/present values on mxharvests axis")
-   
-   # When doing transient runs, it's somehow possible for crops in newly-active patches to be *already alive*. They even have a sowing date (idop)! This will of course not show up in SDATES, but it does show up in SDATES_PERHARV. 
-   # I could put the SDATES_PERHARV dates into where they "should" be, but instead I'm just going to invalidate those "seasons."
-   #
-   # In all but the last calendar year, which patches had no sowing?
-   no_sowing_yp = np.all(np.isnan(this_ds.SDATES.values[:-1,:,:]), axis=1)
-   # In all but the first calendar year, which harvests' jdays are < their sowings' jdays? (Indicates sowing the previous calendar year.)
-   hsdate1_gt_hdate1_yp = this_ds.SDATES_PERHARV.values[1:,0,:] > this_ds.HDATES.values[1:,0,:]
-   # Where both, we have the problem.
-   falsely_alive_yp = no_sowing_yp & hsdate1_gt_hdate1_yp
-   if np.any(falsely_alive_yp):
-      print(f"Warning: {np.sum(falsely_alive_yp)} patch-seasons being ignored: Seemingly sown the year before harvest, but no sowings occurred that year.")
-      falsely_alive_yp = np.concatenate((np.full((1, this_ds.dims["patch"]), False),
-                                       falsely_alive_yp),
-                                       axis=0)
-      falsely_alive_y1p = np.expand_dims(falsely_alive_yp, axis=1)
-      dummy_false_y1p = np.expand_dims(np.full_like(falsely_alive_yp, False), axis=1)
-      falsely_alive_yhp = np.concatenate((falsely_alive_y1p, dummy_false_y1p), axis=1)
-      for v in this_ds.data_vars:
-         if this_ds[v].dims != ("time", "mxharvests", "patch"):
-            continue
-         this_ds[v] = this_ds[v].where(~falsely_alive_yhp)
-         
-   def check_no_negative(this_ds_in, varList_no_negative, which_file, verbose=False):
-      tiny_negOK = 1e-12
-      this_ds = this_ds_in.copy()
-      for v in this_ds:
-         if not any(x in v for x in varList_no_negative):
-            continue
-         the_min = np.nanmin(this_ds[v].values)
-         if the_min < 0:
-            if np.abs(the_min) <= tiny_negOK:
-               if verbose: print(f"Tiny negative value(s) in {v} (abs <= {tiny_negOK}) being set to 0 ({which_file})")
-            else:
-               print(f"WARNING: Unexpected negative value(s) in {v}; minimum {the_min} ({which_file})")
-            values = this_ds[v].copy().values
-            values[np.where((values < 0) & (values >= -tiny_negOK))] = 0
-            this_ds[v] = xr.DataArray(values,
-                                      coords = this_ds[v].coords,
-                                      dims = this_ds[v].dims,
-                                      attrs = this_ds[v].attrs)
-
-         elif verbose:
-            print(f"No negative value(s) in {v}; min {the_min} ({which_file})")
-      return this_ds
-            
-   def check_no_zeros(this_ds, varList_no_zero, which_file):
-      for v in this_ds:
-         if not any(x in v for x in varList_no_zero):
-            continue
-         if np.any(this_ds[v].values == 0):
-            print(f"WARNING: Unexpected zero(s) in {v} ({which_file})")
-         elif verbose:
-            print(f"No zero value(s) in {v} ({which_file})")
-         
-   # Check for no zero values where there shouldn't be
-   varList_no_zero = ["DATE", "YEAR"]
-   check_no_zeros(this_ds, varList_no_zero, "original file")
-   
-   # Convert time*mxharvests axes to growingseason axis
-   this_ds_gs = convert_axis_time2gs(this_ds, verbose=verbose, incl_orig=False)
-   
-   # Get growing season length
-   this_ds["GSLEN_PERHARV"] = get_gs_len_da(this_ds["HDATES"] - this_ds["SDATES_PERHARV"])
-   this_ds_gs["GSLEN"] = get_gs_len_da(this_ds_gs["HDATES"] - this_ds_gs["SDATES"])
-   
-   # Get *biomass* *actually harvested*
-   this_ds["GRAIN_TO_FOOD_ANN"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
-   this_ds["GRAIN_TO_FOOD_PERHARV"] = adjust_grainC(this_ds["GRAINC_TO_FOOD_PERHARV"], this_ds.patches1d_itype_veg_str)
-   this_ds_gs["GRAIN_TO_FOOD_ANN"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD_ANN"], this_ds.patches1d_itype_veg_str)
-   this_ds_gs["GRAIN_TO_FOOD"] = adjust_grainC(this_ds_gs["GRAINC_TO_FOOD"], this_ds.patches1d_itype_veg_str)
+                        sdates_rx_ds=None, gdds_rx_ds=None, verbose=False):
+    
+    # Minimum harvest threshold allowed in PlantCrop()
+    gdd_min = 50
+    
+    # Import
+    this_ds = utils.import_ds(filename,
+                                myVars=myVars,
+                                myVegtypes=myVegtypes)
+    
+    # Trim to years of interest (do not include extra year needed for finishing last growing season)
+    if y1 and yN:
+        this_ds = check_and_trim_years(y1, yN, this_ds)
+    else: # Assume including all growing seasons except last complete one are "of interest"
+        y1 = this_ds.time.values[0].year
+        yN = this_ds.time.values[-1].year - 2
+        this_ds = check_and_trim_years(y1, yN, this_ds)
         
-   # Get GRAINC variants with values set to 0 if season was longer than CLM PFT parameter mxmat
-   if mxmats:
-       for v in this_ds:
-            if "FOOD" not in v or "ANN" in v:
+    # What vegetation types are included?
+    vegtype_list = [x for x in this_ds.vegtype_str.values if x in this_ds.patches1d_itype_veg_str.values]
+    
+    # Check for consistency among sowing/harvest date/year info
+    date_vars = ["SDATES_PERHARV", "SYEARS_PERHARV", "HDATES", "HYEARS"]
+    all_nan = np.full(this_ds[date_vars[0]].shape, True)
+    all_nonpos = np.full(this_ds[date_vars[0]].shape, True)
+    all_pos = np.full(this_ds[date_vars[0]].shape, True)
+    for v in date_vars:
+        all_nan = all_nan & np.isnan(this_ds[v].values)
+        all_nonpos = all_nonpos & (this_ds[v].values <= 0)
+        all_pos = all_pos & (this_ds[v].values > 0)
+    if np.any(np.bitwise_not(all_nan | all_nonpos | all_pos)):
+        raise RuntimeError("Inconsistent missing/present values on mxharvests axis")
+    
+    # When doing transient runs, it's somehow possible for crops in newly-active patches to be *already alive*. They even have a sowing date (idop)! This will of course not show up in SDATES, but it does show up in SDATES_PERHARV. 
+    # I could put the SDATES_PERHARV dates into where they "should" be, but instead I'm just going to invalidate those "seasons."
+    #
+    # In all but the last calendar year, which patches had no sowing?
+    no_sowing_yp = np.all(np.isnan(this_ds.SDATES.values[:-1,:,:]), axis=1)
+    # In all but the first calendar year, which harvests' jdays are < their sowings' jdays? (Indicates sowing the previous calendar year.)
+    hsdate1_gt_hdate1_yp = this_ds.SDATES_PERHARV.values[1:,0,:] > this_ds.HDATES.values[1:,0,:]
+    # Where both, we have the problem.
+    falsely_alive_yp = no_sowing_yp & hsdate1_gt_hdate1_yp
+    if np.any(falsely_alive_yp):
+        print(f"Warning: {np.sum(falsely_alive_yp)} patch-seasons being ignored: Seemingly sown the year before harvest, but no sowings occurred that year.")
+        falsely_alive_yp = np.concatenate((np.full((1, this_ds.dims["patch"]), False),
+                                                    falsely_alive_yp),
+                                                    axis=0)
+        falsely_alive_y1p = np.expand_dims(falsely_alive_yp, axis=1)
+        dummy_false_y1p = np.expand_dims(np.full_like(falsely_alive_yp, False), axis=1)
+        falsely_alive_yhp = np.concatenate((falsely_alive_y1p, dummy_false_y1p), axis=1)
+        for v in this_ds.data_vars:
+            if this_ds[v].dims != ("time", "mxharvests", "patch"):
                 continue
-            v2 = v + "_MXMAT"
-            tmp_da = this_ds[v]
-            tmp_ra = tmp_da.copy().values
-            for veg_str in np.unique(this_ds.patches1d_itype_veg_str.values):
-                mxmat_veg_str = veg_str.replace("soybean", "temperate_soybean").replace("tropical_temperate", "tropical")
-                mxmat = mxmats[mxmat_veg_str]
-                tmp_ra[np.where((this_ds.patches1d_itype_veg_str.values == veg_str) & (this_ds["GSLEN_PERHARV"].values > mxmat))] = 0
-            this_ds[v2] = xr.DataArray(data = tmp_ra,
-                                                 coords = tmp_da.coords,
-                                                 attrs = tmp_da.attrs)
-       for v in this_ds:
-            if "FOOD" not in v or "ANN" not in v:
+            this_ds[v] = this_ds[v].where(~falsely_alive_yhp)
+            
+    def check_no_negative(this_ds_in, varList_no_negative, which_file, verbose=False):
+        tiny_negOK = 1e-12
+        this_ds = this_ds_in.copy()
+        for v in this_ds:
+            if not any(x in v for x in varList_no_negative):
                 continue
-            ph = v.replace("ANN", "PERHARV_MXMAT")
-            v2 = v.replace("ANN", "ANN_MXMAT")
-            this_ds[v2] = this_ds[ph].sum(dim="mxharvests")
-            this_ds_gs[v2] = this_ds[v2].copy()
-              
-       for v in this_ds_gs:
-            if "FOOD" not in v or "ANN" in v:
+            the_min = np.nanmin(this_ds[v].values)
+            if the_min < 0:
+                if np.abs(the_min) <= tiny_negOK:
+                    if verbose: print(f"Tiny negative value(s) in {v} (abs <= {tiny_negOK}) being set to 0 ({which_file})")
+                else:
+                    print(f"WARNING: Unexpected negative value(s) in {v}; minimum {the_min} ({which_file})")
+                values = this_ds[v].copy().values
+                values[np.where((values < 0) & (values >= -tiny_negOK))] = 0
+                this_ds[v] = xr.DataArray(values,
+                                          coords = this_ds[v].coords,
+                                          dims = this_ds[v].dims,
+                                          attrs = this_ds[v].attrs)
+
+            elif verbose:
+                print(f"No negative value(s) in {v}; min {the_min} ({which_file})")
+        return this_ds
+                
+    def check_no_zeros(this_ds, varList_no_zero, which_file):
+        for v in this_ds:
+            if not any(x in v for x in varList_no_zero):
                 continue
-            tmp_da = this_ds_gs[v]
-            tmp_ra = tmp_da.copy().values
-            for veg_str in np.unique(this_ds_gs.patches1d_itype_veg_str.values):
-                mxmat_veg_str = veg_str.replace("soybean", "temperate_soybean").replace("tropical_temperate", "tropical")
-                mxmat = mxmats[mxmat_veg_str]
-                tmp_ra[np.where(np.expand_dims(this_ds_gs.patches1d_itype_veg_str.values == veg_str, 1) & (this_ds_gs["GSLEN"].values > mxmat))] = 0
-            this_ds_gs[v + "_MXMAT"] = xr.DataArray(data = tmp_ra,
-                                                    coords = tmp_da.coords,
-                                                    attrs = tmp_da.attrs)
-          
-   # Get HUI accumulation as fraction of required
-   this_ds_gs["HUIFRAC"] = this_ds_gs["HUI"] / this_ds_gs["GDDHARV"]
-   
-   # Avoid tiny negative values
-   varList_no_negative = ["GRAIN", "REASON", "GDD", "HUI", "YEAR", "DATE", "GSLEN"]
-   this_ds_gs = check_no_negative(this_ds_gs, varList_no_negative, "new file", verbose=verbose)
-   
-   # Check for no zero values where there shouldn't be
-   varList_no_zero = ["REASON", "DATE"]
-   check_no_zeros(this_ds_gs, varList_no_zero, "new file")
-   
-   # Check that e.g., GDDACCUM <= HUI
-   for vars in [["GDDACCUM", "HUI"],
-                ["SYEARS", "HYEARS"]]:
-      if all(v in this_ds_gs for v in vars):
-         check_v0_le_v1(this_ds_gs, vars, both_nan_ok=True, throw_error=True)
-      
-   # Check that prescribed calendars were obeyed
-   if sdates_rx_ds:
-      check_rx_obeyed(vegtype_list, sdates_rx_ds, this_ds, "this_ds", "SDATES")
-   if gdds_rx_ds:
-      check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, "this_ds", "SDATES", "GDDHARV", gdd_min=gdd_min)
-   
-   # Convert time axis to integer year
-   this_ds_gs = this_ds_gs.assign_coords({"time": [t.year for t in this_ds.time_bounds.values[:,0]]})
-      
-   return this_ds_gs
+            if np.any(this_ds[v].values == 0):
+                print(f"WARNING: Unexpected zero(s) in {v} ({which_file})")
+            elif verbose:
+                print(f"No zero value(s) in {v} ({which_file})")
+            
+    # Check for no zero values where there shouldn't be
+    varList_no_zero = ["DATE", "YEAR"]
+    check_no_zeros(this_ds, varList_no_zero, "original file")
+    
+    # Convert time*mxharvests axes to growingseason axis
+    this_ds_gs = convert_axis_time2gs(this_ds, verbose=verbose, incl_orig=False)
+    
+    # These are needed for calculating yield later
+    this_ds_gs['GRAINC_TO_FOOD_PERHARV'] = this_ds['GRAINC_TO_FOOD_PERHARV']
+    this_ds_gs['GDDHARV_PERHARV'] = this_ds['GDDHARV_PERHARV']
+    
+    # Get growing season length
+    this_ds["GSLEN_PERHARV"] = get_gs_len_da(this_ds["HDATES"] - this_ds["SDATES_PERHARV"])
+    this_ds_gs["GSLEN"] = get_gs_len_da(this_ds_gs["HDATES"] - this_ds_gs["SDATES"])
+    this_ds_gs["GSLEN_PERHARV"] = this_ds["GSLEN_PERHARV"]
+    
+    # Get HUI accumulation as fraction of required
+    this_ds_gs["HUIFRAC"] = this_ds_gs["HUI"] / this_ds_gs["GDDHARV"]
+    this_ds_gs["HUIFRAC_PERHARV"] = this_ds["HUI_PERHARV"] / this_ds["GDDHARV_PERHARV"]
+    
+    # Avoid tiny negative values
+    varList_no_negative = ["GRAIN", "REASON", "GDD", "HUI", "YEAR", "DATE", "GSLEN"]
+    this_ds_gs = check_no_negative(this_ds_gs, varList_no_negative, "new file", verbose=verbose)
+    
+    # Check for no zero values where there shouldn't be
+    varList_no_zero = ["REASON", "DATE"]
+    check_no_zeros(this_ds_gs, varList_no_zero, "new file")
+    
+    # Check that e.g., GDDACCUM <= HUI
+    for vars in [["GDDACCUM", "HUI"],
+                 ["SYEARS", "HYEARS"]]:
+        if all(v in this_ds_gs for v in vars):
+            check_v0_le_v1(this_ds_gs, vars, both_nan_ok=True, throw_error=True)
+        
+    # Check that prescribed calendars were obeyed
+    if sdates_rx_ds:
+        check_rx_obeyed(vegtype_list, sdates_rx_ds, this_ds, "this_ds", "SDATES")
+    if gdds_rx_ds:
+        check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, "this_ds", "SDATES", "GDDHARV", gdd_min=gdd_min)
+    
+    # Convert time axis to integer year
+    this_ds_gs = this_ds_gs.assign_coords({"time": [t.year for t in this_ds.time_bounds.values[:,0]]})
+        
+    # Import monthly irrigation outputs, if present
+    pattern = os.path.join(os.path.dirname(filename), "*irrig_monthly.nc")
+    irrig_file = glob.glob(pattern)
+    if irrig_file:
+        if len(irrig_file) > 1:
+            raise RuntimeError(f"Expected at most 1 *irrig_monthly.nc; found {len(irrig_file)}")
+        irrig_file = irrig_file[0]
+        tmp = xr.open_dataset(irrig_file)
+        new_time = [x[0] for x in tmp.time_bounds.values]
+        tmp = tmp.assign_coords(time=new_time)
+        tmp = tmp.sel(time=slice(f"{y1}-01-01", f"{yN}-12-31"))
+        
+        # Calculate limited irrigation
+        mms_to_m3d = (tmp['area']*1e6 * tmp['landfrac']) * 1e-3 * 60*60*24
+        days_in_month = tmp.time.dt.days_in_month
+        qirrig = np.expand_dims((tmp["QIRRIG_FROM_SURFACE"] * days_in_month * mms_to_m3d).values, axis=3) 
+        avail = np.expand_dims(0.9*tmp["VOLRMCH"], axis=3)
+        concatted = np.concatenate((qirrig, avail), axis=3)
+        qirrig_lim = np.min(concatted, axis=3)
+        qirrig_lim = xr.DataArray(data = qirrig_lim,
+                                coords = tmp["QIRRIG_FROM_SURFACE"].coords,
+                                attrs = tmp["QIRRIG_FROM_SURFACE"].attrs)
+        qirrig_lim = qirrig_lim / days_in_month / mms_to_m3d
+        qirrig_lim.attrs = tmp["QIRRIG_FROM_SURFACE"].attrs
+        qirrig_lim.attrs['long_name'] = "water added through surface water irrigation, limited by 90% of available"
+        tmp["QIRRIG_FROM_SURFACE_LIM"] = qirrig_lim
+        
+        # Calculate unfulfilled demand
+        tmp['UNFULFILLED_DEMAND'] = tmp['QIRRIG_FROM_SURFACE'] - tmp['QIRRIG_FROM_SURFACE_LIM']
+        tmp['UNFULFILLED_DEMAND'].attrs = tmp['QIRRIG_FROM_SURFACE'].attrs
+        tmp['UNFULFILLED_DEMAND'].attrs['long_name'] = 'irrigation demand unable to be filled based on limitation (90% of VOLRMCH)'
+
+        # Calculate irrigation as fraction of available water
+        for v in ["QIRRIG_FROM_SURFACE", "QIRRIG_FROM_SURFACE_LIM", "UNFULFILLED_DEMAND"]:
+            v2 = v + "_FRAC"
+            tmp[v2] = (tmp[v] * days_in_month * mms_to_m3d) / tmp["VOLRMCH"]
+            tmp[v2].attrs = tmp[v].attrs
+            tmp[v2].attrs['units'] = "fraction of available"
+            tmp[v2].attrs['long_name'] = tmp[v2].attrs['long_name'] + " as frac. available"
+        
+        irrig_ds = xr.Dataset()
+        for x in tmp:
+            if "time" not in tmp[x].dims or x=="time_bounds":
+                if x != "time_bounds":
+                    irrig_ds[x] = tmp[x]
+                continue
+            irrig_ds[x] = annual_mean_from_monthly(tmp, x)
+            irrig_ds[x].attrs = tmp[x].attrs
+            
+            # Convert mm/s to m3/yr
+            if irrig_ds[x].attrs['units'] == "mm/s":
+                irrig_ds[x] = (tmp['area']*1e6 * tmp['landfrac']) * irrig_ds[x] * 60*60*24*365 * 1e-3
+                irrig_ds[x].attrs = tmp[x].attrs
+                irrig_ds[x].attrs['units'] = "m3/yr"
+
+    else:
+        irrig_ds = None
+        
+    return this_ds_gs, irrig_ds
 
 
 def make_axis(fig, ny, nx, n):
@@ -1437,17 +1719,52 @@ def mask_immature(this_ds, this_vegtype, gridded_da):
     return gridded_da
 
 
-def open_lu_ds(filename, y1, yN, existing_ds):
-   # Open and trim to years of interest
-   ds = xr.open_dataset(filename).sel(time=slice(y1,yN))
-
-   # Assign actual lon/lat coordinates
-   ds = ds.assign_coords(lon=("lsmlon", existing_ds.lon.values),
-                              lat=("lsmlat", existing_ds.lat.values))
-   ds = ds.swap_dims({"lsmlon": "lon",
-                           "lsmlat": "lat"})
-   return ds
-
+def open_lu_ds(filename, y1, yN, existing_ds, ungrid=True):
+    # Open and trim to years of interest
+    dsg = xr.open_dataset(filename).sel(time=slice(y1,yN))
+    
+    # Assign actual lon/lat coordinates
+    dsg = dsg.assign_coords(lon=("lsmlon", existing_ds.lon.values),
+                            lat=("lsmlat", existing_ds.lat.values))
+    dsg = dsg.swap_dims({"lsmlon": "lon",
+                         "lsmlat": "lat"})
+    
+    dsg['AREA_CFT'] = dsg.AREA*1e6 * dsg.LANDFRAC_PFT * dsg.PCT_CROP/100 * dsg.PCT_CFT/100
+    dsg['AREA_CFT'].attrs = {'units': 'm2'}
+    dsg['AREA_CFT'].load()
+    
+    if not ungrid:
+        return dsg
+    
+    # Un-grid
+    query_ilons = [int(x)-1 for x in existing_ds['patches1d_ixy'].values]
+    query_ilats = [int(x)-1 for x in existing_ds['patches1d_jxy'].values]
+    query_ivts = [list(dsg.cft.values).index(x) for x in existing_ds['patches1d_itype_veg'].values]
+    
+    ds = xr.Dataset(attrs=dsg.attrs)
+    for v in ["AREA", "LANDFRAC_PFT", "PCT_CFT", "PCT_CROP", "AREA_CFT"]:
+        if 'time' in dsg[v].dims:
+            new_coords = existing_ds['GRAINC_TO_FOOD_ANN'].coords
+        else:
+            new_coords = existing_ds['patches1d_lon'].coords
+        if 'cft' in dsg[v].dims:
+            ds[v] = dsg[v].isel(lon=xr.DataArray(query_ilons, dims='patch'),
+                                lat=xr.DataArray(query_ilats, dims='patch'),
+                                cft=xr.DataArray(query_ivts, dims='patch'),
+                                drop=True)\
+                            .assign_coords(new_coords)
+        else:
+            ds[v] = dsg[v].isel(lon=xr.DataArray(query_ilons, dims='patch'),
+                                lat=xr.DataArray(query_ilats, dims='patch'),
+                                drop=True)\
+                            .assign_coords(new_coords)
+    for v in existing_ds:
+        if "patches1d_" in v:
+            ds[v] = existing_ds[v]
+    ds['lon'] = dsg['lon']
+    ds['lat'] = dsg['lat']
+    return ds
+    
 
 def print_gs_table(ds):
     if "patch" in ds.dims:
@@ -1569,96 +1886,96 @@ def remove_outliers(gridded_da):
 
 
 def round_lonlats_to_match_da(ds_a, varname_a, tolerance, ds_b=None, varname_b=None):
-   if (ds_b and varname_b) or (not ds_b and not varname_b):
-      raise RuntimeError(f"You must provide one of ds_b or varname_b")
-   elif ds_b:
-      da_a = ds_a[varname_a]
-      da_b = ds_b[varname_a]
-   elif varname_b:
-      da_a = ds_a[varname_a]
-      da_b = ds_a[varname_b]
-      
-   unique_vals_a = np.unique(da_a)
-   unique_vals_b = np.unique(da_b)
-   
-   # Depends on unique values being sorted ascending, which they should be from np.unique().
-   # If calling with one of these being unique values from a coordinate axis, having that be unique_vals_b should avoid large differences due to some coordinate values not being represented in data.
-   def get_diffs(unique_vals_a, unique_vals_b):
-      max_diff = 0
-      y0 = 0
-      diffs = []
-      for x in unique_vals_a:
-         min_diff_fromx = np.inf
-         for i,y in enumerate(unique_vals_b[y0:]):
-            y_minus_x = y-x
-            min_diff_fromx = min(min_diff_fromx, np.abs(y_minus_x))
-            if y_minus_x >= 0:
-               break
-         max_diff = max(max_diff, min_diff_fromx)
-         if min_diff_fromx > 0:
-            diffs.append(min_diff_fromx)
-      return max_diff, diffs
-   
-   max_diff, diffs = get_diffs(unique_vals_a, unique_vals_b)
-   
-   if max_diff > tolerance:
-      new_tolerance = np.ceil(np.log10(max_diff))
-      if new_tolerance > 0:
-         print(len(unique_vals_a))
-         print(unique_vals_a)
-         print(len(unique_vals_b))
-         print(unique_vals_b)
-         print(diffs)
-         raise RuntimeError(f"Maximum disagreement in {varname_a} ({max_diff}) is intolerably large")
-      new_tolerance = 10**new_tolerance
-      if varname_b:
-         print(f"Maximum disagreement between {varname_a} and {varname_b} ({max_diff}) is larger than default tolerance of {tolerance}. Increasing tolerance to {new_tolerance}.")
-      else:
-         print(f"Maximum disagreement in {varname_a} ({max_diff}) is larger than default tolerance of {tolerance}. Increasing tolerance to {new_tolerance}.")
-      tolerance = new_tolerance
-   neglog_tolerance = int(-np.log10(tolerance))
-   
-   da_a = np.round(da_a, neglog_tolerance)
-   da_b = np.round(da_b, neglog_tolerance)
-   
-   def replace_vals(ds, new_da, varname):
-      if len(ds[varname]) != len(new_da):
-         raise RuntimeError(f"Not allowing you to change length of {varname} from {len(ds[varname])} to {len(new_da)}")
-      if varname in ds.coords:
-         ds = ds.assign_coords({varname: new_da.values})
-      elif varname in ds.data_vars:
-         ds[varname] = new_da
-      else:
-         raise TypeError(f"{varname} is not a coordinate or data variable; update round_lonlats_to_match_da()->replace_vals() to handle it")
-      return ds
-   
-   ds_a = replace_vals(ds_a, da_a, varname_a)
-   if ds_b:
-      ds_b = replace_vals(ds_b, da_b, varname_a)
-      return ds_a, ds_b, tolerance
-   else:
-      ds_a = replace_vals(ds_a, da_b, varname_b)
-      return ds_a, tolerance
+    if (ds_b and varname_b) or (not ds_b and not varname_b):
+        raise RuntimeError(f"You must provide one of ds_b or varname_b")
+    elif ds_b:
+        da_a = ds_a[varname_a]
+        da_b = ds_b[varname_a]
+    elif varname_b:
+        da_a = ds_a[varname_a]
+        da_b = ds_a[varname_b]
+        
+    unique_vals_a = np.unique(da_a)
+    unique_vals_b = np.unique(da_b)
+    
+    # Depends on unique values being sorted ascending, which they should be from np.unique().
+    # If calling with one of these being unique values from a coordinate axis, having that be unique_vals_b should avoid large differences due to some coordinate values not being represented in data.
+    def get_diffs(unique_vals_a, unique_vals_b):
+        max_diff = 0
+        y0 = 0
+        diffs = []
+        for x in unique_vals_a:
+            min_diff_fromx = np.inf
+            for i,y in enumerate(unique_vals_b[y0:]):
+                y_minus_x = y-x
+                min_diff_fromx = min(min_diff_fromx, np.abs(y_minus_x))
+                if y_minus_x >= 0:
+                    break
+            max_diff = max(max_diff, min_diff_fromx)
+            if min_diff_fromx > 0:
+                diffs.append(min_diff_fromx)
+        return max_diff, diffs
+    
+    max_diff, diffs = get_diffs(unique_vals_a, unique_vals_b)
+    
+    if max_diff > tolerance:
+        new_tolerance = np.ceil(np.log10(max_diff))
+        if new_tolerance > 0:
+            print(len(unique_vals_a))
+            print(unique_vals_a)
+            print(len(unique_vals_b))
+            print(unique_vals_b)
+            print(diffs)
+            raise RuntimeError(f"Maximum disagreement in {varname_a} ({max_diff}) is intolerably large")
+        new_tolerance = 10**new_tolerance
+        if varname_b:
+            print(f"Maximum disagreement between {varname_a} and {varname_b} ({max_diff}) is larger than default tolerance of {tolerance}. Increasing tolerance to {new_tolerance}.")
+        else:
+            print(f"Maximum disagreement in {varname_a} ({max_diff}) is larger than default tolerance of {tolerance}. Increasing tolerance to {new_tolerance}.")
+        tolerance = new_tolerance
+    neglog_tolerance = int(-np.log10(tolerance))
+    
+    da_a = np.round(da_a, neglog_tolerance)
+    da_b = np.round(da_b, neglog_tolerance)
+    
+    def replace_vals(ds, new_da, varname):
+        if len(ds[varname]) != len(new_da):
+            raise RuntimeError(f"Not allowing you to change length of {varname} from {len(ds[varname])} to {len(new_da)}")
+        if varname in ds.coords:
+            ds = ds.assign_coords({varname: new_da.values})
+        elif varname in ds.data_vars:
+            ds[varname] = new_da
+        else:
+            raise TypeError(f"{varname} is not a coordinate or data variable; update round_lonlats_to_match_da()->replace_vals() to handle it")
+        return ds
+    
+    ds_a = replace_vals(ds_a, da_a, varname_a)
+    if ds_b:
+        ds_b = replace_vals(ds_b, da_b, varname_a)
+        return ds_a, ds_b, tolerance
+    else:
+        ds_a = replace_vals(ds_a, da_b, varname_b)
+        return ds_a, tolerance
 
 
 def round_lonlats_to_match_ds(ds_a, ds_b, which_coord, tolerance):
-   tolerance_orig = np.inf
-   i=0
-   max_Nloops = 10
-   while tolerance != tolerance_orig:
-      if i > max_Nloops:
-         raise RuntimeError(f"More than {max_Nloops} loops required in round_lonlats_to_match_ds()")
-      tolerance_orig = tolerance
-      patches_var = "patches1d_" + which_coord
-      if patches_var in ds_a and which_coord in ds_a:
-         ds_a, tolerance = round_lonlats_to_match_da(ds_a, patches_var, tolerance, varname_b=which_coord)
-      if patches_var in ds_b and which_coord in ds_b:
-         ds_b, tolerance = round_lonlats_to_match_da(ds_b, patches_var, tolerance, varname_b=which_coord)
-      if patches_var in ds_a and patches_var in ds_b:
-         ds_a, ds_b, tolerance = round_lonlats_to_match_da(ds_a, patches_var, tolerance, ds_b=ds_b)
-      if which_coord in ds_a and which_coord in ds_b:
-         ds_a, ds_b, tolerance = round_lonlats_to_match_da(ds_a, which_coord, tolerance, ds_b=ds_b)
-   return ds_a, ds_b, tolerance
+    tolerance_orig = np.inf
+    i=0
+    max_Nloops = 10
+    while tolerance != tolerance_orig:
+        if i > max_Nloops:
+            raise RuntimeError(f"More than {max_Nloops} loops required in round_lonlats_to_match_ds()")
+        tolerance_orig = tolerance
+        patches_var = "patches1d_" + which_coord
+        if patches_var in ds_a and which_coord in ds_a:
+            ds_a, tolerance = round_lonlats_to_match_da(ds_a, patches_var, tolerance, varname_b=which_coord)
+        if patches_var in ds_b and which_coord in ds_b:
+            ds_b, tolerance = round_lonlats_to_match_da(ds_b, patches_var, tolerance, varname_b=which_coord)
+        if patches_var in ds_a and patches_var in ds_b:
+            ds_a, ds_b, tolerance = round_lonlats_to_match_da(ds_a, patches_var, tolerance, ds_b=ds_b)
+        if which_coord in ds_a and which_coord in ds_b:
+            ds_a, ds_b, tolerance = round_lonlats_to_match_da(ds_a, which_coord, tolerance, ds_b=ds_b)
+    return ds_a, ds_b, tolerance
 
 
 # For backwards compatibility with files missing SDATES_PERHARV.
@@ -1689,6 +2006,24 @@ def set_up_ds_with_gs_axis(ds_in):
     return ds_out
 
 
+def shift_sim_timeseries(array_in_cy, whichWay, inds_obs, inds_sim):
+    array_out_cy = np.full((array_in_cy.shape[0], array_in_cy.shape[1]-2), fill_value=np.nan)
+    array_out_cy[inds_obs,:] = array_in_cy[inds_obs,1:-1]
+    if whichWay == "L":
+        array_out_cy[inds_sim,:] = array_in_cy[inds_sim,:-2]
+    elif whichWay == "R":
+        array_out_cy[inds_sim,:] = array_in_cy[inds_sim,2:]
+    else:
+        raise RuntimeError("whichWay {whichWay} not recognized. Use L or R.")
+    return array_out_cy
+
+
+def strip_cropname(x):
+    for y in ['irrigated', 'temperate', 'tropical', 'spring', 'winter']:
+        x = x.replace(y+"_", "")
+    return x
+
+
 def subtract_mean(in_ps):
    warnings.filterwarnings("ignore", message="Mean of empty slice") # Happens when you do np.nanmean() of an all-NaN 
    mean_p = np.nanmean(in_ps, axis=1)
@@ -1698,37 +2033,167 @@ def subtract_mean(in_ps):
 
 
 def time_units_and_trim(ds, y1, yN, dt_type):
-   
-   # Convert to dt_type
-   time0 = ds.time.values[0]
-   time0_type = type(time0)
-   if not isinstance(time0, cftime.datetime):
-      if not isinstance(time0, np.integer):
-         raise TypeError(f"Unsure how to convert time of type {time0_type} to cftime.datetime")
-      print(f"Converting integer time to {dt_type}, assuming values are years and each time step is Jan. 1.")
-      ds = ds.assign_coords({"time": [dt_type(x, 1, 1) for x in ds.time.values]})
-   elif not isinstance(time0, dt_type):
-      raise TypeError(f"Expected time axis to be type {dt_type} but got {time0_type}")
-   
-   # Trim
-   ds = ds.sel(time=slice(f"{y1}-01-01", f"{yN}-01-01"))
-      
-   return ds
+    
+    # Convert to dt_type
+    time0 = ds.time.values[0]
+    time0_type = type(time0)
+    if not isinstance(time0, cftime.datetime):
+        if not isinstance(time0, np.integer):
+            raise TypeError(f"Unsure how to convert time of type {time0_type} to cftime.datetime")
+        print(f"Converting integer time to {dt_type}, assuming values are years and each time step is Jan. 1.")
+        ds = ds.assign_coords({"time": [dt_type(x, 1, 1) for x in ds.time.values]})
+    elif not isinstance(time0, dt_type):
+        raise TypeError(f"Expected time axis to be type {dt_type} but got {time0_type}")
+    
+    # Trim
+    ds = ds.sel(time=slice(f"{y1}-01-01", f"{yN}-01-01"))
+        
+    return ds
 
+# kwargs like gridded_ds_dim='ungridded_target_ds_dim'
+# e.g.: lon='patches1d_ixy', lat='patches1d_jxy'
+def ungrid(gridded_xr, ungridded_target_ds, coords_var, **kwargs):
+    
+    # Remove any empties from ungridded_target_ds
+    for key, selection in kwargs.items():
+        if isinstance(ungridded_target_ds[selection].values[0], str):
+            # print(f"Removing ungridded_target_ds patches where {selection} is empty")
+            isel_list = [i for i, x in enumerate(ungridded_target_ds[selection]) if x != ""]
+            ungridded_target_ds = ungridded_target_ds.copy().isel({'patch': isel_list})
+            
+            ### I don't think this is necessary
+            # unique_ungridded_selection = ungridded_target_ds[selection].values
+            # isel_list = [i for i, x in enumerate(gridded_xr[key].values) if x in unique_ungridded_selection]
+            # gridded_xr = gridded_xr.isel({key: isel_list})
+    
+    new_coords = ungridded_target_ds[coords_var].coords
+        
+    isel_dict = {}
+    for key, selection in kwargs.items():
+        if key in ['lon', 'lat']:
+            isel_dict[key] = xr.DataArray([int(x)-1 for x in ungridded_target_ds[selection].values],
+                                          dims = 'patch')
+        else:
+            values_list = list(gridded_xr[key].values)
+            isel_dict[key] = xr.DataArray([values_list.index(x) for x in ungridded_target_ds[selection].values],
+                                          dims = 'patch')
+    ungridded_da = gridded_xr.isel(isel_dict, drop=True).assign_coords(new_coords)
+    return ungridded_da
+
+
+# After https://www.itl.nist.gov/div898/software/dataplot/refman2/auxillar/weigcorr.htm
+def weighted_cov(a, b, w):
+    ma = np.average(a, weights=w)
+    mb = np.average(b, weights=w)
+    return np.sum(w*(a-ma)*(b-mb)) / np.sum(w)
+    
+def weighted_pearsons_r(x, y, w):
+    return weighted_cov(x, y, w) / np.sqrt(weighted_cov(x, x, w)*weighted_cov(y, y, w))
 
 def yield_anomalies(ps_in):
-   if isinstance(ps_in, xr.DataArray):
-      ps_out = ps_in.values
-   else:
-      ps_out = ps_in
-   
-   # After Jägermeyr & Frieler (2018, Sci. Adv.)
-   ps_out = detrend(ps_out)
-   ps_out /= np.expand_dims(np.std(ps_out, axis=1), axis=1)
-   
-   if isinstance(ps_in, xr.DataArray):
-      ps_out = xr.DataArray(data = ps_out,
-                            coords = ps_in.coords,
-                            attrs = ps_in.attrs)
-         
-   return ps_out
+    if isinstance(ps_in, xr.DataArray):
+        ps_out = ps_in.values
+    else:
+        ps_out = ps_in
+    
+    # After Jägermeyr & Frieler (2018, Sci. Adv.)
+    ps_out = detrend(ps_out)
+    ps_out /= np.expand_dims(np.std(ps_out, axis=1), axis=1)
+    
+    if isinstance(ps_in, xr.DataArray):
+        ps_out = xr.DataArray(data = ps_out,
+                              coords = ps_in.coords,
+                              attrs = ps_in.attrs)
+            
+    return ps_out
+
+def zero_immatures(ds, out_var="YIELD", min_viable_hui=None, mxmats=None, forAnnual=False, force_update=False):
+    
+    mxmat_limited = bool(mxmats)
+    
+    if any(x in out_var for x in ["YIELD", "MATURE"]):
+        in_var = "GRAINC_TO_FOOD"
+    else:
+        raise RuntimeError(f"out_var {out_var} not recognized. Accepted values: *YIELD*, *MATURE*")
+    
+    huifrac_var = "HUIFRAC"
+    gddharv_var = "GDDHARV"
+    gslen_var = "GSLEN"
+    if forAnnual:
+        out_var += "_PERHARV"
+        in_var += "_PERHARV"
+        huifrac_var += "_PERHARV"
+        gddharv_var += "_PERHARV"
+        gslen_var += "_PERHARV"
+    
+    if out_var in ds and not force_update and all([x in ds[out_var].attrs for x in ['min_viable_hui', 'mxmat_limited']]):
+        if ds[out_var].attrs['min_viable_hui'] == min_viable_hui and ds[out_var].attrs['mxmat_limited'] == mxmat_limited:
+            return ds
+        elif 'locked' in ds[out_var].attrs and ds[out_var].attrs['locked']:
+            return ds
+    
+    ds[out_var] = ds[in_var].copy()
+    
+    # Set yield to zero where minimum viable HUI wasn't reached
+    if min_viable_hui is not None:
+        
+        huifrac = ds[huifrac_var].copy().values
+        huifrac[np.where(ds[gddharv_var].values==0)] = 1
+        if min_viable_hui == "isimip3" or min_viable_hui == "ggcmi3":
+            corn_value = 0.8
+            other_value = 0.9
+            min_viable_hui_touse = np.full_like(huifrac, fill_value=other_value)
+            for veg_str in np.unique(ds.patches1d_itype_veg_str.values):
+                if "corn" not in veg_str:
+                    continue
+                is_thistype = np.where((ds.patches1d_itype_veg_str.values == veg_str))[0]
+                patch_index = list(ds[huifrac_var].dims).index("patch")
+                if patch_index == 0:
+                    min_viable_hui_touse[is_thistype,...] = corn_value
+                elif patch_index == ds[huifrac_var].ndim - 1:
+                    min_viable_hui_touse[...,is_thistype] = corn_value
+                else:
+                    # Need patch to be either first or last dimension to allow use of ellipses
+                    raise RuntimeError(f"Temporarily rearrange min_viable_hui_touse so that patch dimension is first (0) or last ({ds[huifrac_var].ndim - 1}), instead of {patch_index}.")
+        elif isinstance(min_viable_hui, str):
+            raise RuntimeError(f"min_viable_hui {min_viable_hui} not recognized. Accepted strings are ggcmi3 or isimip3")
+        else:
+            min_viable_hui_touse = min_viable_hui
+        if np.any(huifrac < min_viable_hui_touse):
+            print(f"Setting {out_var} to zero where minimum viable HUI ({min_viable_hui}) wasn't reached")
+            tmp_da = ds[in_var]
+            tmp = tmp_da.copy().values
+            dont_include = (huifrac < min_viable_hui_touse) & (tmp > 0)
+            tmp[np.where(dont_include)] = 0
+            if "MATURE" in out_var:
+                tmp[np.where(~dont_include & ~np.isnan(tmp))] = 1
+                tmp_da.attrs['units'] = 'fraction'
+            ds[out_var] = xr.DataArray(data = tmp,
+                                       attrs = tmp_da.attrs,
+                                       coords = tmp_da.coords)
+    
+    # Get variants with values set to 0 if season was longer than CLM PFT parameter mxmat
+    if mxmat_limited:
+        tmp_da = ds[out_var]
+        tmp_ra = tmp_da.copy().values
+        for veg_str in np.unique(ds.patches1d_itype_veg_str.values):
+            mxmat_veg_str = veg_str.replace("soybean", "temperate_soybean").replace("tropical_temperate", "tropical")
+            mxmat = mxmats[mxmat_veg_str]
+            tmp_ra[np.where((ds.patches1d_itype_veg_str.values == veg_str) & (ds[gslen_var].values > mxmat))] = 0
+        ds[out_var] = xr.DataArray(data = tmp_ra,
+                                   coords = tmp_da.coords,
+                                   attrs = tmp_da.attrs)
+    
+    # Get *biomass* *actually harvested*
+    if "YIELD" in out_var:
+        ds[out_var] = adjust_grainC(ds[out_var], ds.patches1d_itype_veg_str)
+    
+    # Save details
+    ds[out_var].attrs['min_viable_hui'] = min_viable_hui
+    ds[out_var].attrs['mxmat_limited'] = mxmat_limited
+    
+    # Get dimensions in expected order (time/gs, patch)
+    if not forAnnual:
+        ds[out_var] = ds[out_var].transpose("gs", "patch")
+    
+    return ds
