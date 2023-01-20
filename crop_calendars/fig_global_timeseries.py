@@ -192,34 +192,37 @@ def finishup_allcrops_scatter(c, ny, nx, axes_this, f_this, suptitle, outDir_fig
                    bbox_inches='tight')
     plt.close(f_this)
 
+def get_incl_crops(thisCrop_clm, patches1d_itype_veg_str, cropList_combined_clm):
+    if isinstance(patches1d_itype_veg_str, xr.DataArray):
+        patches1d_itype_veg_str = patches1d_itype_veg_str.values
+        
+    if "Total" in thisCrop_clm:
+        incl_crops = [x for x in patches1d_itype_veg_str if x.replace('irrigated_','').replace('temperate_','').replace('tropical_','').replace('spring_','') in [y.lower() for y in cropList_combined_clm]]
+        if thisCrop_clm == "Total (no sgc)":
+            incl_crops = [x for x in incl_crops if "sugarcane" not in x]
+        elif thisCrop_clm == "Total (grains only)":
+            incl_crops = [x for x in incl_crops if "sugarcane" not in x and "cotton" not in x]
+        elif thisCrop_clm == "Total":
+            pass
+        else:
+            raise RuntimeError("???")
+    else:
+        incl_crops = [x for x in patches1d_itype_veg_str if thisCrop_clm.lower() in x]
+    
+    return incl_crops
+        
+
 def get_CLM_ts_area_y(case, lu_ds, thisCrop_clm, cropList_combined_clm):
         
-        dummy_y_da = lu_ds.AREA_CFT.isel(patch=0, drop=True)
-        area_y = np.full(dummy_y_da.shape, 0.0)
-        if "Total" in thisCrop_clm:
-            incl_crops = [x for x in case['ds'].vegtype_str.values if x.replace('irrigated_','').replace('temperate_','').replace('tropical_','').replace('spring_','') in [y.lower() for y in cropList_combined_clm]]
-            if thisCrop_clm == "Total (no sgc)":
-                incl_crops = [x for x in incl_crops if "sugarcane" not in x]
-            elif thisCrop_clm == "Total (grains only)":
-                incl_crops = [x for x in incl_crops if "sugarcane" not in x and "cotton" not in x]
-            elif thisCrop_clm == "Total":
-                pass
-            else:
-                raise RuntimeError("???")
-            incl_crops_int = [utils.ivt_str2int(x) for x in incl_crops]
-            isel_list = [i for i, x in enumerate(lu_ds.patches1d_itype_veg.values) if x in incl_crops_int]
-            area_y = lu_ds.AREA_CFT.isel(patch=isel_list).sum(dim="patch").values
-        else:
-            for pft_str in case['ds'].vegtype_str.values:
-                if thisCrop_clm.lower() not in pft_str:
-                    continue
-                pft_int = utils.ivt_str2int(pft_str)
-                where_thisCrop = np.where(lu_ds['patches1d_itype_veg'] == pft_int)[0]
-                area_y += lu_ds.AREA_CFT.isel(patch=where_thisCrop).sum(dim="patch").values
-        area_y *= 1e-4 # m2 to ha
-        ts_area_y = xr.DataArray(data=area_y, coords=dummy_y_da.coords)
-        
-        return ts_area_y
+    dummy_y_da = lu_ds.AREA_CFT.isel(patch=0, drop=True)
+    incl_crops = get_incl_crops(thisCrop_clm, case['ds'].vegtype_str, cropList_combined_clm)
+    incl_crops_int = [utils.ivt_str2int(x) for x in incl_crops]
+    isel_list = [i for i, x in enumerate(lu_ds.patches1d_itype_veg.values) if x in incl_crops_int]
+    area_y = lu_ds.AREA_CFT.isel(patch=isel_list).sum(dim="patch").values
+    area_y *= 1e-4 # m2 to ha
+    ts_area_y = xr.DataArray(data=area_y, coords=dummy_y_da.coords)
+    
+    return ts_area_y
 
 
 def get_CLM_ts_prod_y(case, lu_ds, use_annual_yields, min_viable_hui, mxmats, thisCrop_clm, cropList_combined_clm):
