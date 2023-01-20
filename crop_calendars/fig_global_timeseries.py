@@ -192,7 +192,7 @@ def finishup_allcrops_scatter(c, ny, nx, axes_this, f_this, suptitle, outDir_fig
                    bbox_inches='tight')
     plt.close(f_this)
 
-def get_incl_crops(thisCrop_clm, patches1d_itype_veg_str, cropList_combined_clm):
+def get_incl_crops(thisCrop_clm, patches1d_itype_veg_str, cropList_combined_clm, only_irrigated=False):
     if isinstance(patches1d_itype_veg_str, xr.DataArray):
         patches1d_itype_veg_str = patches1d_itype_veg_str.values
         
@@ -209,13 +209,16 @@ def get_incl_crops(thisCrop_clm, patches1d_itype_veg_str, cropList_combined_clm)
     else:
         incl_crops = [x for x in patches1d_itype_veg_str if thisCrop_clm.lower() in x]
     
+    if only_irrigated:
+        incl_crops = [x for x in incl_crops if "irrigated" in x]
+    
     return incl_crops
         
 
-def get_CLM_ts_area_y(case, lu_ds, thisCrop_clm, cropList_combined_clm):
+def get_CLM_ts_area_y(case, lu_ds, thisCrop_clm, cropList_combined_clm, only_irrigated=False):
         
     dummy_y_da = lu_ds.AREA_CFT.isel(patch=0, drop=True)
-    incl_crops = get_incl_crops(thisCrop_clm, case['ds'].vegtype_str, cropList_combined_clm)
+    incl_crops = get_incl_crops(thisCrop_clm, case['ds'].vegtype_str, cropList_combined_clm, only_irrigated=only_irrigated)
     incl_crops_int = [utils.ivt_str2int(x) for x in incl_crops]
     isel_list = [i for i, x in enumerate(lu_ds.patches1d_itype_veg.values) if x in incl_crops_int]
     area_y = lu_ds.AREA_CFT.isel(patch=isel_list).sum(dim="patch").values
