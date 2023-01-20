@@ -140,14 +140,13 @@ for i, (casename, case) in enumerate(cases.items()):
                                               dims = {"ivt": this_ds.ivt})
 
     else:
-        this_ds, irrig_ds = cc.import_output(case['filepath'], myVars=myVars,
+        this_ds = cc.import_output(case['filepath'], myVars=myVars,
                                    y1=y1, yN=yN, verbose=verbose_import)
         bad_patches = cc.check_constant_vars(this_ds, case, ignore_nan=True, constantGSs=case['constantGSs'], verbose=True, throw_error=False)
         # for p in bad_patches:
         #	  cc.print_gs_table(this_ds.isel(patch=p))
     
     case["ds"] = this_ds
-    case["irrig_ds"] = irrig_ds
 
 # Get growing season set info	  
 gs_values = this_ds.gs.values

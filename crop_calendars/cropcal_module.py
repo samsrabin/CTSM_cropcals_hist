@@ -1715,69 +1715,50 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
         check_rx_obeyed(vegtype_list, sdates_rx_ds, this_ds, "this_ds", "SDATES")
     if gdds_rx_ds:
         check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, "this_ds", "SDATES", "GDDHARV", gdd_min=gdd_min)
+
+    # Convert time axis to integer year, saving original as 'cftime'
+    this_ds_gs = this_ds_gs.assign_coords({'cftime': this_ds['time_bounds'].isel({'hist_interval': 0})})
+    this_ds_gs = this_ds_gs.assign_coords({"time": [t.year for t in this_ds_gs['cftime'].values]})
     
-    # Convert time axis to integer year
-    this_ds_gs = this_ds_gs.assign_coords({"time": [t.year for t in this_ds.time_bounds.values[:,0]]})
+    # Import monthly use and demand, if present
+    pattern = os.path.join(os.path.dirname(filename), "*.h2.*.nc")
+    irrig_file_patches = glob.glob(pattern)
+    if irrig_file_patches:
+        if len(irrig_file_patches) > 1:
+            raise RuntimeError(f"Expected at most 1 *.h2.*.nc; found {len(irrig_file_patches)}")
+        irrig_file_patches = irrig_file_patches[0]
+        irrig_ds_patches = utils.import_ds(irrig_file_patches, myVegtypes=myVegtypes, chunks={'time': 12},
+                                           myVars = ['QIRRIG_DEMAND', 'QIRRIG_DRIP', 'QIRRIG_SPRINKLER'])
         
-    # Import monthly irrigation outputs, if present
-    pattern = os.path.join(os.path.dirname(filename), "*irrig_monthly.nc")
-    irrig_file = glob.glob(pattern)
-    if irrig_file:
-        if len(irrig_file) > 1:
-            raise RuntimeError(f"Expected at most 1 *irrig_monthly.nc; found {len(irrig_file)}")
-        irrig_file = irrig_file[0]
-        tmp = xr.open_dataset(irrig_file)
-        new_time = [x[0] for x in tmp.time_bounds.values]
-        tmp = tmp.assign_coords(time=new_time)
-        tmp = tmp.sel(time=slice(f"{y1}-01-01", f"{yN}-12-31"))
+        # Trim to years of interest
+        # Time axis shows END of time period; fix this.
+        new_time = [x[0] for x in irrig_ds_patches.time_bounds.values]
+        irrig_ds_patches = irrig_ds_patches
+        irrig_ds_patches = irrig_ds_patches.assign_coords(time=new_time)
+        irrig_ds_patches = irrig_ds_patches.sel(time=slice(f"{y1}-01-01", f"{yN+1}-12-31"))
         
-        # Calculate limited irrigation
-        mms_to_m3d = (tmp['area']*1e6 * tmp['landfrac']) * 1e-3 * 60*60*24
-        days_in_month = tmp.time.dt.days_in_month
-        qirrig = np.expand_dims((tmp["QIRRIG_FROM_SURFACE"] * days_in_month * mms_to_m3d).values, axis=3) 
-        avail = np.expand_dims(0.9*tmp["VOLRMCH"], axis=3)
-        concatted = np.concatenate((qirrig, avail), axis=3)
-        qirrig_lim = np.min(concatted, axis=3)
-        qirrig_lim = xr.DataArray(data = qirrig_lim,
-                                coords = tmp["QIRRIG_FROM_SURFACE"].coords,
-                                attrs = tmp["QIRRIG_FROM_SURFACE"].attrs)
-        qirrig_lim = qirrig_lim / days_in_month / mms_to_m3d
-        qirrig_lim.attrs = tmp["QIRRIG_FROM_SURFACE"].attrs
-        qirrig_lim.attrs['long_name'] = "water added through surface water irrigation, limited by 90% of available"
-        tmp["QIRRIG_FROM_SURFACE_LIM"] = qirrig_lim
-        
+        time_mth_dimname = "time_mth"
+        this_ds_gs["QIRRIG_DEMAND_PATCH_MTH"] = irrig_ds_patches["QIRRIG_DEMAND"].rename({'time': time_mth_dimname})
+        this_ds_gs["QIRRIG_APPLIED_PATCH_MTH"] = irrig_ds_patches["QIRRIG_DRIP"].rename({'time': time_mth_dimname}) \
+                                               + irrig_ds_patches["QIRRIG_SPRINKLER"].rename({'time': time_mth_dimname})
+        this_ds_gs['QIRRIG_APPLIED_PATCH_MTH'].attrs = this_ds_gs['QIRRIG_DEMAND_PATCH_MTH'].attrs
+        this_ds_gs["QIRRIG_APPLIED_PATCH_MTH"].attrs['long_name'] = 'water added via drip or sprinkler irrigation'
+                
         # Calculate unfulfilled demand
-        tmp['UNFULFILLED_DEMAND'] = tmp['QIRRIG_FROM_SURFACE'] - tmp['QIRRIG_FROM_SURFACE_LIM']
-        tmp['UNFULFILLED_DEMAND'].attrs = tmp['QIRRIG_FROM_SURFACE'].attrs
-        tmp['UNFULFILLED_DEMAND'].attrs['long_name'] = 'irrigation demand unable to be filled based on limitation (90% of VOLRMCH)'
-
-        # Calculate irrigation as fraction of available water
-        for v in ["QIRRIG_FROM_SURFACE", "QIRRIG_FROM_SURFACE_LIM", "UNFULFILLED_DEMAND"]:
-            v2 = v + "_FRAC"
-            tmp[v2] = (tmp[v] * days_in_month * mms_to_m3d) / tmp["VOLRMCH"]
-            tmp[v2].attrs = tmp[v].attrs
-            tmp[v2].attrs['units'] = "fraction of available"
-            tmp[v2].attrs['long_name'] = tmp[v2].attrs['long_name'] + " as frac. available"
+        this_ds_gs['QIRRIG_UNFULFILLED_PATCH_MTH'] = this_ds_gs['QIRRIG_DEMAND_PATCH_MTH'] - this_ds_gs['QIRRIG_APPLIED_PATCH_MTH']
+        this_ds_gs['QIRRIG_UNFULFILLED_PATCH_MTH'].attrs = this_ds_gs['QIRRIG_DEMAND_PATCH_MTH'].attrs
+        this_ds_gs['QIRRIG_UNFULFILLED_PATCH_MTH'].attrs['long_name'] = 'irrigation demand unable to be filled'
+                
+        # Calculate yearly means
+        for v in ["QIRRIG_DEMAND_PATCH_MTH", "QIRRIG_APPLIED_PATCH_MTH", "QIRRIG_UNFULFILLED_PATCH_MTH"]:
+            v2 = v.replace('MTH', 'ANN')
+            v2_da = utils.weighted_annual_mean(this_ds_gs[v], time_in='time_mth')
+            this_ds_gs[v2] = v2_da.assign_coords({'time': this_ds_gs.time})
+            if np.any(~np.isnan(this_ds_gs[v].values)) and not np.any(~np.isnan(this_ds_gs[v2].values)):
+                raise RuntimeError("Annual mean turned into all NaN")
+            this_ds_gs[v2].attrs = this_ds_gs[v].attrs
         
-        irrig_ds = xr.Dataset()
-        for x in tmp:
-            if "time" not in tmp[x].dims or x=="time_bounds":
-                if x != "time_bounds":
-                    irrig_ds[x] = tmp[x]
-                continue
-            irrig_ds[x] = annual_mean_from_monthly(tmp, x)
-            irrig_ds[x].attrs = tmp[x].attrs
-            
-            # Convert mm/s to m3/yr
-            if irrig_ds[x].attrs['units'] == "mm/s":
-                irrig_ds[x] = (tmp['area']*1e6 * tmp['landfrac']) * irrig_ds[x] * 60*60*24*365 * 1e-3
-                irrig_ds[x].attrs = tmp[x].attrs
-                irrig_ds[x].attrs['units'] = "m3/yr"
-
-    else:
-        irrig_ds = None
-        
-    return this_ds_gs, irrig_ds
+    return this_ds_gs
 
 
 def make_axis(fig, ny, nx, n):
