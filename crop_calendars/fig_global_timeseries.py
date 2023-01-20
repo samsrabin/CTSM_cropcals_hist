@@ -213,23 +213,33 @@ def get_incl_crops(thisCrop_clm, patches1d_itype_veg_str, cropList_combined_clm,
         incl_crops = [x for x in incl_crops if "irrigated" in x]
     
     return incl_crops
+
+
+def get_sum_over_patches(da, incl_crops=None, patches1d_itype_veg=None):
+
+    if incl_crops is not None:
+        if patches1d_itype_veg is None:
+            raise RuntimeError("If specifying incl_crops, you must also provide patches1d_itype_veg")
+        elif isinstance(patches1d_itype_veg, xr.DataArray):
+            patches1d_itype_veg = patches1d_itype_veg.values
+        incl_crops_int = [utils.ivt_str2int(x) for x in incl_crops]
+        isel_list = [i for i, x in enumerate(patches1d_itype_veg) if x in incl_crops_int]
+        da = da.isel(patch=isel_list)
         
+    da = da.sum(dim='patch')
+    return da
+
 
 def get_CLM_ts_area_y(case, lu_ds, thisCrop_clm, cropList_combined_clm, incl_crops=None, only_irrigated=None):
         
-    dummy_y_da = lu_ds.AREA_CFT.isel(patch=0, drop=True)
-    
     if incl_crops is None:
         incl_crops = get_incl_crops(thisCrop_clm, case['ds'].vegtype_str, cropList_combined_clm, only_irrigated=only_irrigated)
     elif only_irrigated is not None:
         raise RuntimeError("get_CLM_ts_area_y(): Do not specify both incl_crops and only_irrigated")
     
-    incl_crops_int = [utils.ivt_str2int(x) for x in incl_crops]
-    isel_list = [i for i, x in enumerate(lu_ds.patches1d_itype_veg.values) if x in incl_crops_int]
-    area_y = lu_ds.AREA_CFT.isel(patch=isel_list).sum(dim="patch").values
-    area_y *= 1e-4 # m2 to ha
-    ts_area_y = xr.DataArray(data=area_y, coords=dummy_y_da.coords)
-    
+    ts_area_y = get_sum_over_patches(lu_ds.AREA_CFT * 1e-4, # m2 to ha
+                                     incl_crops=incl_crops,
+                                     patches1d_itype_veg=lu_ds.patches1d_itype_veg)
     return ts_area_y
 
 
