@@ -215,10 +215,15 @@ def get_incl_crops(thisCrop_clm, patches1d_itype_veg_str, cropList_combined_clm,
     return incl_crops
         
 
-def get_CLM_ts_area_y(case, lu_ds, thisCrop_clm, cropList_combined_clm, only_irrigated=False):
+def get_CLM_ts_area_y(case, lu_ds, thisCrop_clm, cropList_combined_clm, incl_crops=None, only_irrigated=None):
         
     dummy_y_da = lu_ds.AREA_CFT.isel(patch=0, drop=True)
-    incl_crops = get_incl_crops(thisCrop_clm, case['ds'].vegtype_str, cropList_combined_clm, only_irrigated=only_irrigated)
+    
+    if incl_crops is None:
+        incl_crops = get_incl_crops(thisCrop_clm, case['ds'].vegtype_str, cropList_combined_clm, only_irrigated=only_irrigated)
+    elif only_irrigated is not None:
+        raise RuntimeError("get_CLM_ts_area_y(): Do not specify both incl_crops and only_irrigated")
+    
     incl_crops_int = [utils.ivt_str2int(x) for x in incl_crops]
     isel_list = [i for i, x in enumerate(lu_ds.patches1d_itype_veg.values) if x in incl_crops_int]
     area_y = lu_ds.AREA_CFT.isel(patch=isel_list).sum(dim="patch").values
