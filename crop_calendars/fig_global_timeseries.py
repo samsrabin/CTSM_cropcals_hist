@@ -262,7 +262,75 @@ def get_CLM_ts_prod_y(case, lu_ds, use_annual_yields, min_viable_hui, mxmats, th
 
 
 
-def global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, \
+def global_timeseries_irrig(thisVar, cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains only)", figsize=(35, 18), noFigs=False, ny=2, nx=4, plot_y1=1980, plot_yN=2010):
+    
+    if not noFigs:
+        # f_lines_area, axes_lines_area = get_figs_axes(ny, nx, figsize)
+        f_lines_irrig, axes_lines_irrig = get_figs_axes(ny, nx, figsize)
+        
+    # Get included cases
+    fig_caselist = [x for x in cases]
+    for casename in fig_caselist:
+        if thisVar not in cases[casename]['ds']:
+            fig_caselist.remove(casename)
+    
+    for c, thisCrop_clm in enumerate(cropList_combined_clm + [extra]):
+        print(f"{thisCrop_clm}...")
+        is_obs = []
+        
+        if not noFigs:
+            # ax_lines_area = axes_lines_area[c]
+            ax_lines_irrig = axes_lines_irrig[c]
+                
+        # CLM outputs
+        first_case = True
+        for i, (casename, case) in enumerate(cases.items()):
+            if casename not in fig_caselist:
+                continue
+            lu_ds = reses[case['res']]['ds']
+            is_obs.append(False)
+        
+            # Area
+            incl_crops = get_incl_crops(thisCrop_clm, case['ds'].vegtype_str, cropList_combined_clm, only_irrigated=True)
+            ts_area_y = get_CLM_ts_area_y(case, lu_ds, thisCrop_clm, cropList_combined_clm, incl_crops=incl_crops)
+            
+            # Irrigation
+            ts_irrig_y = get_sum_over_patches(case['ds'][thisVar] * 1e-9, # m3 to km3
+                                              incl_crops=incl_crops,
+                                              patches1d_itype_veg=case['ds']['patches1d_itype_veg'])
+            
+            # Trim to years of interest
+            ts_irrig_y = ts_irrig_y.sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+            
+            # Save
+            if first_case:
+                ydata_area = np.expand_dims(ts_area_y.values, axis=0)
+                ydata_irrig = np.expand_dims(ts_irrig_y.values, axis=0)
+                first_case = False
+            else:
+                ydata_area = np.concatenate((ydata_area,
+                                            np.expand_dims(ts_area_y.values, axis=0)),
+                                            axis=0)
+                ydata_irrig = np.concatenate((ydata_irrig,
+                                            np.expand_dims(ts_irrig_y.values, axis=0)),
+                                            axis=0)
+                        
+        # Make plots for this crop
+        if not noFigs:
+            xlabel = "Year"
+            # make_1crop_lines(ax_lines_area, ydata_area, fig_caselist, thisCrop_clm, "Mha", xlabel, plot_y1, plot_yN)
+            make_1crop_lines(ax_lines_irrig, ydata_irrig, fig_caselist, thisCrop_clm, "km$^3$", xlabel, plot_y1, plot_yN)
+            
+    # Finish up and save
+    if not noFigs:
+        print("Finishing and saving...")
+        # finishup_allcrops_lines(c, ny, nx, axes_lines_area, f_lines_area, "Global crop area", outDir_figs, fig_caselist)
+        finishup_allcrops_lines(c, ny, nx, axes_lines_irrig, f_lines_irrig, f"Global irrigation {thisVar.split('_')[1].lower()}", outDir_figs, None, fig_caselist)
+
+    print("Done.")
+
+
+def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, \
     equalize_scatter_axes=False, extra="Total (grains only)", figsize=(35, 18), include_scatter=True, include_shiftsens=True, min_viable_hui_list="ggcmi3", mxmats=None, noFigs=False, ny=2, nx=4, obs_for_fig="FAOSTAT", plot_y1=1980, plot_yN=2010, stats_round=3, use_annual_yields=False, verbose=False, w=5):
     
     if not isinstance(min_viable_hui_list, list):

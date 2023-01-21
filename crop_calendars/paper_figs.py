@@ -38,7 +38,7 @@ import re
 import importlib
 import pandas as pd
 import cftime
-from fig_global_timeseries import global_timeseries
+from fig_global_timeseries import global_timeseries_yieldetc, global_timeseries_irrig
 from fig_maps_allCrops import *
 from fig_maps_eachCrop import maps_eachCrop
 
@@ -532,8 +532,10 @@ if mxmat_limited:
 else:
     mxmats_tmp = None
 
-cases = global_timeseries(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, equalize_scatter_axes=equalize_scatter_axes, extra=extra, figsize=figsize, include_scatter=include_scatter, include_shiftsens=include_shiftsens, min_viable_hui_list=min_viable_hui, mxmats=mxmats_tmp, noFigs=noFigs, ny=2, nx=4, obs_for_fig=obs_for_fig, plot_y1=plot_y1, plot_yN=plot_yN, stats_round=stats_round, use_annual_yields=use_annual_yields, w=w)
+cases = global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, equalize_scatter_axes=equalize_scatter_axes, extra=extra, figsize=figsize, include_scatter=include_scatter, include_shiftsens=include_shiftsens, min_viable_hui_list=min_viable_hui, mxmats=mxmats_tmp, noFigs=noFigs, ny=2, nx=4, obs_for_fig=obs_for_fig, plot_y1=plot_y1, plot_yN=plot_yN, stats_round=stats_round, use_annual_yields=use_annual_yields, w=w)
 
+global_timeseries_irrig("IRRIG_DEMAND_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains only)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
+global_timeseries_irrig("IRRIG_APPLIED_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains only)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
 
 # %% Make maps of individual crops (rainfed, irrigated)
 
