@@ -35,9 +35,7 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
     grays = [dark_gray, light_gray]
     
     for i, casename in enumerate(caselist):
-        if i <= 1:
-            color = grays[i]
-        elif "CLM Default" in casename:
+        if "CLM Default" in casename:
             color = [x/255 for x in [92, 219, 219]]
         elif "Prescribed Calendars" in casename:
             color = [x/255 for x in [250, 102, 240]]
@@ -45,6 +43,8 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
             color = [x/255 for x in [150, 110, 0]]
         elif "Prescribed Maturity" in casename:
             color = [x/255 for x in [128,0,0]]
+        elif i <= 1:
+            color = grays[i]
         elif i==4:
             # Purple more distinct from my light gray
             color = [x/255 for x in [133, 92, 255]]
