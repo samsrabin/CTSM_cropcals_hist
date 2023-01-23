@@ -399,7 +399,7 @@ for v in earthstats_gd['f19_g17']:
 importlib.reload(cc)
 earthstats={}
 earthstats['f19_g17'] = cc.ungrid(earthstats_gd['f19_g17'],
-                                  cases['CLM Default']['ds'], 'GRAINC_TO_FOOD_ANN',
+                                  cases[[x for x in cases.keys()][0]]['ds'], 'GRAINC_TO_FOOD_ANN',
                                   lon='patches1d_ixy',
                                   lat='patches1d_jxy',
                                   crop='patches1d_itype_combinedCropCLM_str')
