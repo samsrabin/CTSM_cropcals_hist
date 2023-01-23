@@ -60,7 +60,7 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
                                   color=color, linestyle=linestyle,
                                   linewidth=3)
     
-    thisTitle = thisCrop_clm
+    thisTitle = r"$\bf{" + thisCrop_clm.replace(" ", "\ ") + "}$"
     if stats2 is not None:
         skip_this = False
         if len(stats2) != 2:
@@ -118,7 +118,7 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlab
         ax_this.set_xlim(newlim)
         ax_this.set_ylim(newlim)
     
-    thisTitle = thisCrop_clm
+    thisTitle = r"$\bf{" + thisCrop_clm.replace(" ", "\ ") + "}$"
     if stats2 is not None:
         skip_this = False
         if len(stats2) != 2:
