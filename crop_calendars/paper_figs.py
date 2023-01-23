@@ -505,7 +505,7 @@ mxmat_limited = False
 equalize_scatter_axes = False
 
 # extra = "Total (no sgc)"
-extra = "Total (grains only)"
+extra = "Total (grains)"
 
 # Rounding precision for stats
 stats_round = 3
@@ -534,11 +534,13 @@ else:
 
 cases = global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, equalize_scatter_axes=equalize_scatter_axes, extra=extra, figsize=figsize, include_scatter=include_scatter, include_shiftsens=include_shiftsens, min_viable_hui_list=min_viable_hui, mxmats=mxmats_tmp, noFigs=noFigs, ny=2, nx=4, obs_for_fig=obs_for_fig, plot_y1=plot_y1, plot_yN=plot_yN, stats_round=stats_round, use_annual_yields=use_annual_yields, w=w)
 
-global_timeseries_irrig("IRRIG_DEMAND_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains only)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
-global_timeseries_irrig("IRRIG_APPLIED_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains only)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
+# global_timeseries_irrig("IRRIG_DEMAND_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
+# global_timeseries_irrig("IRRIG_APPLIED_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
+
 
 # %% Make maps of individual crops (rainfed, irrigated)
-
+importlib.reload(sys.modules['fig_maps_eachCrop'])
+from fig_maps_eachCrop import maps_eachCrop
 
 # Yield settings
 min_viable_hui = "ggcmi3"

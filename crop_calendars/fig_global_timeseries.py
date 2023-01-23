@@ -200,7 +200,7 @@ def get_incl_crops(thisCrop_clm, patches1d_itype_veg_str, cropList_combined_clm,
         incl_crops = [x for x in patches1d_itype_veg_str if x.replace('irrigated_','').replace('temperate_','').replace('tropical_','').replace('spring_','') in [y.lower() for y in cropList_combined_clm]]
         if thisCrop_clm == "Total (no sgc)":
             incl_crops = [x for x in incl_crops if "sugarcane" not in x]
-        elif thisCrop_clm == "Total (grains only)":
+        elif thisCrop_clm == "Total (grains)":
             incl_crops = [x for x in incl_crops if "sugarcane" not in x and "cotton" not in x]
         elif thisCrop_clm == "Total":
             pass
@@ -253,7 +253,7 @@ def get_CLM_ts_prod_y(case, lu_ds, use_annual_yields, min_viable_hui, mxmats, th
     case['ds']['ts_prod_yc'] = cc.get_ts_prod_clm_yc_da2(case['ds'], lu_ds, yieldVar, cropList_combined_clm, quiet=True)
     if thisCrop_clm == "Total (no sgc)":
         ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Total'])['ts_prod_yc'].sum(dim="Crop").copy()
-    elif thisCrop_clm == "Total (grains only)":
+    elif thisCrop_clm == "Total (grains)":
         ts_prod_y = case['ds'].drop_sel(Crop=['Sugarcane', 'Cotton', 'Total'])['ts_prod_yc'].sum(dim="Crop").copy()
     else:
         ts_prod_y = case['ds']['ts_prod_yc'].sel(Crop=thisCrop_clm).copy()
@@ -262,7 +262,7 @@ def get_CLM_ts_prod_y(case, lu_ds, use_annual_yields, min_viable_hui, mxmats, th
 
 
 
-def global_timeseries_irrig(thisVar, cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains only)", figsize=(35, 18), noFigs=False, ny=2, nx=4, plot_y1=1980, plot_yN=2010):
+def global_timeseries_irrig(thisVar, cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=False, ny=2, nx=4, plot_y1=1980, plot_yN=2010):
     
     if not noFigs:
         # f_lines_area, axes_lines_area = get_figs_axes(ny, nx, figsize)
@@ -331,7 +331,7 @@ def global_timeseries_irrig(thisVar, cases, reses, cropList_combined_clm, outDir
 
 
 def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, \
-    equalize_scatter_axes=False, extra="Total (grains only)", figsize=(35, 18), include_scatter=True, include_shiftsens=True, min_viable_hui_list="ggcmi3", mxmats=None, noFigs=False, ny=2, nx=4, obs_for_fig="FAOSTAT", plot_y1=1980, plot_yN=2010, stats_round=3, use_annual_yields=False, verbose=False, w=5):
+    equalize_scatter_axes=False, extra="Total (grains)", figsize=(35, 18), include_scatter=True, include_shiftsens=True, min_viable_hui_list="ggcmi3", mxmats=None, noFigs=False, ny=2, nx=4, obs_for_fig="FAOSTAT", plot_y1=1980, plot_yN=2010, stats_round=3, use_annual_yields=False, verbose=False, w=5):
     
     if not isinstance(min_viable_hui_list, list):
         min_viable_hui_list = [min_viable_hui_list]
@@ -426,7 +426,7 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
         elif thisCrop_clm == "Total (no sgc)":
             area_tyx = earthstats_gd[this_earthstat_res].drop_sel(crop=['Sugarcane']).HarvestArea.sum(dim="crop").copy()
             prod_tyx = earthstats_gd[this_earthstat_res].drop_sel(crop=['Sugarcane']).Production.sum(dim="crop").copy()
-        elif thisCrop_clm == "Total (grains only)":
+        elif thisCrop_clm == "Total (grains)":
             area_tyx = earthstats_gd[this_earthstat_res].drop_sel(crop=['Sugarcane', 'Cotton']).HarvestArea.sum(dim="crop").copy()
             prod_tyx = earthstats_gd[this_earthstat_res].drop_sel(crop=['Sugarcane', 'Cotton']).Production.sum(dim="crop").copy()
         else:
