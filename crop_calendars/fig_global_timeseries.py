@@ -19,8 +19,8 @@ import matplotlib.pyplot as plt
 from matplotlib import collections as mplcollections
 from matplotlib import cm
 
-def get_figs_axes(ny, nx, figsize):
-    f_list, axes_list = plt.subplots(ny, nx, figsize=figsize)
+def get_figs_axes(ny, nx, figsize, sharex=True):
+    f_list, axes_list = plt.subplots(ny, nx, figsize=figsize, sharex=sharex)
     axes_list = axes_list.flatten()
     return f_list, axes_list
 
@@ -29,7 +29,7 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
     
     da = xr.DataArray(data = ydata_this,
                             coords = {'Case': caselist,
-                                      xlabel: np.arange(y1,yN+1)})
+                                      'x_name': np.arange(y1,yN+1)})
     
     light_gray = [x/255 for x in [148, 148, 148]]
     dark_gray = [x/255 for x in [64, 64, 74]]
@@ -57,7 +57,7 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
             linestyle = "--"
         else:
             linestyle = "-"
-        da.isel(Case=i).plot.line(x=xlabel, ax=ax_this, 
+        da.isel(Case=i).plot.line(x='x_name', ax=ax_this, 
                                   color=color, linestyle=linestyle,
                                   linewidth=3)
     
@@ -84,7 +84,10 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, units, xlabel,
     ax_this.title.set_text(thisTitle)
     ax_this.title.set_size(32)
     ax_this.tick_params(axis='both', which='major', labelsize=20)
-    ax_this.set_xlabel(xlabel, fontsize=24)
+    if xlabel is not None:
+        ax_this.set_xlabel(xlabel, fontsize=24)
+    else:
+        ax_this.set_xlabel("")
     ax_this.set_ylabel(units, fontsize=24)
     if ax_this.get_legend():
         ax_this.get_legend().remove()
@@ -368,11 +371,11 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             f_lines_yield_dt_shiftL, axes_lines_yield_dt_shiftL = get_figs_axes(ny, nx, figsize)
             f_lines_yield_dt_shiftR, axes_lines_yield_dt_shiftR = get_figs_axes(ny, nx, figsize)
         if include_scatter:
-            f_scatter_yield_dt, axes_scatter_yield_dt = get_figs_axes(ny, nx, figsize)
+            f_scatter_yield_dt, axes_scatter_yield_dt = get_figs_axes(ny, nx, figsize, sharex=False)
             if include_shiftsens:
-                f_scatter_yield_dt_orig, axes_scatter_yield_dt_orig = get_figs_axes(ny, nx, figsize)
-                f_scatter_yield_dt_shiftL, axes_scatter_yield_dt_shiftL = get_figs_axes(ny, nx, figsize)
-                f_scatter_yield_dt_shiftR, axes_scatter_yield_dt_shiftR = get_figs_axes(ny, nx, figsize)
+                f_scatter_yield_dt_orig, axes_scatter_yield_dt_orig = get_figs_axes(ny, nx, figsize, sharex=False)
+                f_scatter_yield_dt_shiftL, axes_scatter_yield_dt_shiftL = get_figs_axes(ny, nx, figsize, sharex=False)
+                f_scatter_yield_dt_shiftR, axes_scatter_yield_dt_shiftR = get_figs_axes(ny, nx, figsize, sharex=False)
 
     # Get list 
     fig_caselist = ["FAOSTAT"]
@@ -624,13 +627,19 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
         # Make plots for this crop
         if not noFigs:
             subplot_str = chr(ord('`') + c+1) # or ord('@') for capital
-            xlabel = "Year"
+            no_xlabel = c < nx*(ny - 1)
+            if no_xlabel:
+                xlabel = None
+            else:
+                xlabel = "Year"
             make_1crop_lines(ax_lines_area, ydata_area_touse, fig_caselist, thisCrop_clm, "Mha", xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
             if include_shiftsens:
                 make_1crop_lines(ax_lines_area_orig, ydata_area, fig_caselist, thisCrop_clm, "Mha", xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
                 make_1crop_lines(ax_lines_area_shiftL, ydata_area_shiftL, fig_caselist, thisCrop_clm, "Mha", xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
                 make_1crop_lines(ax_lines_area_shiftR, ydata_area_shiftR, fig_caselist, thisCrop_clm, "Mha", xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
-            if yield_time_dim == "Year":
+            if no_xlabel:
+                xlabel = None
+            elif yield_time_dim == "Year":
                 xlabel = "Year"
             else:
                 xlabel = f"Obs year, sim {yield_time_dim.lower()}"
