@@ -381,7 +381,8 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
     # Get list 
     fig_caselist = ["FAOSTAT"]
     this_earthstat_res = "f09_g17"
-    fig_caselist += [f"EarthStat ({this_earthstat_res})"]
+    # fig_caselist += [f"EarthStat ({this_earthstat_res})"]
+    fig_caselist += ["EarthStat"]
     for min_viable_hui in min_viable_hui_list:
         for (casename, case) in cases.items():
             fig_casename = casename
