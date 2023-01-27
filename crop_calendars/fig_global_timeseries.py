@@ -96,13 +96,13 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
 def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlabel, equalize_scatter_axes, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None):
     
     for i, casename in enumerate(caselist):
-        if casename == "CLM Default":
+        if "CLM Default" in casename:
             color = [x/255 for x in [92, 219, 219]]
-        elif casename == "Prescribed Calendars":
+        elif "Prescribed Calendars"  in casename:
             color = [x/255 for x in [250, 102, 240]]
-        elif casename == "Prescribed Sowing":
+        elif "Prescribed Sowing"  in casename:
             color = [x/255 for x in [150, 110, 0]]
-        elif casename == "Prescribed Maturity":
+        elif "Prescribed Maturity"  in casename:
             color = [x/255 for x in [128,0,0]]
         elif i==2:
             # Purple more distinct from my light gray
