@@ -659,22 +659,22 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             shiftR_symbols = ["$^R$", "$^R$"]
             make_1crop_lines(ax_lines_prod, ydata_prod_touse, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shift_symbols, subplot_label=subplot_str)
             if len(min_viable_hui_list) > 1:
-                bias0 = None
-            make_1crop_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=stats_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
-            make_1crop_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=stats_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
+                bias_shifted = None
+            make_1crop_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
+            make_1crop_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
             
             if include_shiftsens:
                 make_1crop_lines(ax_lines_prod_orig, ydata_prod, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=noshift_symbols, subplot_label=subplot_str)
                 make_1crop_lines(ax_lines_prod_shiftL, ydata_prod_shiftL, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
                 make_1crop_lines(ax_lines_prod_shiftR, ydata_prod_shiftR, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
                 if len(min_viable_hui_list) > 1:
-                    bias_shifted = None
+                    bias0 = None
                     bias_shiftL = None
                     bias_shiftR = None
-                make_1crop_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
+                make_1crop_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=stats_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
                 make_1crop_lines(ax_lines_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftL, stats_round=stats_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
                 make_1crop_lines(ax_lines_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftR, stats_round=stats_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
-                make_1crop_lines(ax_lines_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
+                make_1crop_lines(ax_lines_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=stats_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
                 make_1crop_lines(ax_lines_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftL, stats_round=stats_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
                 make_1crop_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftR, stats_round=stats_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
             
