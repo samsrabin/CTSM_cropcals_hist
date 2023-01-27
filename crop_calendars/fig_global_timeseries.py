@@ -349,8 +349,8 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
     if not isinstance(min_viable_hui_list, list):
         min_viable_hui_list = [min_viable_hui_list]
     
-    # Allow multiple min_viable_hui values only if this is the case list
-    if len(min_viable_hui_list) > 1 and [x for x in cases.keys()] != ['CLM Default', 'Prescribed Calendars']:
+    # Allow multiple min_viable_hui values only for a certain case list
+    if len(min_viable_hui_list) > 1 and [x.replace(' 22', '') for x in cases.keys()] != ['CLM Default', 'Prescribed Calendars']:
         raise RuntimeError("Multiple min_viable_hui values allowed only for case list ['CLM Default', 'Prescribed Calendars']")
 
     if not noFigs:
@@ -658,6 +658,8 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             shiftL_symbols = ["$^L$", "$^L$"]
             shiftR_symbols = ["$^R$", "$^R$"]
             make_1crop_lines(ax_lines_prod, ydata_prod_touse, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shift_symbols, subplot_label=subplot_str)
+            if len(min_viable_hui_list) > 1:
+                bias0 = None
             make_1crop_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=stats_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
             make_1crop_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=stats_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
             
@@ -665,6 +667,10 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                 make_1crop_lines(ax_lines_prod_orig, ydata_prod, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=noshift_symbols, subplot_label=subplot_str)
                 make_1crop_lines(ax_lines_prod_shiftL, ydata_prod_shiftL, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
                 make_1crop_lines(ax_lines_prod_shiftR, ydata_prod_shiftR, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
+                if len(min_viable_hui_list) > 1:
+                    bias_shifted = None
+                    bias_shiftL = None
+                    bias_shiftR = None
                 make_1crop_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
                 make_1crop_lines(ax_lines_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftL, stats_round=stats_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
                 make_1crop_lines(ax_lines_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftR, stats_round=stats_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
