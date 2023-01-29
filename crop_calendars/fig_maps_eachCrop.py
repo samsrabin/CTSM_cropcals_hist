@@ -109,6 +109,8 @@ def get_colorbar_chunks(im, ax, this_var, cmap_name, is_diff):
         vmin = min(ticks_orig)
         vmax = max(ticks_orig)
         cbar_ticklabels = None
+    if not is_diff and this_var == "GSLEN" and cbar_ticklabels is not None and cbar_ticklabels[-1] > 365:
+        cbar_ticklabels[-1] == 365
     if cmap_name:
         this_cmap = cm.get_cmap(cmap_name, Ncolors)
     else:
@@ -214,6 +216,12 @@ def get_figure_info(ny, ref_casename):
 
 
 def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False):
+    
+    if this_var == "GSLEN":
+        cbar_max = 365
+    else:
+        cbar_max = None
+    
     for i, casename in enumerate(fig_caselist):
         
         plotting_diffs = ref_casename and casename != ref_casename
@@ -359,7 +367,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 extend = "both"
         elif extend is None:
             extend = "neither"
-        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, subplot_label=subplot_str)
+        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, subplot_label=subplot_str, cbar_max=cbar_max)
         if new_axes:
             ims.append(im)
             cbs.append(cb)
@@ -393,7 +401,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 extend = "neither"
         if cmap_to_use is None:
             cmap_to_use = cmap
-        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, subplot_label=subplot_str)
+        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, subplot_label=subplot_str, cbar_max=cbar_max)
         if new_axes:
             ims.append(im)
             cbs.append(cb)
@@ -403,7 +411,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
     return units, vrange, fig, ims, axes, cbs, manual_colors
 
 
-def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend_bounds='both', vmin=None, vmax=None, cbar=None, ticklabels=None, extend_nonbounds='both', subplot_label=None): 
+def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend_bounds='both', vmin=None, vmax=None, cbar=None, ticklabels=None, extend_nonbounds='both', subplot_label=None, cbar_max=None): 
     
     if bounds is not None:
         norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend_bounds)
@@ -443,6 +451,15 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
         
         if ticklabels is not None:
             cbar.set_ticks(ticklabels)
+        elif cbar_max is not None and cbar.get_ticks()[-1] > cbar_max:
+            ticks = cbar.get_ticks()
+            if ticks[-2] > cbar_max:
+                raise RuntimeError(f"Specified cbar_max is {cbar_max} but highest bin BEGINS at {ticks[-2]}")
+            ticklabels = ticks.copy()
+            ticklabels[-1] = cbar_max
+            ticklabels = [str(int(x)) for x in ticklabels]
+            cbar.ax.set_xticks(ticks) # Calling this before set_xticklabels() avoids "UserWarning: FixedFormatter should only be used together with FixedLocator" (https://stackoverflow.com/questions/63723514/userwarning-fixedformatter-should-only-be-used-together-with-fixedlocator)
+            cbar.ax.set_xticklabels(ticklabels)
         cbar.set_label(label=units, fontsize=fontsize['axislabels'])
         cbar.ax.tick_params(labelsize=fontsize['ticklabels'])
      
