@@ -257,9 +257,6 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
         units = var_info['units']
         bounds = None
         vrange = None
-        vmin_to_use = None
-        vmax_to_use = None
-        ticklabels_to_use = None
         manual_colors = False
         extend = None
         if units == "day of year":
