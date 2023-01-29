@@ -1,6 +1,6 @@
 # %% Setup
 
-which_cases = "main2"
+which_cases = "main2.2022"
 # which_cases = "originalCLM"
 # which_cases = "originalBaseline" # As originalCLM, but without cmip6
 # which_cases = "diagnose"

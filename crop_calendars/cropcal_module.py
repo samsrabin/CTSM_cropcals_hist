@@ -935,62 +935,87 @@ def get_caselist(which_cases):
              'res': 'f19_g17',
              'verbosename': 'Original baseline: ctsm5.1.dev092 + my outvars'}
     # My run with rx_crop_calendars2 code but CLM calendars
-    cases['CLM Default'] = \
+    clm_default_22 = \
         {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1958-2014/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.1958-2014.clm2.h1.1958-01-01-00000.nc',
          'constantVars': None,
          'constantGSs': None,
          'res': 'f19_g17',
-         'verbosename': 'CLM Default: my cropcal code, no Rx'}
+         'verbosename': 'CLM Default 22: my cropcal code, no Rx'}
+    if ".2022" in which_cases:
+        cases['CLM Default 22'] = clm_default_22
+    else:
+        cases['CLM Default'] = clm_default_22
+        cases['CLM Default']['filepath'] = "/Users/Shared/CESM_runs/cropcals_20230128/clm50/20230128_clm50_clmdefault/20230128_clm50_clmdefault.clm2.h1.1958-01-01-00000.nc"
+        cases['CLM Default']['verbosename'] = clm_default_22['verbosename'].replace("CLM Default 22", "CLM Default")
+    
 
     # My run with rx_crop_calendars2 code and GGCMI calendars
-    # cases['Prescribed Calendars v2'] = \
-    #     {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3.clm2.h1.1958-01-01-00000.nc',
-    #      'constantVars': ["SDATES", "GDDHARV"],
-    #      'constantGSs': None, # 'None' with constantVars specified means all should be constant
-    #      'res': 'f19_g17',
-    #      'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
-    #      'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
-    #      'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc",
-    #      'verbosename': 'Prescribed Calendars v2: unlim-gs sim and GDDgen'}
-    # cases['Prescribed Calendars v3'] = \
-    #     {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars3.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3.mxmat/cropcals3.f19-g17.rx_crop_calendars3.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced3.mxmat.clm2.h1.1958-01-01-00000.nc',
-    #      'constantVars': ["SDATES", "GDDHARV"],
-    #      'constantGSs': None, # 'None' with constantVars specified means all should be constant
-    #      'res': 'f19_g17',
-    #      'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
-    #      'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
-    #      'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc",
-    #      'verbosename': 'Prescribed Calendars v3: lim-gs sim, unlim-gs GDDgen'}
-    cases['Prescribed Calendars'] = \
-        {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars3.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced4.mxmat/cropcals3.f19-g17.rx_crop_calendars3.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced4.mxmat.clm2.h1.1958-01-01-00000.nc',
-         'constantVars': ["SDATES", "GDDHARV"],
-         'constantGSs': None, # 'None' with constantVars specified means all should be constant
-         'res': 'f19_g17',
-         'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
-         'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
-         'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds.mxmat.2022-10-26-171107/gdds_20221026_180012.nc",
-         'verbosename': 'Prescribed Calendars v4: Rx sdates+GDDs, lim-gs sim and GDDgen'}
-    if which_cases == "diagnose":
-        # My run with rx_crop_calendars2 code and GGCMI sowing dates but CLM maturity reqts
-        cases['Prescribed Sowing'] = \
-            {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.sdateforced_not_gdd/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.sdateforced_not_gdd.clm2.h1.1958-01-01-00000.nc',
-             'constantVars': ["SDATES"],
-             'constantGSs': None, # 'None' with constantVars specified means all should be constant
-             'res': 'f19_g17',
-             'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
-             'rx_hdates_file': None,
-             'rx_gdds_file': None,
-             'verbosename': 'Prescribed sowing: unlim-gs sim'}
-        # My run with rx_crop_calendars2 code and CLM sowing dates but GGCMI maturity reqts
-        cases['Prescribed Maturity'] = \
-            {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced_not_sdate.mxmat/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced_not_sdate.mxmat.clm2.h1.1958-01-01-00000.nc',
-             'constantVars': ["GDDHARV"],
-             'constantGSs': None, # 'None' with constantVars specified means all should be constant
-             'res': 'f19_g17',
-             'rx_sdates_file': None,
-             'rx_hdates_file': None,
-             'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc",
-             'verbosename': 'Prescribed maturity reqts.: unlim-gs sim and GDDs'}
+    if ".2022" in which_cases:
+        cases['Prescribed Calendars 22'] = \
+            {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars3.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced4.mxmat/cropcals3.f19-g17.rx_crop_calendars3.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced4.mxmat.clm2.h1.1958-01-01-00000.nc',
+            'constantVars': ["SDATES", "GDDHARV"],
+            'constantGSs': None, # 'None' with constantVars specified means all should be constant
+            'res': 'f19_g17',
+            'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
+            'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
+            'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds.mxmat.2022-10-26-171107/gdds_20221026_180012.nc",
+            'verbosename': 'Prescribed Calendars v4: Rx sdates+GDDs, lim-gs sim and GDDgen'}
+    else:
+        cases['Prescribed Calendars'] = \
+            {'filepath': '/Users/Shared/CESM_runs/cropcals_20230128/clm50/20230128_clm50_rxboth/20230128_clm50_rxboth.clm2.h1.1958-01-01-00000.nc',
+            'constantVars': ["SDATES", "GDDHARV"],
+            'constantGSs': None, # 'None' with constantVars specified means all should be constant
+            'res': 'f19_g17',
+            'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates_mostrice/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20230102_175625.nc",
+            'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates_mostrice/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20230102_175625.nc",
+            'rx_gdds_file': "/Users/Shared/CESM_runs/20220102_gddgen_ts/generate_gdds.mxmat.2023-01-03-065522/gdds_20230103_074025.nc",
+            'verbosename': 'Prescribed Calendars v5: Rx sdates+GDDs, lim-gs sim and GDDgen'}
+
+    # Prescribed Sowing and Prescribed Maturity
+    if "diagnose" in which_cases:
+        if ".2022" in which_cases:
+            # My run with rx_crop_calendars2 code and GGCMI sowing dates but CLM maturity reqts
+            cases['Prescribed Sowing 22'] = \
+                {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.sdateforced_not_gdd/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.sdateforced_not_gdd.clm2.h1.1958-01-01-00000.nc',
+                'constantVars': ["SDATES"],
+                'constantGSs': None, # 'None' with constantVars specified means all should be constant
+                'res': 'f19_g17',
+                'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
+                'rx_hdates_file': None,
+                'rx_gdds_file': None,
+                'verbosename': 'Prescribed sowing: unlim-gs sim'}
+            # My run with rx_crop_calendars2 code and CLM sowing dates but GGCMI maturity reqts
+            cases['Prescribed Maturity 22'] = \
+                {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced_not_sdate.mxmat/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced_not_sdate.mxmat.clm2.h1.1958-01-01-00000.nc',
+                'constantVars': ["GDDHARV"],
+                'constantGSs': None, # 'None' with constantVars specified means all should be constant
+                'res': 'f19_g17',
+                'rx_sdates_file': None,
+                'rx_hdates_file': None,
+                'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc",
+                'verbosename': 'Prescribed maturity reqts.: unlim-gs sim and GDDs'}
+        else:
+            # My run with rx_crop_calendars2 code and GGCMI sowing dates but CLM maturity reqts
+            cases['Prescribed Sowing'] = \
+                {'filepath': '/Users/Shared/CESM_runs/cropcals_20230128/clm50/20230128_clm50_rxsdates/20230128_clm50_rxsdates.clm2.h1.1958-01-01-00000.nc',
+                'constantVars': ["SDATES"],
+                'constantGSs': None, # 'None' with constantVars specified means all should be constant
+                'res': 'f19_g17',
+                'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates_mostrice/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20230102_175625.nc",
+                'rx_hdates_file': None,
+                'rx_gdds_file': None,
+                'verbosename': 'Prescribed sowing: unlim-gs sim'}
+            # My run with rx_crop_calendars2 code and CLM sowing dates but GGCMI maturity reqts
+            cases['Prescribed Maturity'] = \
+                {'filepath': '/Users/Shared/CESM_runs/cropcals_20230128/clm50/20230128_clm50_rxgdds/20230128_clm50_rxgdds.clm2.h1.1958-01-01-00000.nc',
+                'constantVars': ["GDDHARV"],
+                'constantGSs': None, # 'None' with constantVars specified means all should be constant
+                'res': 'f19_g17',
+                'rx_sdates_file': None,
+                'rx_hdates_file': None,
+                'rx_gdds_file': "/Users/Shared/CESM_runs/20220102_gddgen_ts/generate_gdds.mxmat.2023-01-03-065522/gdds_20230103_074025.nc",
+                'verbosename': 'Prescribed maturity reqts.: unlim-gs sim and GDDs'}
+
                                                
     return cases
 
