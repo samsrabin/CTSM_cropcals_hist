@@ -172,6 +172,8 @@ for x in clm_types_main:
             clm_types_rfir.append(y)
 clm_types = np.unique([x.replace('irrigated_', '') for x in clm_types_rfir])
 
+print("Done importing model output.")
+
 
 # %% Import LU data
 importlib.reload(cc)
@@ -227,10 +229,13 @@ for i, (casename, case) in enumerate(cases.items()):
     case['ds'] = case_ds
     case['ds'].load()
     reses[case['res']]['ds'] = lu_ds
-    
+
+print("Done.")
+ 
 
 # %% Calculate irrigation totals
 
+print("Calculating irrigation totals...")
 for i, (casename, case) in enumerate(cases.items()):
     mms_to_m3d = reses[case['res']]['ds']['AREA_CFT'] * 1e-3 * 60*60*24
     for v in case['ds']:
@@ -260,7 +265,6 @@ for i, (casename, case) in enumerate(cases.items()):
         grid_index_var = 'patches1d_gi'
         case['ds'][v3] = case['ds'][v2].groupby(case['ds'][grid_index_var]).sum().rename({grid_index_var: 'grid'})
         case['ds'][v3].attrs = case['ds'][v2].attrs
-
 print("Done.")
 
 
@@ -484,13 +488,13 @@ importlib.reload(cc)
 # plot_y1 = 1980
 # plot_yN = 2010
 
-# min_viable_hui = 1.0
+### min_viable_hui = 1.0
 min_viable_hui = "ggcmi3"
 include_scatter = True
 # min_viable_hui = ["ggcmi3", 0, 1]
 # include_scatter = False
 
-include_shiftsens = True
+include_shiftsens = False
 
 # Window width for detrending (0 for signal.detrend())
 w = 5
