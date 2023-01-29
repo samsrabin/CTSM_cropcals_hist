@@ -269,10 +269,13 @@ print("Done.")
 
 
 # %% Import GGCMI sowing and harvest dates, and check sims
-# Minimum harvest threshold allowed in PlantCrop()
-gdd_min = 50
 
 for i, (casename, case) in enumerate(cases.items()):
+    
+    if 'gdd_min' in case:
+        gdd_min = case['gdd_min']
+    else:
+        gdd_min = None
     
     if 'rx_sdates_file' in case:
         if case['rx_sdates_file']:

@@ -391,7 +391,8 @@ def check_rx_obeyed(vegtype_list, rx_ds, dates_ds, which_ds, output_var, gdd_min
         if "GDDHARV" in output_var:
             # ...GDD harvest threshold minimum set in PlantCrop()
             if gdd_min == None:
-                raise RuntimeError(f"gdd_min must be provided when doing check_rx_obeyed() for {output_var}")
+                gdd_min = default_gdd_min()
+                print(f"gdd_min not provided when doing check_rx_obeyed() for {output_var}; using default {gdd_min}")
             rx_array[(rx_array >= 0) & (rx_array < gdd_min)] = gdd_min
             
             # ...harvest reason
@@ -943,10 +944,12 @@ def get_caselist(which_cases):
          'verbosename': 'CLM Default 22: my cropcal code, no Rx'}
     if ".2022" in which_cases:
         cases['CLM Default 22'] = clm_default_22
+        cases['CLM Default 22']['gdd_min'] = 50
     else:
         cases['CLM Default'] = clm_default_22
         cases['CLM Default']['filepath'] = "/Users/Shared/CESM_runs/cropcals_20230128/clm50/20230128_clm50_clmdefault/20230128_clm50_clmdefault.clm2.h1.1958-01-01-00000.nc"
         cases['CLM Default']['verbosename'] = clm_default_22['verbosename'].replace("CLM Default 22", "CLM Default")
+        cases['CLM Default']['gdd_min'] = 1.0
     
 
     # My run with rx_crop_calendars2 code and GGCMI calendars
@@ -959,7 +962,8 @@ def get_caselist(which_cases):
             'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
             'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
             'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds.mxmat.2022-10-26-171107/gdds_20221026_180012.nc",
-            'verbosename': 'Prescribed Calendars v4: Rx sdates+GDDs, lim-gs sim and GDDgen'}
+            'verbosename': 'Prescribed Calendars v4: Rx sdates+GDDs, lim-gs sim and GDDgen',
+            'gdd_min': 50}
     else:
         cases['Prescribed Calendars'] = \
             {'filepath': '/Users/Shared/CESM_runs/cropcals_20230128/clm50/20230128_clm50_rxboth/20230128_clm50_rxboth.clm2.h1.1958-01-01-00000.nc',
@@ -969,7 +973,8 @@ def get_caselist(which_cases):
             'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates_mostrice/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20230102_175625.nc",
             'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates_mostrice/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20230102_175625.nc",
             'rx_gdds_file': "/Users/Shared/CESM_runs/20220102_gddgen_ts/generate_gdds.mxmat.2023-01-03-065522/gdds_20230103_074025.nc",
-            'verbosename': 'Prescribed Calendars v5: Rx sdates+GDDs, lim-gs sim and GDDgen'}
+            'verbosename': 'Prescribed Calendars v5: Rx sdates+GDDs, lim-gs sim and GDDgen',
+            'gdd_min': 1.0}
 
     # Prescribed Sowing and Prescribed Maturity
     if "diagnose" in which_cases:
@@ -983,7 +988,8 @@ def get_caselist(which_cases):
                 'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20220727_164727.nc",
                 'rx_hdates_file': None,
                 'rx_gdds_file': None,
-                'verbosename': 'Prescribed sowing: unlim-gs sim'}
+                'verbosename': 'Prescribed sowing: unlim-gs sim',
+                'gdd_min': 50}
             # My run with rx_crop_calendars2 code and CLM sowing dates but GGCMI maturity reqts
             cases['Prescribed Maturity 22'] = \
                 {'filepath': '/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced_not_sdate.mxmat/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced_not_sdate.mxmat.clm2.h1.1958-01-01-00000.nc',
@@ -993,7 +999,8 @@ def get_caselist(which_cases):
                 'rx_sdates_file': None,
                 'rx_hdates_file': None,
                 'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc",
-                'verbosename': 'Prescribed maturity reqts.: unlim-gs sim and GDDs'}
+                'verbosename': 'Prescribed maturity reqts.: unlim-gs sim and GDDs',
+                'gdd_min': 50}
         else:
             # My run with rx_crop_calendars2 code and GGCMI sowing dates but CLM maturity reqts
             cases['Prescribed Sowing'] = \
@@ -1004,7 +1011,8 @@ def get_caselist(which_cases):
                 'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates_mostrice/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20230102_175625.nc",
                 'rx_hdates_file': None,
                 'rx_gdds_file': None,
-                'verbosename': 'Prescribed sowing: unlim-gs sim'}
+                'verbosename': 'Prescribed sowing: unlim-gs sim',
+                'gdd_min': 1.0}
             # My run with rx_crop_calendars2 code and CLM sowing dates but GGCMI maturity reqts
             cases['Prescribed Maturity'] = \
                 {'filepath': '/Users/Shared/CESM_runs/cropcals_20230128/clm50/20230128_clm50_rxgdds/20230128_clm50_rxgdds.clm2.h1.1958-01-01-00000.nc',
@@ -1014,7 +1022,8 @@ def get_caselist(which_cases):
                 'rx_sdates_file': None,
                 'rx_hdates_file': None,
                 'rx_gdds_file': "/Users/Shared/CESM_runs/20220102_gddgen_ts/generate_gdds.mxmat.2023-01-03-065522/gdds_20230103_074025.nc",
-                'verbosename': 'Prescribed maturity reqts.: unlim-gs sim and GDDs'}
+                'verbosename': 'Prescribed maturity reqts.: unlim-gs sim and GDDs',
+                'gdd_min': 1.0}
 
                                                
     return cases
@@ -1060,6 +1069,11 @@ def get_extreme_info(diff_array, rx_array, mxn, dims, gs, patches1d_lon, patches
     
     return round(themxn, 3), round(thisLon, 3), round(thisLat,3), thisGS, round(thisRx)
 
+
+# Minimum harvest threshold allowed in PlantCrop()
+# Was 50 before cropcal runs 2023-01-28
+def default_gdd_min():
+    return 1.0
 
 # Get growing season lengths from a DataArray of hdate-sdate
 def get_gs_len_da(this_da):
@@ -1617,10 +1631,6 @@ def import_rx_dates(var_prefix, date_inFile, dates_ds, set_neg1_to_nan=True):
 
 def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mgdcrop_list(), 
                         sdates_rx_ds=None, gdds_rx_ds=None, verbose=False):
-    
-    # Minimum harvest threshold allowed in PlantCrop()
-    gdd_min = 50
-    
     # Import
     this_ds = utils.import_ds(filename,
                                 myVars=myVars,
@@ -1741,7 +1751,7 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
     if sdates_rx_ds:
         check_rx_obeyed(vegtype_list, sdates_rx_ds, this_ds, "this_ds", "SDATES")
     if gdds_rx_ds:
-        check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, "this_ds", "SDATES", "GDDHARV", gdd_min=gdd_min)
+        check_rx_obeyed(vegtype_list, gdds_rx_ds, this_ds, "this_ds", "SDATES", "GDDHARV", gdd_min=default_gdd_min())
 
     # Convert time axis to integer year, saving original as 'cftime'
     this_ds_gs = this_ds_gs.assign_coords({'cftime': this_ds['time_bounds'].isel({'hist_interval': 0})})
