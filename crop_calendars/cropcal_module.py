@@ -825,7 +825,9 @@ def equalize_colorbars(ims, center0=False, this_var=None):
     for i in np.arange(nims):
         ims[i].set_clim(vmin, vmax)
     
-    return extend
+    vrange = [vmin, vmax]
+    
+    return extend, vrange
 
 
 # For backwards compatibility with files missing SDATES_PERHARV.
