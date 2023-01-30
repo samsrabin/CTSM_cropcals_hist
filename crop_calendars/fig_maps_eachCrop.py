@@ -16,7 +16,7 @@ abs_cmap_default = 'rainbow'
 gslen_colorbar_max = 364
 
 
-def add_rowcol_labels(axes, fig_caselist, fontsize, nx, ny, rx_row_label, thisCrop_out):
+def add_rowcol_labels(axes, fig_caselist, fontsize, nx, ny, rx_row_label):
     # Add row labels
     leftmost = np.arange(0, nx*ny, nx)
     for a, ax in enumerate(axes):
@@ -592,7 +592,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                             fontsize = fontsize['suptitle'])
 
             # Add row and column labels
-            add_rowcol_labels(axes, fig_caselist, fontsize, nx, ny, rx_row_label, thisCrop_out)
+            add_rowcol_labels(axes, fig_caselist, fontsize, nx, ny, rx_row_label)
             
             # Draw all-subplot colorbar
             if not ref_casename:
