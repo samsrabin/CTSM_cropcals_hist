@@ -3,7 +3,8 @@
 import numpy as np
 import xarray as xr
 
-infile = '/Users/Shared/CESM_work/CropEvalData_ssr/landuse.timeseries_1.9x2.5_hist_78pfts_CMIP6_simyr1850-2015_c170824.nc4'
+# infile = '/Users/Shared/CESM_work/CropEvalData_ssr/landuse.timeseries_1.9x2.5_hist_78pfts_CMIP6_simyr1850-2015_c170824.nc4'
+infile = "/Users/Shared/CESM_work/CropEvalData_ssr/landuse.timeseries_1.9x2.5_hist_78_CMIP6_1850-2015_c230127.nlevurb5.nc"
 first_fake_year = 1976
 outfile = infile.replace('.nc', f'.gddgen{first_fake_year}-2015.nc')
 
