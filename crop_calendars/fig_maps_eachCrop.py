@@ -13,6 +13,7 @@ import cropcal_module as cc
 from cropcal_figs_module import *
 
 abs_cmap_default = 'rainbow'
+gslen_colorbar_max = 364
 
 
 def add_rowcol_labels(axes, fig_caselist, fontsize, nx, ny, rx_row_label, thisCrop_out):
@@ -109,8 +110,8 @@ def get_colorbar_chunks(im, ax, this_var, cmap_name, is_diff):
         vmin = min(ticks_orig)
         vmax = max(ticks_orig)
         cbar_ticklabels = None
-    if not is_diff and this_var == "GSLEN" and cbar_ticklabels is not None and cbar_ticklabels[-1] > 365:
-        cbar_ticklabels[-1] == 365
+    if not is_diff and this_var == "GSLEN" and cbar_ticklabels is not None and cbar_ticklabels[-1] > gslen_colorbar_max:
+        cbar_ticklabels[-1] == gslen_colorbar_max
     if cmap_name:
         this_cmap = cm.get_cmap(cmap_name, Ncolors)
     else:
@@ -218,7 +219,7 @@ def get_figure_info(ny, ref_casename):
 def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False):
     
     if this_var == "GSLEN":
-        cbar_max = 365
+        cbar_max = gslen_colorbar_max
     else:
         cbar_max = None
     
