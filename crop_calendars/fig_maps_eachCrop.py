@@ -198,8 +198,12 @@ def get_figure_info(ny, ref_casename):
         new_sp_left = None
     elif ny == 3:
         figsize = (14, 10)	 # width, height
-        suptitle_xpos = 0.5
-        suptitle_ypos = 0.96
+        if ref_casename:
+            suptitle_xpos = 0.5
+            suptitle_ypos = 0.96
+        else:
+            suptitle_xpos = 0.55
+            suptitle_ypos = 0.98
         cbar_pos = [0.2, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
         new_sp_bottom = 0.11 # default: 0.1
         new_sp_left = 0.125
