@@ -503,7 +503,7 @@ def set_ticks(lonlat_bin_width, fontsize, x_or_y):
 
 
 
-def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_viable_hui, mxmats_tmp, nx, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList):
+def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_viable_hui, mxmats_tmp, nx, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList, chunk_colorbar=False):
 
     for (this_var, var_info) in varList.items():
         
@@ -604,31 +604,33 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                     extend, eq_vrange = cc.equalize_colorbars(ims, this_var=this_var)
                 
                 # Chunk colorbar
-                vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[0], axes[0], this_var, abs_cmap, False)
-                if ref_casename:
-                    diff_vmin, diff_vmax, diff_Ncolors, diff_this_cmap, diff_cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[2], axes[2], this_var, diff_cmap, True)
-                    while diff_eq_vrange[1] <= diff_cbar_ticklabels[-2]:
-                        diff_cbar_ticklabels = diff_cbar_ticklabels[1:-1]
-                        diff_vmin = diff_cbar_ticklabels[0]
-                        diff_vmax = diff_cbar_ticklabels[-1]
-                        diff_Ncolors -= 2
-                        if diff_Ncolors <= 0:
-                            raise RuntimeError("Infinite loop?")
-                        diff_this_cmap = cm.get_cmap(diff_cmap, diff_Ncolors)
-                    if diff_eq_vrange[1] <= diff_cbar_ticklabels[-2]:
-                        print(f"diff_eq_vrange: {diff_eq_vrange}")
-                        print(f"range from get_colorbar_chunks(): [{diff_vmin}, {diff_vmax}]")
-                        print(f"diff_Ncolors: {diff_Ncolors}")
-                        print(f"diff_cbar_ticklabels: {diff_cbar_ticklabels}")
-                        print(f"diff_this_cmap: {diff_this_cmap}")
-                        raise RuntimeError("Extra bin(s)!")
-                else:
-                    diff_vmin = None
-                    diff_vmax = None
-                    diff_Ncolors = None
-                    diff_this_cmap = None
-                    diff_cbar_ticklabels = None
-                units, vrange, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange)
+                cbar_ticklabels = None
+                if chunk_colorbar:
+                    vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[0], axes[0], this_var, abs_cmap, False)
+                    if ref_casename:
+                        diff_vmin, diff_vmax, diff_Ncolors, diff_this_cmap, diff_cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[2], axes[2], this_var, diff_cmap, True)
+                        while diff_eq_vrange[1] <= diff_cbar_ticklabels[-2]:
+                            diff_cbar_ticklabels = diff_cbar_ticklabels[1:-1]
+                            diff_vmin = diff_cbar_ticklabels[0]
+                            diff_vmax = diff_cbar_ticklabels[-1]
+                            diff_Ncolors -= 2
+                            if diff_Ncolors <= 0:
+                                raise RuntimeError("Infinite loop?")
+                            diff_this_cmap = cm.get_cmap(diff_cmap, diff_Ncolors)
+                        if diff_eq_vrange[1] <= diff_cbar_ticklabels[-2]:
+                            print(f"diff_eq_vrange: {diff_eq_vrange}")
+                            print(f"range from get_colorbar_chunks(): [{diff_vmin}, {diff_vmax}]")
+                            print(f"diff_Ncolors: {diff_Ncolors}")
+                            print(f"diff_cbar_ticklabels: {diff_cbar_ticklabels}")
+                            print(f"diff_this_cmap: {diff_this_cmap}")
+                            raise RuntimeError("Extra bin(s)!")
+                    else:
+                        diff_vmin = None
+                        diff_vmax = None
+                        diff_Ncolors = None
+                        diff_this_cmap = None
+                        diff_cbar_ticklabels = None
+                    units, vrange, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange)
                 
                 # Redraw all-subplot colorbar 
                 if not ref_casename:
@@ -638,7 +640,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                     cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=units, extend = extend)
                     cb.ax.tick_params(labelsize=fontsize['ticklabels'])
                     cb.set_label(units, fontsize=fontsize['titles'])
-                    if cbar_ticklabels:
+                    if cbar_ticklabels is not None:
                         cb.set_ticks(cb.get_ticks()) # Does nothing except to avoid "FixedFormatter should only be used together with FixedLocator" warning in call of cb.set_ticklabels() below
                         cb.set_ticklabels(cbar_ticklabels)
             
