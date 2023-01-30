@@ -368,6 +368,8 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 extend = "both"
         elif extend is None:
             extend = "neither"
+        if cmap_to_use is None:
+            cmap_to_use = cmap
         im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, subplot_label=subplot_str, cbar_max=cbar_max)
         if new_axes:
             ims.append(im)
