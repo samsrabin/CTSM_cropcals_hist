@@ -13,6 +13,10 @@ ds_in = xr.open_dataset(infile)
 ds_tmp = ds_in.sel(time=slice(first_fake_year,2015)).copy()
 
 # Where is each crop ever active?
+if "AREA" not in ds_tmp:
+   ds_tmp["AREA"] = xr.DataArray(data=np.ones_like(ds_tmp["LANDFRAC_PFT"]),
+                                 dims=ds_tmp["LANDFRAC_PFT"].dims,
+                                 coords=ds_tmp["LANDFRAC_PFT"].coords)
 ds_tmp['AREA_CROP'] = (ds_tmp.AREA * ds_tmp.LANDFRAC_PFT * ds_tmp.PCT_CROP/100).transpose("time", "lsmlat", "lsmlon")
 ds_tmp['AREA_CFT'] = (ds_tmp['AREA_CROP'] * ds_tmp.PCT_CFT/100).transpose("time", "cft", "lsmlat", "lsmlon")
 ds_area_max = ds_tmp['AREA_CFT'].max(dim="time")
