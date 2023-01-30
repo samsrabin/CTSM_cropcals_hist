@@ -53,4 +53,4 @@ ds_tmp['PCT_CFT'] = xr.DataArray(data = new_pct_cft_tcyx,
 ds_out = xr.concat((ds_in.copy().sel(time=slice(0, first_fake_year-1)),
                     ds_tmp), dim="time")
 ds_out = ds_out.drop([v for v in ds_out if v not in ds_in])
-ds_out.to_netcdf(outfile)
+ds_out.to_netcdf(outfile, format="NETCDF3_64BIT")
