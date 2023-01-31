@@ -362,7 +362,7 @@ def global_timeseries_irrig(thisVar, cases, reses, cropList_combined_clm, outDir
 
 
 def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, \
-    equalize_scatter_axes=False, extra="Total (grains)", figsize=(35, 18), include_scatter=True, include_shiftsens=True, min_viable_hui_list="ggcmi3", mxmats=None, noFigs=False, ny=2, nx=4, obs_for_fig="FAOSTAT", plot_y1=1980, plot_yN=2010, stats_round=3, use_annual_yields=False, verbose=False, w=5):
+    equalize_scatter_axes=False, extra="Total (grains)", figsize=(35, 18), include_scatter=True, include_shiftsens=True, min_viable_hui_list="ggcmi3", mxmats=None, noFigs=False, ny=2, nx=4, obs_for_fig="FAOSTAT", plot_y1=1980, plot_yN=2010, remove_scatter_bias=False, stats_round=3, use_annual_yields=False, verbose=False, w=5):
     
     if not isinstance(min_viable_hui_list, list):
         min_viable_hui_list = [min_viable_hui_list]
@@ -523,16 +523,21 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
         # Get detrended data
         if w == 0:
             r = 1
-            ydata_yield_dt = signal.detrend(ydata_yield, axis=1) + np.mean(ydata_yield, axis=1, keepdims=True)
-            ydata_yield_shiftL_dt = signal.detrend(ydata_yield_shiftL, axis=1) + np.mean(ydata_yield, axis=1, keepdims=True)
-            ydata_yield_shiftR_dt = signal.detrend(ydata_yield_shiftR, axis=1) + np.mean(ydata_yield, axis=1, keepdims=True)
+            ydata_yield_dt = signal.detrend(ydata_yield, axis=1)
+            ydata_yield_shiftL_dt = signal.detrend(ydata_yield_shiftL, axis=1)
+            ydata_yield_shiftR_dt = signal.detrend(ydata_yield_shiftR, axis=1)
+            if not remove_scatter_bias:
+                ydata_yield_bias = np.mean(ydata_yield, axis=1, keepdims=True)
+                ydata_yield_dt += ydata_yield_bias
+                ydata_yield_shiftL_dt += ydata_yield_bias
+                ydata_yield_shiftR_dt += ydata_yield_bias
         elif w==-1:
             raise RuntimeError("Specify w ≥ 0")
         else:
             r = cc.get_window_radius(w)
-            ydata_yield_dt = cc.christoph_detrend(ydata_yield, w)
-            ydata_yield_shiftL_dt = cc.christoph_detrend(ydata_yield_shiftL, w)
-            ydata_yield_shiftR_dt = cc.christoph_detrend(ydata_yield_shiftR, w)
+            ydata_yield_dt = cc.christoph_detrend(ydata_yield, w, center0=remove_scatter_bias)
+            ydata_yield_shiftL_dt = cc.christoph_detrend(ydata_yield_shiftL, w, center0=remove_scatter_bias)
+            ydata_yield_shiftR_dt = cc.christoph_detrend(ydata_yield_shiftR, w, center0=remove_scatter_bias)
         yearList_shifted_dt = yearList_shifted[r:-r]
         ydata_yield_sdt = signal.detrend(ydata_yield, axis=1) + np.mean(ydata_yield, axis=1, keepdims=True)
         
