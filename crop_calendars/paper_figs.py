@@ -1470,20 +1470,20 @@ varList = {
         'units':      't/ha',
         'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
     'YIELD_ANN_DIFFEARTHSTAT': {
-        'suptitle':   'Mean annual yield ∆ from EarthStat',
+        'suptitle':   'Mean annual yield bias rel. EarthStat',
         'units':      't/ha',
         'multiplier': 1},
     'YIELD_ANN_DIFFEARTHSTAT_DIFF': {
-        'suptitle':   'Mean annual yield ∆ from EarthStat',
-        'units':      'Change in abs. error (t/ha)',
+        'suptitle':   'Mean annual yield bias rel. EarthStat',
+        'units':      'Change in abs. bias (t/ha)',
         'multiplier': 1},
     'PROD_ANN_DIFFEARTHSTAT': {
-        'suptitle':   'Mean annual production ∆ from EarthStat',
+        'suptitle':   'Mean annual production bias rel. EarthStat',
         'units':      'Mt',
         'multiplier': 1e-6}, # t to Mt
     'PROD_ANN_DIFFEARTHSTAT_DIFF': {
-        'suptitle':   'Mean annual production ∆ from EarthStat',
-        'units':      'Change in abs. error (Mt)',
+        'suptitle':   'Mean annual production bias rel. EarthStat',
+        'units':      'Change in abs. bias (Mt)',
         'multiplier': 1e-6}, # t to Mt
 }
 
