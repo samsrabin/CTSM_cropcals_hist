@@ -130,12 +130,12 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlab
         ax_this.text(0.02, 0.93, f"({subplot_label})", transform=ax_this.transAxes,
              fontsize=24)
     
-    # if equalize_scatter_axes:
-    #     xlim = ax_this.get_xlim()
-    #     ylim = ax_this.get_ylim()
-    #     newlim = [min(xlim[0], ylim[0]), max(xlim[1], ylim[1])]
-    #     ax_this.set_xlim(newlim)
-    #     ax_this.set_ylim(newlim)
+    if equalize_scatter_axes:
+        xlim = ax_this.get_xlim()
+        ylim = ax_this.get_ylim()
+        newlim = [min(xlim[0], ylim[0]), max(xlim[1], ylim[1])]
+        ax_this.set_xlim(newlim)
+        ax_this.set_ylim(newlim)
     
     # Add 1:1 line
     xlim = ax_this.get_xlim()
