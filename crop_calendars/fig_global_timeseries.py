@@ -20,7 +20,13 @@ from matplotlib import collections as mplcollections
 from matplotlib import cm
 from matplotlib.ticker import MultipleLocator
 
+fontsize = {'axis_label': 28,
+            'suptitle': 24,
+            'title': 30,
+            'tick_label': 24}
 max_yticks = 8 # Should depend on fontsize['tick_label']
+ticklength_major = 10
+ticklength_minor = ticklength_major / 2
 
 
 def reduce_yticks(ax):
@@ -84,7 +90,7 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
                                   linewidth=3)
     
     if subplot_label is not None:
-        ax_this.text(0.02, 0.93, f"({subplot_label})", transform=ax_this.transAxes, fontsize=24)
+        ax_this.text(0.02, 0.93, f"({subplot_label})", transform=ax_this.transAxes, fontsize=fontsize['axis_label'])
     
     thisTitle = r"$\bf{" + thisCrop_clm.replace(" ", "\ ") + "}$"
     if stats2 is not None:
@@ -104,20 +110,18 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
                 thisTitle += f" ({shift_symbols[0]}{stats2[0]} → {shift_symbols[1]}{stats2[1]})"
     
     ax_this.title.set_text(thisTitle)
-    ax_this.title.set_size(30)
-    fontsize_label_axis = 28
-    fontsize_label_tick = 24
-    ax_this.tick_params(axis='x', which='major', labelsize=fontsize_label_tick, length=10)
-    ax_this.tick_params(axis='y', which='major', labelsize=fontsize_label_tick, length=5)
+    ax_this.title.set_size(fontsize['title'])
+    ax_this.tick_params(axis='x', which='major', labelsize=fontsize['tick_label'], length=ticklength_major)
+    ax_this.tick_params(axis='y', which='major', labelsize=fontsize['tick_label'], length=ticklength_minor)
     ax_this.xaxis.set_minor_locator(MultipleLocator(5))
-    ax_this.tick_params(axis='x', which='minor', length=5)
+    ax_this.tick_params(axis='x', which='minor', length=ticklength_minor)
     reduce_yticks(ax_this)
     if xlabel is not None:
-        ax_this.set_xlabel(xlabel, fontsize=fontsize_label_axis)
+        ax_this.set_xlabel(xlabel, fontsize=fontsize['axis_label'])
         ax_this.xaxis.set_label_coords(0.5, -0.1)
     else:
         ax_this.set_xlabel("")
-    ax_this.set_ylabel(ylabel, fontsize=fontsize_label_axis)
+    ax_this.set_ylabel(ylabel, fontsize=fontsize['axis_label'])
     ax_this.yaxis.set_label_coords(-0.125, 0.5)
     if ax_this.get_legend():
         ax_this.get_legend().remove()
@@ -150,7 +154,7 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabe
     
     if subplot_label is not None:
         ax_this.text(0.02, 0.93, f"({subplot_label})", transform=ax_this.transAxes,
-             fontsize=24)
+             fontsize=fontsize['axis_label'])
     
     if equalize_scatter_axes:
         xlim = ax_this.get_xlim()
@@ -187,10 +191,10 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabe
                 thisTitle += f" ({shift_symbols[0]}{stats2[0]} → {shift_symbols[1]}{stats2[1]})"
     
     ax_this.title.set_text(thisTitle)
-    ax_this.title.set_size(32)
-    ax_this.tick_params(axis='both', which='major', labelsize=20)
-    ax_this.set_xlabel(xlabel, fontsize=24)
-    ax_this.set_ylabel(ylabel, fontsize=24)
+    ax_this.title.set_size(fontsize['title'])
+    ax_this.tick_params(axis='both', which='major', labelsize=fontsize['tick_label'], length=ticklength_minor)
+    ax_this.set_xlabel(xlabel, fontsize=fontsize['axis_label'])
+    ax_this.set_ylabel(ylabel, fontsize=fontsize['axis_label'])
     reduce_yticks(ax_this)
     if ax_this.get_legend():
         ax_this.get_legend().remove()
@@ -207,7 +211,7 @@ def finishup_allcrops_lines(c, ny, nx, axes_this, f_this, suptitle, outDir_figs,
     if not hide_suptitle:
         f_this.suptitle(suptitle,
                         x = 0.1, horizontalalignment = 'left',
-                        fontsize=24)
+                        fontsize=fontsize['suptitle'])
     
     f_this.legend(handles = axes_this[0].lines,
                   labels = fig_caselist,
@@ -230,7 +234,7 @@ def finishup_allcrops_scatter(c, ny, nx, axes_this, f_this, suptitle, outDir_fig
         
     f_this.suptitle(suptitle,
                     x = 0.1, horizontalalignment = 'left',
-                    fontsize=24)
+                    fontsize=fontsize['suptitle'])
     
     # Get the handles of just the points (i.e., not including regression lines)    
     legend_handles = [x for x in axes_this[0].get_children() if isinstance(x, mplcollections.PathCollection)]
