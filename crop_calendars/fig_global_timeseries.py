@@ -18,6 +18,7 @@ from scipy import signal
 import matplotlib.pyplot as plt
 from matplotlib import collections as mplcollections
 from matplotlib import cm
+from matplotlib.ticker import MultipleLocator
 
 def get_figs_axes(ny, nx, figsize, sharex=True):
     f_list, axes_list = plt.subplots(ny, nx, figsize=figsize, sharex=sharex)
@@ -82,13 +83,20 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
                 thisTitle += f" ({shift_symbols[0]}{stats2[0]} → {shift_symbols[1]}{stats2[1]})"
     
     ax_this.title.set_text(thisTitle)
-    ax_this.title.set_size(32)
-    ax_this.tick_params(axis='both', which='major', labelsize=20)
+    ax_this.title.set_size(30)
+    fontsize_label_axis = 28
+    fontsize_label_tick = 24
+    ax_this.tick_params(axis='x', which='major', labelsize=fontsize_label_tick, length=10)
+    ax_this.tick_params(axis='y', which='major', labelsize=fontsize_label_tick, length=5)
+    ax_this.xaxis.set_minor_locator(MultipleLocator(5))
+    ax_this.tick_params(axis='x', which='minor', length=5)
     if xlabel is not None:
-        ax_this.set_xlabel(xlabel, fontsize=24)
+        ax_this.set_xlabel(xlabel, fontsize=fontsize_label_axis)
+        ax_this.xaxis.set_label_coords(0.5, -0.1)
     else:
         ax_this.set_xlabel("")
-    ax_this.set_ylabel(ylabel, fontsize=24)
+    ax_this.set_ylabel(ylabel, fontsize=fontsize_label_axis)
+    ax_this.yaxis.set_label_coords(-0.125, 0.5)
     if ax_this.get_legend():
         ax_this.get_legend().remove()
 
