@@ -220,7 +220,7 @@ def get_figure_info(ny, ref_casename):
     return cbar_pos, figsize, hspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos
 
 
-def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False):
+def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False):
     
     if this_var == "GSLEN":
         cbar_max = gslen_colorbar_max
@@ -294,23 +294,30 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 else:
                     cmap = diverging_map
                 
-                manual_colors = True
-                bounds = np.arange(-165, 165+1, 30)
-                ticklabels_to_use = bounds
                 units = "days"
-                cmap_to_use = cm.get_cmap(cmap)
-                extend = "both"
+                if chunk_colorbar:
+                    manual_colors = True
+                    bounds = np.arange(-165, 165+1, 30)
+                    ticklabels_to_use = bounds
+                    cmap_to_use = cm.get_cmap(cmap)
+                    extend = "both"
+                else:
+                    vmax = np.nanmax(np.abs(this_map.values))
+                    vrange = [-vmax, vmax]
             else:
                 if abs_cmap:
                     cmap = abs_cmap
                 else:
                     cmap = 'twilight_shifted'
                 
-                manual_colors = True
-                bounds = np.append(np.append(1, np.arange(50, 350+1, 50)), 365)
-                cmap_to_use = cm.get_cmap(cmap)
                 units = "Day of year"
-                extend = "neither"
+                if chunk_colorbar:
+                    manual_colors = True
+                    bounds = np.append(np.append(1, np.arange(50, 350+1, 50)), 365)
+                    cmap_to_use = cm.get_cmap(cmap)
+                    extend = "neither"
+                else:
+                    vrange = [1, 365]
         else:
             if time_dim in this_map.dims:
                 this_map = this_map.mean(dim=time_dim)
@@ -584,7 +591,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
             ims = []
             axes = []
             cbs = []
-            units, vrange, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, abs_cmap=abs_cmap, diff_cmap=diff_cmap)
+            units, vrange, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, abs_cmap=abs_cmap, diff_cmap=diff_cmap)
 
             fig.suptitle(this_suptitle,
                             x = suptitle_xpos,
@@ -636,7 +643,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                         diff_Ncolors = None
                         diff_this_cmap = None
                         diff_cbar_ticklabels = None
-                    units, vrange, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange)
+                    units, vrange, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange)
                 
                 # Redraw all-subplot colorbar 
                 if not ref_casename:
