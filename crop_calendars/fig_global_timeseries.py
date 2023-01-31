@@ -140,7 +140,7 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlab
     # Add 1:1 line
     xlim = ax_this.get_xlim()
     ylim = ax_this.get_ylim()
-    plt.plot([0,100],[0,100])
+    plt.plot([-100,100], [-100,100], '--', color='gray', alpha=0.5)
     ax_this.set_xlim(xlim)
     ax_this.set_ylim(ylim)
     
