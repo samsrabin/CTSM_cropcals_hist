@@ -20,6 +20,27 @@ from matplotlib import collections as mplcollections
 from matplotlib import cm
 from matplotlib.ticker import MultipleLocator
 
+max_yticks = 8 # Should depend on fontsize['tick_label']
+
+
+def reduce_yticks(ax):
+    yticks = ax.get_yticks()
+    ylim = ax.get_ylim()
+    yticks_shown = yticks
+    lo_not_shown = ylim[0] > yticks[0]
+    if lo_not_shown:
+        yticks_shown = yticks_shown[1:]
+    hi_not_shown = ylim[-1] < yticks[-1]
+    if hi_not_shown:
+        yticks_shown = yticks_shown[:-1]
+    Nticks_shown = len(yticks_shown)
+    if Nticks_shown > max_yticks:
+        if Nticks_shown % 2:
+            ax.set_yticks([yticks_shown[y] for y in np.arange(0,9,2)])
+        else:
+            raise RuntimeWarning("Not sure how to trim an odd number of yticks")
+        
+
 def get_figs_axes(ny, nx, figsize, sharex=True):
     f_list, axes_list = plt.subplots(ny, nx, figsize=figsize, sharex=sharex)
     axes_list = axes_list.flatten()
@@ -90,6 +111,7 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
     ax_this.tick_params(axis='y', which='major', labelsize=fontsize_label_tick, length=5)
     ax_this.xaxis.set_minor_locator(MultipleLocator(5))
     ax_this.tick_params(axis='x', which='minor', length=5)
+    reduce_yticks(ax_this)
     if xlabel is not None:
         ax_this.set_xlabel(xlabel, fontsize=fontsize_label_axis)
         ax_this.xaxis.set_label_coords(0.5, -0.1)
@@ -169,6 +191,7 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabe
     ax_this.tick_params(axis='both', which='major', labelsize=20)
     ax_this.set_xlabel(xlabel, fontsize=24)
     ax_this.set_ylabel(ylabel, fontsize=24)
+    reduce_yticks(ax_this)
     if ax_this.get_legend():
         ax_this.get_legend().remove()
 
