@@ -101,7 +101,7 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
         ax_this.get_legend().remove()
 
 
-def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlabel, equalize_scatter_axes, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None):
+def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabel, ylabel, equalize_scatter_axes, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None):
     
     for i, casename in enumerate(caselist):
         if "CLM Default" in casename:
@@ -167,8 +167,8 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, axlab
     ax_this.title.set_text(thisTitle)
     ax_this.title.set_size(32)
     ax_this.tick_params(axis='both', which='major', labelsize=20)
-    ax_this.set_xlabel(axlabel, fontsize=24)
-    ax_this.set_ylabel(axlabel, fontsize=24)
+    ax_this.set_xlabel(xlabel, fontsize=24)
+    ax_this.set_ylabel(ylabel, fontsize=24)
     if ax_this.get_legend():
         ax_this.get_legend().remove()
 
@@ -658,6 +658,7 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             else:
                 xlabel = "Year"
             no_ylabel = c%nx
+            label_yield = "Global yield (t/ha)"
             if no_ylabel:
                 ylabel_area = None
                 ylabel_prod = None
@@ -665,7 +666,7 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             else:
                 ylabel_area = "Global area (Mha)"
                 ylabel_prod = "Global production (Mt)"
-                ylabel_yield = "Global yield (t/ha)"
+                ylabel_yield = label_yield
             make_1crop_lines(ax_lines_area, ydata_area_touse, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
             if include_shiftsens:
                 make_1crop_lines(ax_lines_area_orig, ydata_area, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
@@ -703,11 +704,21 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             
             # Scatter plots
             if include_scatter:
-                make_1crop_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, "t/ha", equalize_scatter_axes, stats2=corrcoef_ref_touse, stats_round=stats_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
+                xlabel_yield_scatter = None
+                ylabel_yield_scatter = None
+                if ylabel_yield is not None:
+                    ylabel_yield_scatter = ylabel_yield
+                    if remove_scatter_bias:
+                        ylabel_yield_scatter += ", bias removed"
+                if xlabel is not None:
+                    xlabel_yield_scatter = label_yield
+                    if remove_scatter_bias:
+                        xlabel_yield_scatter += ", bias removed"
+                make_1crop_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref_touse, stats_round=stats_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
                 if include_shiftsens:
-                    make_1crop_scatter(ax_scatter_yield_dt_orig, ydata_yield_dt[o,:], ydata_yield_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, "t/ha", equalize_scatter_axes, stats2=corrcoef_ref, stats_round=stats_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
-                    make_1crop_scatter(ax_scatter_yield_dt_shiftL, ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, "t/ha", equalize_scatter_axes, stats2=corrcoeffL, stats_round=stats_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
-                    make_1crop_scatter(ax_scatter_yield_dt_shiftR, ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, "t/ha", equalize_scatter_axes, stats2=corrcoeffR, stats_round=stats_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
+                    make_1crop_scatter(ax_scatter_yield_dt_orig, ydata_yield_dt[o,:], ydata_yield_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref, stats_round=stats_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
+                    make_1crop_scatter(ax_scatter_yield_dt_shiftL, ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm,xlabel_yield_scatter,  ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffL, stats_round=stats_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
+                    make_1crop_scatter(ax_scatter_yield_dt_shiftR, ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffR, stats_round=stats_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
             
     # Finish up and save
     if not noFigs:
