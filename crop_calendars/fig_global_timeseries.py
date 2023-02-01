@@ -69,14 +69,11 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
         elif "Prescribed Calendars" in casename:
             color = [x/255 for x in [250, 102, 240]]
         elif "Prescribed Sowing" in casename:
-            color = [x/255 for x in [150, 110, 0]]
+            color = [x/255 for x in [133, 92, 255]]
         elif "Prescribed Maturity" in casename:
             color = [x/255 for x in [128,0,0]]
         elif i <= 1:
             color = grays[i]
-        elif i==4:
-            # Purple more distinct from my light gray
-            color = [x/255 for x in [133, 92, 255]]
         else:
             color = cm.Dark2(i-2)
         if (casename == "CLM Default" and "Original baseline" in caselist) or (casename in ["Prescribed Sowing", "Prescribed Maturity"]) or "min. HUI 1" in casename:
@@ -135,12 +132,9 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabe
         elif "Prescribed Calendars"  in casename:
             color = [x/255 for x in [250, 102, 240]]
         elif "Prescribed Sowing"  in casename:
-            color = [x/255 for x in [150, 110, 0]]
+            color = [x/255 for x in [133, 92, 255]]
         elif "Prescribed Maturity"  in casename:
             color = [x/255 for x in [128,0,0]]
-        elif i==2:
-            # Purple more distinct from my light gray
-            color = [x/255 for x in [133, 92, 255]]
         else:
             color = cm.Dark2(i)
         if casename in ["Prescribed Sowing", "Prescribed Maturity"]:
