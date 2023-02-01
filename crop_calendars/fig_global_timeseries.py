@@ -389,7 +389,7 @@ def global_timeseries_irrig(thisVar, cases, reses, cropList_combined_clm, outDir
 
 
 def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, \
-    equalize_scatter_axes=False, extra="Total (grains)", figsize=(35, 18), include_scatter=True, include_shiftsens=True, min_viable_hui_list="ggcmi3", mxmats=None, noFigs=False, ny=2, nx=4, obs_for_fig="FAOSTAT", plot_y1=1980, plot_yN=2010, remove_scatter_bias=False, stats_round=3, use_annual_yields=False, verbose=False, w=5):
+    equalize_scatter_axes=False, extra="Total (grains)", figsize=(35, 18), include_scatter=True, include_shiftsens=True, min_viable_hui_list="ggcmi3", mxmats=None, noFigs=False, ny=2, nx=4, obs_for_fig="FAOSTAT", plot_y1=1980, plot_yN=2010, remove_scatter_bias=False, bias_round=1, corrcoef_round=3, use_annual_yields=False, verbose=False, w=5):
     
     if not isinstance(min_viable_hui_list, list):
         min_viable_hui_list = [min_viable_hui_list]
@@ -622,15 +622,15 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                 bias0 = bias
             if verbose:
                 for i, casename in enumerate(fig_caselist[2:]):
-                    print(f"   {thisCrop_clm} bias MM window={w} weighted {casename}: {np.round(bias[i], stats_round)}")
+                    print(f"   {thisCrop_clm} bias MM window={w} weighted {casename}: {np.round(bias[i], bias_round)}")
             
             # corrcoeff = [stats.linregress(ydata_yield[o,:], ydata_yield[x,:]) for x in np.arange(2, ydata_yield.shape[0])]
             # for i, casename in enumerate(fig_caselist[2:]):
-            #     print(f"   {thisCrop_clm} r orig unweighted {casename}: {np.round(corrcoeff[i].rvalue, stats_round)}")
+            #     print(f"   {thisCrop_clm} r orig unweighted {casename}: {np.round(corrcoeff[i].rvalue, corrcoef_round)}")
                 
             # corrcoeff = [stats.linregress(ydata_yield_sdt[o,r:-r], ydata_yield_sdt[x,r:-r]) for x in inds_sim]
             # for i, casename in enumerate(fig_caselist[2:]):
-            #     print(f"   {thisCrop_clm} r signal.detrend() unweighted {casename}: {np.round(corrcoeff[i].rvalue, stats_round)}")
+            #     print(f"   {thisCrop_clm} r signal.detrend() unweighted {casename}: {np.round(corrcoeff[i].rvalue, corrcoef_round)}")
             
             # Weights should never be shifted, as they are observed values.
             weights = ydata_prod[o,:]
@@ -638,21 +638,21 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             corrcoeff = [cc.weighted_pearsons_r(ydata_yield_dt[o,:], ydata_yield_dt[x,:], weights) for x in inds_sim]
             if verbose:
                 for i, casename in enumerate(fig_caselist[2:]):
-                    print(f"   {thisCrop_clm} r MM window={w} weighted {casename}: {np.round(corrcoeff[i], stats_round)}")
+                    print(f"   {thisCrop_clm} r MM window={w} weighted {casename}: {np.round(corrcoeff[i], corrcoef_round)}")
             if this_obs == obs_for_fig:
                 corrcoef_ref = corrcoeff
                 
             corrcoeffL = [cc.weighted_pearsons_r(ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[x,:], weights) for x in inds_sim]
             if verbose:
                 for i, casename in enumerate(fig_caselist[2:]):
-                    print(f"   {thisCrop_clm} r MM window={w} unweighted shift LEFT {casename}: {np.round(corrcoeffL[i], stats_round)}")
+                    print(f"   {thisCrop_clm} r MM window={w} unweighted shift LEFT {casename}: {np.round(corrcoeffL[i], corrcoef_round)}")
             if this_obs == obs_for_fig:
                 corrcoefL_ref = corrcoeffL
             
             corrcoeffR = [cc.weighted_pearsons_r(ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[x,:], weights) for x in inds_sim]
             if verbose:
                 for i, casename in enumerate(fig_caselist[2:]):
-                    print(f"   {thisCrop_clm} r MM window={w} unweighted shift RIGHT {casename}: {np.round(corrcoeffR[i], stats_round)}")
+                    print(f"   {thisCrop_clm} r MM window={w} unweighted shift RIGHT {casename}: {np.round(corrcoeffR[i], corrcoef_round)}")
             if this_obs == obs_for_fig:
                 corrcoefR_ref = corrcoeffR
         
@@ -738,8 +738,8 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             make_1crop_lines(ax_lines_prod, ydata_prod_touse, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shift_symbols, subplot_label=subplot_str)
             if len(min_viable_hui_list) > 1:
                 bias_shifted = None
-            make_1crop_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
-            make_1crop_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=stats_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
+            make_1crop_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=bias_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
+            make_1crop_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=bias_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
             
             if include_shiftsens:
                 make_1crop_lines(ax_lines_prod_orig, ydata_prod, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=noshift_symbols, subplot_label=subplot_str)
@@ -749,12 +749,12 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                     bias0 = None
                     bias_shiftL = None
                     bias_shiftR = None
-                make_1crop_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=stats_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
-                make_1crop_lines(ax_lines_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftL, stats_round=stats_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
-                make_1crop_lines(ax_lines_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftR, stats_round=stats_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
-                make_1crop_lines(ax_lines_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=stats_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
-                make_1crop_lines(ax_lines_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftL, stats_round=stats_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
-                make_1crop_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftR, stats_round=stats_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
+                make_1crop_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=bias_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
+                make_1crop_lines(ax_lines_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftL, stats_round=bias_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
+                make_1crop_lines(ax_lines_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftR, stats_round=bias_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
+                make_1crop_lines(ax_lines_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=bias_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
+                make_1crop_lines(ax_lines_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftL, stats_round=bias_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
+                make_1crop_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftR, stats_round=bias_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
             
             # Scatter plots
             if include_scatter:
@@ -768,11 +768,11 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                     xlabel_yield_scatter = label_yield
                     if remove_scatter_bias:
                         xlabel_yield_scatter += ", bias removed"
-                make_1crop_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref_touse, stats_round=stats_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
+                make_1crop_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref_touse, stats_round=corrcoef_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
                 if include_shiftsens:
-                    make_1crop_scatter(ax_scatter_yield_dt_orig, ydata_yield_dt[o,:], ydata_yield_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref, stats_round=stats_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
-                    make_1crop_scatter(ax_scatter_yield_dt_shiftL, ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm,xlabel_yield_scatter,  ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffL, stats_round=stats_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
-                    make_1crop_scatter(ax_scatter_yield_dt_shiftR, ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffR, stats_round=stats_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
+                    make_1crop_scatter(ax_scatter_yield_dt_orig, ydata_yield_dt[o,:], ydata_yield_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref, stats_round=corrcoef_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
+                    make_1crop_scatter(ax_scatter_yield_dt_shiftL, ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm,xlabel_yield_scatter,  ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffL, stats_round=corrcoef_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
+                    make_1crop_scatter(ax_scatter_yield_dt_shiftR, ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffR, stats_round=corrcoef_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
             
     # Finish up and save
     if not noFigs:
