@@ -942,6 +942,26 @@ def get_caselist(which_cases):
          'constantGSs': None,
          'res': 'f19_g17',
          'verbosename': 'CLM Default 22: my cropcal code, no Rx'}
+    clm_default_20230128_ctsm50 = \
+        {'filepath': '/Users/Shared/CESM_runs/cropcals_20230128/clm50/20230128_clm50_clmdefault/20230128_clm50_clmdefault.clm2.h1.1958-01-01-00000.nc',
+         'constantVars': None,
+         'constantGSs': None,
+         'res': 'f19_g17',
+         'verbosename': 'CLM Default 20230128, ctsm5.0 LU: my cropcal code, no Rx'}
+    # As above, but with ctsm5.2 land use
+    clm_default_20230128_ctsm52 = \
+        {'filepath': '/Users/Shared/CESM_runs/cropcals_20230128/clm52/20230128_clm52_clmdefault/20230128_clm52_clmdefault.clm2.h1.1958-01-01-00000.nc',
+         'constantVars': None,
+         'constantGSs': None,
+         'res': 'f19_g17_ctsm5.2',
+         'verbosename': 'CLM Default 20230128, ctsm5.2 LU: my cropcal code, no Rx'}
+    
+    if which_cases == "ctsm_lu_5.0_vs_5.2":
+        cases['5.0 LU'] = clm_default_20230128_ctsm50
+        cases['5.2 LU'] = clm_default_20230128_ctsm52
+        return cases
+        
+    
     if ".2022" in which_cases:
         cases['CLM Default 22'] = clm_default_22
         cases['CLM Default 22']['gdd_min'] = 50

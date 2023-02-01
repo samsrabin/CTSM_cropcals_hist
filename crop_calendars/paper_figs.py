@@ -182,8 +182,10 @@ importlib.reload(cc)
 reses = {}
 # f09_g17 ("""1-degree"""; i.e., 1.25 lon x 0.9 lat)
 reses["f09_g17"] = {"lu_path": "/Users/Shared/CESM_work/CropEvalData_ssr/landuse.timeseries_0.9x1.25_hist_78pfts_CMIP6_simyr1850-2015_c170824.nc4"}
-# f19_g17 ("""2-degree"""; i.e., 2.5 lon x 1.9 lat)
+# f19_g17 ("""2-degree"""; i.e., 2.5 lon x 1.9 lat), ctsm5.0
 reses["f19_g17"] = {"lu_path": "/Users/Shared/CESM_work/CropEvalData_ssr/landuse.timeseries_1.9x2.5_hist_78pfts_CMIP6_simyr1850-2015_c170824.nc4"}
+# f19_g17 ("""2-degree"""; i.e., 2.5 lon x 1.9 lat), ctsm5.2
+reses["f19_g17_ctsm5.2"] = {"lu_path": "/Users/Shared/CESM_work/CropEvalData_ssr/landuse.timeseries_1.9x2.5_hist_78_CMIP6_1850-2015_c230127.nlevurb5.AREA.nc"}
 
 # Import land use to reses dicts
 for i, (resname, res) in enumerate(reses.items()):
@@ -410,6 +412,8 @@ earthstats['f19_g17'] = cc.ungrid(earthstats_gd['f19_g17'],
                                   lon='patches1d_ixy',
                                   lat='patches1d_jxy',
                                   crop='patches1d_itype_combinedCropCLM_str')
+
+earthstats['f19_g17_ctsm5.2'] = earthstats['f19_g17']
 
 print("Done importing FAO EarthStat.")
 
