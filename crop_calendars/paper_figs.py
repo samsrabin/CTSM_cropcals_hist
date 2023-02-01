@@ -5,6 +5,9 @@ which_cases = "main2.2022"
 # which_cases = "originalBaseline" # As originalCLM, but without cmip6
 # which_cases = "diagnose"
 
+# Include irrigation?
+incl_irrig = False
+
 # Yields will be set to zero unless HUI at harvest is ≥ min_viable_hui
 min_viable_hui = 1
 
@@ -141,7 +144,8 @@ for i, (casename, case) in enumerate(cases.items()):
 
     else:
         this_ds = cc.import_output(case['filepath'], myVars=myVars,
-                                   y1=y1, yN=yN, verbose=verbose_import)
+                                   y1=y1, yN=yN, verbose=verbose_import,
+                                   incl_irrig=incl_irrig)
         bad_patches = cc.check_constant_vars(this_ds, case, ignore_nan=True, constantGSs=case['constantGSs'], verbose=True, throw_error=False)
         # for p in bad_patches:
         #	  cc.print_gs_table(this_ds.isel(patch=p))
@@ -237,37 +241,38 @@ print("Done.")
 
 # %% Calculate irrigation totals
 
-print("Calculating irrigation totals...")
-for i, (casename, case) in enumerate(cases.items()):
-    mms_to_m3d = reses[case['res']]['ds']['AREA_CFT'] * 1e-3 * 60*60*24
-    for v in case['ds']:
-        if "QIRRIG" not in v:
-            continue
-        
-        # Calculate total patch-level irrigation (mm/s → m3)
-        v2 = v.replace('QIRRIG', 'IRRIG')
-        v2_da = case['ds'][v].copy()
-        if v2_da.attrs['units'] != 'mm/s':
-            print(f"Not calculating total irrigation for {v} (units {v2_da.attrs['units']}, not mm/s")
-            continue
-        elif "MTH" in v:
-            print(f"Not calculating total irrigation for {v} (monthly-fying areas too memory-intensive)")
-            continue
-            days_in_month = v2_da['time_mth'].dt.days_in_month
-            v2_da *= days_in_month * mms_to_m3d
-        elif "ANN" in v:
-            v2_da *= mms_to_m3d * 365
-        else:
-            raise RuntimeError(f"Decide how/whether to calculate total irrigation for {v}")
-        v2_da.attrs['units'] = "m^3"
-        case['ds'][v2] = v2_da
-        
-        # Calculate total gridcell-level irrigation
-        v3 = v2.replace("PATCH", "GRID")
-        grid_index_var = 'patches1d_gi'
-        case['ds'][v3] = case['ds'][v2].groupby(case['ds'][grid_index_var]).sum().rename({grid_index_var: 'grid'})
-        case['ds'][v3].attrs = case['ds'][v2].attrs
-print("Done.")
+if incl_irrig:
+    print("Calculating irrigation totals...")
+    for i, (casename, case) in enumerate(cases.items()):
+        mms_to_m3d = reses[case['res']]['ds']['AREA_CFT'] * 1e-3 * 60*60*24
+        for v in case['ds']:
+            if "QIRRIG" not in v:
+                continue
+            
+            # Calculate total patch-level irrigation (mm/s → m3)
+            v2 = v.replace('QIRRIG', 'IRRIG')
+            v2_da = case['ds'][v].copy()
+            if v2_da.attrs['units'] != 'mm/s':
+                print(f"Not calculating total irrigation for {v} (units {v2_da.attrs['units']}, not mm/s")
+                continue
+            elif "MTH" in v:
+                print(f"Not calculating total irrigation for {v} (monthly-fying areas too memory-intensive)")
+                continue
+                days_in_month = v2_da['time_mth'].dt.days_in_month
+                v2_da *= days_in_month * mms_to_m3d
+            elif "ANN" in v:
+                v2_da *= mms_to_m3d * 365
+            else:
+                raise RuntimeError(f"Decide how/whether to calculate total irrigation for {v}")
+            v2_da.attrs['units'] = "m^3"
+            case['ds'][v2] = v2_da
+            
+            # Calculate total gridcell-level irrigation
+            v3 = v2.replace("PATCH", "GRID")
+            grid_index_var = 'patches1d_gi'
+            case['ds'][v3] = case['ds'][v2].groupby(case['ds'][grid_index_var]).sum().rename({grid_index_var: 'grid'})
+            case['ds'][v3].attrs = case['ds'][v2].attrs
+    print("Done.")
 
 
 # %% Import GGCMI sowing and harvest dates, and check sims
@@ -548,8 +553,9 @@ else:
 
 cases = global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, equalize_scatter_axes=equalize_scatter_axes, extra=extra, figsize=figsize, include_scatter=include_scatter, include_shiftsens=include_shiftsens, min_viable_hui_list=min_viable_hui, mxmats=mxmats_tmp, noFigs=noFigs, ny=2, nx=4, obs_for_fig=obs_for_fig, plot_y1=plot_y1, plot_yN=plot_yN, remove_scatter_bias=remove_scatter_bias, stats_round=stats_round, use_annual_yields=use_annual_yields, w=w)
 
-# global_timeseries_irrig("IRRIG_DEMAND_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
-# global_timeseries_irrig("IRRIG_APPLIED_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
+if incl_irrig:
+    global_timeseries_irrig("IRRIG_DEMAND_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
+    global_timeseries_irrig("IRRIG_APPLIED_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
 
 
 # %% Make maps of individual crops (rainfed, irrigated)

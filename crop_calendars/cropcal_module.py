@@ -1650,7 +1650,7 @@ def import_rx_dates(var_prefix, date_inFile, dates_ds, set_neg1_to_nan=True):
 
 
 def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mgdcrop_list(), 
-                        sdates_rx_ds=None, gdds_rx_ds=None, verbose=False):
+                  sdates_rx_ds=None, gdds_rx_ds=None, verbose=False, incl_irrig=True):
     # Import
     this_ds = utils.import_ds(filename,
                                 myVars=myVars,
@@ -1780,7 +1780,7 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
     # Import monthly use and demand, if present
     pattern = os.path.join(os.path.dirname(filename), "*.h2.*.nc")
     irrig_file_patches = glob.glob(pattern)
-    if irrig_file_patches:
+    if incl_irrig and irrig_file_patches:
         if len(irrig_file_patches) > 1:
             raise RuntimeError(f"Expected at most 1 *.h2.*.nc; found {len(irrig_file_patches)}")
         irrig_file_patches = irrig_file_patches[0]
