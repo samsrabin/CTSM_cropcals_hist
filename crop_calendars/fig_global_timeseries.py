@@ -540,6 +540,9 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
         ydata_prod_shiftR = cc.shift_sim_timeseries(ydata_prod, "R", inds_obs, inds_sim)
         ydata_yield_shiftL = cc.shift_sim_timeseries(ydata_yield, "L", inds_obs, inds_sim)
         ydata_yield_shiftR = cc.shift_sim_timeseries(ydata_yield, "R", inds_obs, inds_sim)
+        ydata_yield_biased = ydata_yield
+        ydata_yield_biased_shiftL = ydata_yield_shiftL
+        ydata_yield_biased_shiftR = ydata_yield_shiftR
         
         # Now ignore the outer timesteps to ensure the same years are being considered
         yearList_shifted = yearList[1:-1]
@@ -550,21 +553,33 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
         # Get detrended data
         if w == 0:
             r = 1
-            ydata_yield_dt = signal.detrend(ydata_yield, axis=1)
-            ydata_yield_shiftL_dt = signal.detrend(ydata_yield_shiftL, axis=1)
-            ydata_yield_shiftR_dt = signal.detrend(ydata_yield_shiftR, axis=1)
-            if not remove_scatter_bias:
-                ydata_yield_bias = np.mean(ydata_yield, axis=1, keepdims=True)
-                ydata_yield_dt += ydata_yield_bias
-                ydata_yield_shiftL_dt += ydata_yield_bias
-                ydata_yield_shiftR_dt += ydata_yield_bias
+            ydata_yield_debiased_dt = signal.detrend(ydata_yield, axis=1)
+            ydata_yield_debiased_shiftL_dt = signal.detrend(ydata_yield_shiftL, axis=1)
+            ydata_yield_debiased_shiftR_dt = signal.detrend(ydata_yield_shiftR, axis=1)
+            ydata_yield_bias = np.mean(ydata_yield, axis=1, keepdims=True)
+            ydata_yield_biased_dt = ydata_yield_debiased_dt + ydata_yield_bias
+            ydata_yield_biased_shiftL_dt = ydata_yield_debiased_shiftL_dt + ydata_yield_bias
+            ydata_yield_biased_shiftR_dt = ydata_yield_debiased_shiftR_dt + ydata_yield_bias
         elif w==-1:
             raise RuntimeError("Specify w ≥ 0")
         else:
             r = cc.get_window_radius(w)
-            ydata_yield_dt = cc.christoph_detrend(ydata_yield, w, center0=remove_scatter_bias)
-            ydata_yield_shiftL_dt = cc.christoph_detrend(ydata_yield_shiftL, w, center0=remove_scatter_bias)
-            ydata_yield_shiftR_dt = cc.christoph_detrend(ydata_yield_shiftR, w, center0=remove_scatter_bias)
+            center0 = True
+            ydata_yield_debiased_dt = cc.christoph_detrend(ydata_yield, w, center0=center0)
+            ydata_yield_debiased_shiftL_dt = cc.christoph_detrend(ydata_yield_shiftL, w, center0=center0)
+            ydata_yield_debiased_shiftR_dt = cc.christoph_detrend(ydata_yield_shiftR, w, center0=center0)
+            center0 = False
+            ydata_yield_biased_dt = cc.christoph_detrend(ydata_yield, w, center0=center0)
+            ydata_yield_biased_shiftL_dt = cc.christoph_detrend(ydata_yield_shiftL, w, center0=center0)
+            ydata_yield_biased_shiftR_dt = cc.christoph_detrend(ydata_yield_shiftR, w, center0=center0)
+        if remove_scatter_bias:
+            ydata_yield_dt = ydata_yield_debiased_dt
+            ydata_yield_shiftL_dt = ydata_yield_debiased_shiftL_dt
+            ydata_yield_shiftR_dt = ydata_yield_debiased_shiftR_dt
+        else:
+            ydata_yield_dt = ydata_yield_biased_dt
+            ydata_yield_shiftL_dt = ydata_yield_biased_shiftL_dt
+            ydata_yield_shiftR_dt = ydata_yield_biased_shiftR_dt
         yearList_shifted_dt = yearList_shifted[r:-r]
         ydata_yield_sdt = signal.detrend(ydata_yield, axis=1) + np.mean(ydata_yield, axis=1, keepdims=True)
         
@@ -587,6 +602,12 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
         ydata_yield_dt = ydata_yield_dt[:,yearList_shifted_dt_ok]
         ydata_yield_shiftL_dt = ydata_yield_shiftL_dt[:,yearList_shifted_dt_ok]
         ydata_yield_shiftR_dt = ydata_yield_shiftR_dt[:,yearList_shifted_dt_ok]
+        ydata_yield_biased = ydata_yield_biased[:,yearList_shifted_ok]
+        ydata_yield_biased_shiftL = ydata_yield_biased_shiftL[:,yearList_shifted_ok]
+        ydata_yield_biased_shiftR = ydata_yield_biased_shiftR[:,yearList_shifted_ok]
+        ydata_yield_biased_dt = ydata_yield_biased_dt[:,yearList_shifted_dt_ok]
+        ydata_yield_biased_shiftL_dt = ydata_yield_biased_shiftL_dt[:,yearList_shifted_dt_ok]
+        ydata_yield_biased_shiftR_dt = ydata_yield_biased_shiftR_dt[:,yearList_shifted_dt_ok]
         
         bias0 = None
         for o in inds_obs:
@@ -639,6 +660,8 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
         ydata_prod_touse = ydata_prod.copy()
         ydata_yield_touse = ydata_yield.copy()
         ydata_yield_dt_touse = ydata_yield_dt.copy()
+        ydata_yield_biased_touse = ydata_yield.copy()
+        ydata_yield_biased_dt_touse = ydata_yield_biased_dt.copy()
         corrcoef_ref_touse = corrcoef_ref.copy()
         shift_symbols = []
         for i,s in enumerate(inds_sim):
@@ -656,6 +679,8 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                 ydata_prod_touse[s,:] = ydata_prod_shiftL[s,:]
                 ydata_yield_touse[s,:] = ydata_yield_shiftL[s,:]
                 ydata_yield_dt_touse[s,:] = ydata_yield_shiftL_dt[s,:]
+                ydata_yield_biased_touse[s,:] = ydata_yield_biased_shiftL[s,:]
+                ydata_yield_biased_dt_touse[s,:] = ydata_yield_biased_shiftL_dt[s,:]
                 corrcoef_ref_touse[i] = corrcoefL_ref[i]
                 shift_symbols.append("$^L$")
             elif Rshift_better:
@@ -665,6 +690,8 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                 ydata_prod_touse[s,:] = ydata_prod_shiftR[s,:]
                 ydata_yield_touse[s,:] = ydata_yield_shiftR[s,:]
                 ydata_yield_dt_touse[s,:] = ydata_yield_shiftR_dt[s,:]
+                ydata_yield_biased_touse[s,:] = ydata_yield_biased_shiftR[s,:]
+                ydata_yield_biased_dt_touse[s,:] = ydata_yield_biased_shiftR_dt[s,:]
                 corrcoef_ref_touse[i] = corrcoefR_ref[i]
                 shift_symbols.append("$^R$")
             else:
@@ -672,9 +699,9 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
 
         # Get shifted bias
         o = fig_caselist.index(obs_for_fig)
-        bias_shifted = cc.get_timeseries_bias(ydata_yield_dt_touse[inds_sim,:], ydata_yield_dt_touse[o,:], fig_caselist, weights=ydata_prod[o,:])
-        bias_shiftL = cc.get_timeseries_bias(ydata_yield_shiftL_dt[inds_sim,:], ydata_yield_dt_touse[o,:], fig_caselist, weights=ydata_prod[o,:])
-        bias_shiftR = cc.get_timeseries_bias(ydata_yield_shiftR_dt[inds_sim,:], ydata_yield_dt_touse[o,:], fig_caselist, weights=ydata_prod[o,:])
+        bias_shifted = cc.get_timeseries_bias(ydata_yield_biased_dt_touse[inds_sim,:], ydata_yield_biased_dt_touse[o,:], fig_caselist, weights=ydata_prod[o,:])
+        bias_shiftL = cc.get_timeseries_bias(ydata_yield_biased_shiftL_dt[inds_sim,:], ydata_yield_biased_dt_touse[o,:], fig_caselist, weights=ydata_prod[o,:])
+        bias_shiftR = cc.get_timeseries_bias(ydata_yield_biased_shiftR_dt[inds_sim,:], ydata_yield_biased_dt_touse[o,:], fig_caselist, weights=ydata_prod[o,:])
         
         # Make plots for this crop
         if not noFigs:
