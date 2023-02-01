@@ -21,7 +21,7 @@ from matplotlib import cm
 from matplotlib.ticker import MultipleLocator
 
 fontsize = {'axis_label': 28,
-            'suptitle': 24,
+            'suptitle': 36,
             'title': 30,
             'tick_label': 24}
 max_yticks = 8 # Should depend on fontsize['tick_label']
@@ -233,7 +233,7 @@ def finishup_allcrops_scatter(c, ny, nx, axes_this, f_this, suptitle, outDir_fig
         suptitle += " (limited season length)"
         
     f_this.suptitle(suptitle,
-                    x = 0.1, horizontalalignment = 'left',
+                    x = 0.5, y=0.05, horizontalalignment = 'center',
                     fontsize=fontsize['suptitle'])
     
     # Get the handles of just the points (i.e., not including regression lines)    
