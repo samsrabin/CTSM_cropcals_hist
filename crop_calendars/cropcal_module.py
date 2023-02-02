@@ -1776,43 +1776,41 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
     this_ds_gs = this_ds_gs.assign_coords({'cftime': this_ds['time_bounds'].isel({'hist_interval': 0})})
     this_ds_gs = this_ds_gs.assign_coords({"time": [t.year for t in this_ds_gs['cftime'].values]})
     
-    # Import monthly use and demand, if present
-    pattern = os.path.join(os.path.dirname(filename), "*.h2.*.nc")
-    irrig_file_patches = glob.glob(pattern)
-    if incl_irrig and irrig_file_patches:
-        if len(irrig_file_patches) > 1:
-            raise RuntimeError(f"Expected at most 1 *.h2.*.nc; found {len(irrig_file_patches)}")
-        irrig_file_patches = irrig_file_patches[0]
-        irrig_ds_patches = utils.import_ds(irrig_file_patches, myVegtypes=myVegtypes, chunks={'time': 12},
-                                           myVars = ['QIRRIG_DEMAND', 'QIRRIG_DRIP', 'QIRRIG_SPRINKLER'])
-        
-        # Trim to years of interest
-        # Time axis shows END of time period; fix this.
-        new_time = [x[0] for x in irrig_ds_patches.time_bounds.values]
-        irrig_ds_patches = irrig_ds_patches
-        irrig_ds_patches = irrig_ds_patches.assign_coords(time=new_time)
-        irrig_ds_patches = irrig_ds_patches.sel(time=slice(f"{y1}-01-01", f"{yN+1}-12-31"))
-        
-        time_mth_dimname = "time_mth"
-        this_ds_gs["QIRRIG_DEMAND_PATCH_MTH"] = irrig_ds_patches["QIRRIG_DEMAND"].rename({'time': time_mth_dimname})
-        this_ds_gs["QIRRIG_APPLIED_PATCH_MTH"] = irrig_ds_patches["QIRRIG_DRIP"].rename({'time': time_mth_dimname}) \
-                                               + irrig_ds_patches["QIRRIG_SPRINKLER"].rename({'time': time_mth_dimname})
-        this_ds_gs['QIRRIG_APPLIED_PATCH_MTH'].attrs = this_ds_gs['QIRRIG_DEMAND_PATCH_MTH'].attrs
-        this_ds_gs["QIRRIG_APPLIED_PATCH_MTH"].attrs['long_name'] = 'water added via drip or sprinkler irrigation'
-                
-        # Calculate unfulfilled demand
-        this_ds_gs['QIRRIG_UNFULFILLED_PATCH_MTH'] = this_ds_gs['QIRRIG_DEMAND_PATCH_MTH'] - this_ds_gs['QIRRIG_APPLIED_PATCH_MTH']
-        this_ds_gs['QIRRIG_UNFULFILLED_PATCH_MTH'].attrs = this_ds_gs['QIRRIG_DEMAND_PATCH_MTH'].attrs
-        this_ds_gs['QIRRIG_UNFULFILLED_PATCH_MTH'].attrs['long_name'] = 'irrigation demand unable to be filled'
-                
-        # Calculate yearly means
-        for v in ["QIRRIG_DEMAND_PATCH_MTH", "QIRRIG_APPLIED_PATCH_MTH", "QIRRIG_UNFULFILLED_PATCH_MTH"]:
-            v2 = v.replace('MTH', 'ANN')
-            v2_da = utils.weighted_annual_mean(this_ds_gs[v], time_in='time_mth')
-            this_ds_gs[v2] = v2_da.assign_coords({'time': this_ds_gs.time})
-            if np.any(~np.isnan(this_ds_gs[v].values)) and not np.any(~np.isnan(this_ds_gs[v2].values)):
-                raise RuntimeError("Annual mean turned into all NaN")
-            this_ds_gs[v2].attrs = this_ds_gs[v].attrs
+    # Import irrigation data, if doing so
+    if incl_irrig:
+    
+        # Monthly use and demand
+        pattern = os.path.join(os.path.dirname(filename), "*.h2.*.nc")
+        irrig_file_patches = glob.glob(pattern)
+        if irrig_file_patches:
+            if len(irrig_file_patches) > 1:
+                raise RuntimeError(f"Expected at most 1 *.h2.*.nc; found {len(irrig_file_patches)}")
+            irrig_file_patches = irrig_file_patches[0]
+            irrig_ds_patches = utils.import_ds(irrig_file_patches, myVegtypes=myVegtypes, chunks={'time': 12},
+                                            myVars = ['QIRRIG_DEMAND', 'QIRRIG_DRIP', 'QIRRIG_SPRINKLER'])
+            irrig_ds_patches = time_units_and_trim_mth(irrig_ds_patches, y1, yN)
+            
+            # Combine drip + sprinkler irrigation
+            irrig_ds_patches["QIRRIG_APPLIED"] = irrig_ds_patches["QIRRIG_DRIP"]+ irrig_ds_patches["QIRRIG_SPRINKLER"]
+            irrig_ds_patches['QIRRIG_APPLIED'].attrs = irrig_ds_patches['QIRRIG_DEMAND'].attrs
+            irrig_ds_patches["QIRRIG_APPLIED"].attrs['long_name'] = 'water added via drip or sprinkler irrigation'
+            
+            # Calculate unfulfilled demand
+            irrig_ds_patches["QIRRIG_UNFULFILLED"] = irrig_ds_patches['QIRRIG_DEMAND'] - irrig_ds_patches['QIRRIG_APPLIED']
+            irrig_ds_patches['QIRRIG_UNFULFILLED'].attrs = irrig_ds_patches['QIRRIG_DEMAND'].attrs
+            irrig_ds_patches['QIRRIG_UNFULFILLED'].attrs['long_name'] = 'irrigation demand unable to be filled'
+            
+            vars_to_save = ["QIRRIG_DEMAND", "QIRRIG_APPLIED", "QIRRIG_UNFULFILLED"]
+            
+            # Append _PATCH to distinguish from eventual gridcell sums (_GRID)
+            rename_dict = {}
+            for v in vars_to_save:
+                rename_dict[v] = v + "_PATCH"
+            irrig_ds_patches = irrig_ds_patches.rename(rename_dict)
+            vars_to_save = [v + "_PATCH" for v in vars_to_save]
+            
+            # Finish processing
+            this_ds_gs = process_monthly_irrig(this_ds_gs, irrig_ds_patches, vars_to_save)
         
     return this_ds_gs
 
@@ -1987,6 +1985,28 @@ def print_onepatch_wrongNgs(p, this_ds_orig, sdates_ymp, hdates_ymp, sdates_pym,
         print_nopandas(sdates_pg2[p,:], hdates_pg2[p,:], 'After "Ignore any harvests that were planted in the final year, because some cells will have incomplete growing seasons for the final year"')
     
     print("\n\n")
+
+
+def process_monthly_irrig(ds, irrig_ds, varList):
+    if not isinstance(varList, list):
+        varList = [varList]
+        
+    # Rename and copy to main ds
+    time_mth_dimname = "time_mth"
+    for v in varList:
+        ds[f"{v}_MTH"] = irrig_ds[v].rename({'time': time_mth_dimname})
+    varList = [v + "_MTH" for v in varList]
+    
+    # Calculate yearly means
+    for v in varList:
+        v2 = v.replace('MTH', 'ANN')
+        v2_da = utils.weighted_annual_mean(ds[v], time_in='time_mth')
+        ds[v2] = v2_da.assign_coords({'time': ds.time})
+        if np.any(~np.isnan(ds[v].values)) and not np.any(~np.isnan(ds[v2].values)):
+            raise RuntimeError(f"Annual mean for {v} turned into all NaN")
+        ds[v2].attrs = ds[v].attrs
+    
+    return ds
 
 
 def remove_outliers(gridded_da):
@@ -2165,6 +2185,16 @@ def time_units_and_trim(ds, y1, yN, dt_type):
     ds = ds.sel(time=slice(f"{y1}-01-01", f"{yN}-01-01"))
         
     return ds
+
+
+# Trim monthly dataset to years of interest
+def time_units_and_trim_mth(ds, y1, yN):
+    # Time axis shows END of time period; fix this.
+    new_time = [x[0] for x in ds.time_bounds.values]
+    ds = ds.assign_coords(time=new_time)
+    
+    return ds.sel(time=slice(f"{y1}-01-01", f"{yN+1}-12-31"))
+
 
 # kwargs like gridded_ds_dim='ungridded_target_ds_dim'
 # e.g.: lon='patches1d_ixy', lat='patches1d_jxy'
