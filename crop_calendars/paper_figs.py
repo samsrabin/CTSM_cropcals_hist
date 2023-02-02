@@ -244,34 +244,42 @@ print("Done.")
 if incl_irrig:
     print("Calculating irrigation totals...")
     for i, (casename, case) in enumerate(cases.items()):
-        mms_to_m3d = reses[case['res']]['ds']['AREA_CFT'] * 1e-3 * 60*60*24
+        mms_to_m3d = 1e-3 * 60*60*24
+        mms_to_m3d_patch = reses[case['res']]['ds']['AREA_CFT'] * mms_to_m3d
+        mms_to_m3d_grid = case['ds']['AREA_GRID'] * mms_to_m3d
         for v in case['ds']:
-            if "QIRRIG" not in v:
+            if "QIRRIG" not in v or "_FRAC_" in v:
                 continue
             
             # Calculate total patch-level irrigation (mm/s → m3)
             v2 = v.replace('QIRRIG', 'IRRIG')
             v2_da = case['ds'][v].copy()
             if v2_da.attrs['units'] != 'mm/s':
-                print(f"Not calculating total irrigation for {v} (units {v2_da.attrs['units']}, not mm/s")
+                print(f"Not calculating total for {v} (units {v2_da.attrs['units']}, not mm/s)")
                 continue
             elif "MTH" in v:
-                print(f"Not calculating total irrigation for {v} (monthly-fying areas too memory-intensive)")
+                print(f"Not calculating total for {v} (monthly-fying areas too memory-intensive)")
                 continue
                 days_in_month = v2_da['time_mth'].dt.days_in_month
-                v2_da *= days_in_month * mms_to_m3d
+                v2_da *= days_in_month * mms_to_m3d_patch
             elif "ANN" in v:
-                v2_da *= mms_to_m3d * 365
+                if "PATCH" in v:
+                    v2_da *= mms_to_m3d_patch * 365
+                elif "GRID" in v:
+                    v2_da *= mms_to_m3d_grid * 365
+                else:
+                    raise RuntimeError(f"Unsure how to get total for {v}")
             else:
-                raise RuntimeError(f"Decide how/whether to calculate total irrigation for {v}")
+                raise RuntimeError(f"Decide how/whether to calculate total for {v}")
             v2_da.attrs['units'] = "m^3"
             case['ds'][v2] = v2_da
             
-            # Calculate total gridcell-level irrigation
-            v3 = v2.replace("PATCH", "GRID")
-            grid_index_var = 'patches1d_gi'
-            case['ds'][v3] = case['ds'][v2].groupby(case['ds'][grid_index_var]).sum().rename({grid_index_var: 'grid'})
-            case['ds'][v3].attrs = case['ds'][v2].attrs
+            # Calculate total gridcell-level irrigation for included crops
+            if "PATCH" in v2:
+                v3 = v2.replace("PATCH", "GRID")
+                grid_index_var = 'patches1d_gi'
+                case['ds'][v3] = case['ds'][v2].groupby(case['ds'][grid_index_var]).sum().rename({grid_index_var: 'grid'})
+                case['ds'][v3].attrs = case['ds'][v2].attrs
     print("Done.")
 
 

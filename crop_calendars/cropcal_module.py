@@ -1812,6 +1812,73 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
             # Finish processing
             this_ds_gs = process_monthly_irrig(this_ds_gs, irrig_ds_patches, vars_to_save)
         
+        # Monthly withdrawals and availability
+        pattern = os.path.join(os.path.dirname(filename), "*.h3.*.nc")
+        irrig_file_grid = glob.glob(pattern)
+        if irrig_file_grid:
+            if len(irrig_file_grid) > 1:
+                raise RuntimeError(f"Expected at most 1 *.h3.*.nc; found {len(irrig_file_grid)}")
+            irrig_file_grid = irrig_file_grid[0]
+            irrig_ds_grid = utils.import_ds(irrig_file_grid, chunks={'time': 12},
+                                            myVars = ['area', 'grid1d_ixy', 'grid1d_jxy', 'grid1d_lon', 'grid1d_lat', 'QIRRIG_FROM_GW_CONFINED', 'QIRRIG_FROM_GW_UNCONFINED', 'QIRRIG_FROM_SURFACE', 'VOLRMCH'])
+            irrig_ds_grid = time_units_and_trim_mth(irrig_ds_grid, y1, yN)
+            
+            # Ensure that no groundwater was used
+            if np.any(irrig_ds_grid['QIRRIG_FROM_GW_CONFINED'] + irrig_ds_grid['QIRRIG_FROM_GW_UNCONFINED'] > 0):
+                raise RuntimeError("Unexpectedly found some irrigation using groundwater")
+            
+            # Rename this variable so that it has a QIRRIG prefix
+            irrig_ds_grid = irrig_ds_grid.rename({"VOLRMCH": "QIRRIG_SUPPLY"})
+            irrig_ds_grid["QIRRIG_SUPPLY"].attrs['long_name'] = irrig_ds_grid["QIRRIG_SUPPLY"].attrs['long_name'] + " (aka VOLRMCH)"
+            
+            vars_to_save = ['QIRRIG_FROM_SURFACE', 'QIRRIG_SUPPLY']
+            
+            # Append _GRID to distinguish from patch-level irrigation data
+            rename_dict = {}
+            for v in vars_to_save:
+                rename_dict[v] = v + "_GRID"
+            irrig_ds_grid = irrig_ds_grid.rename(rename_dict)
+            vars_to_save = [v + "_GRID" for v in vars_to_save]
+            
+            # Finish processing
+            this_ds_gs = process_monthly_irrig(this_ds_gs, irrig_ds_grid, vars_to_save)
+            
+            # Calculate irrigation as fraction of main river channel volume
+            # (Do it here instead of process_monthly_irrig() because monthly doesn't add to annual.)
+            for t in ['MTH', 'ANN']:
+                this_ds_gs[f'QIRRIG_FROM_SURFACE_FRAC_RIVER_GRID_{t}'] = this_ds_gs[f'QIRRIG_FROM_SURFACE_GRID_{t}'] / this_ds_gs[f'QIRRIG_SUPPLY_GRID_{t}']
+                this_ds_gs[f'QIRRIG_FROM_SURFACE_FRAC_RIVER_GRID_{t}'] = this_ds_gs[f'QIRRIG_FROM_SURFACE_FRAC_RIVER_GRID_{t}'].assign_coords(this_ds_gs[f'QIRRIG_FROM_SURFACE_GRID_{t}'].coords)
+
+            # Ensure gridcells are same-ordered between patch- and gridcell-level datasets
+            this_ds_gs = this_ds_gs.assign_coords({'gridcell': this_ds_gs['gridcell'] + 1})
+            irrig_ds_grid = irrig_ds_grid.assign_coords({'gridcell': irrig_ds_grid['gridcell'] + 1})
+            test_gi = int(this_ds_gs['gridcell'].shape[0] / 3) # An arbitrary gridcell to test
+            test_g = irrig_ds_grid['gridcell'].values[test_gi]
+            test_pi = np.where(this_ds_gs['patches1d_gi'] == test_g)[0][0]
+            test_p_lon = this_ds_gs['patches1d_lon'].isel(patch=test_pi)
+            test_p_lat = this_ds_gs['patches1d_lat'].isel(patch=test_pi)
+            test_g_lon = irrig_ds_grid['grid1d_lon'].isel(gridcell=test_gi)
+            test_g_lat = irrig_ds_grid['grid1d_lat'].isel(gridcell=test_gi)
+            if test_p_lon != test_g_lon or test_p_lat != test_g_lat:
+                print(f"{test_p_lon} =? {test_g_lon}")
+                print(f"{test_p_lat} =? {test_g_lat}")
+                raise RuntimeError("Gridcell indexing mismatch")
+            
+            # Save gridcell info
+            for v in irrig_ds_grid:
+                if "grid" in v:
+                    this_ds_gs[v] = irrig_ds_grid[v]
+            
+            # Save gridcell area
+            this_ds_gs['AREA_GRID'] = ungrid(irrig_ds_grid['area'], irrig_ds_grid, target_dim="gridcell", lon="grid1d_ixy", lat="grid1d_jxy")
+            if this_ds_gs['AREA_GRID'].attrs['units'] != "m^2":
+                if this_ds_gs['AREA_GRID'].attrs['units'] == "km^2":
+                    to_m2 = 1e6
+                else:
+                    raise RuntimeError(f"Unsure how to convert {this_ds_gs['AREA_GRID'].attrs['units']} to m^2")
+                this_ds_gs['AREA_GRID'] *= to_m2
+                this_ds_gs['AREA_GRID'].attrs['units'] = "m^2"
+    
     return this_ds_gs
 
 
@@ -2198,32 +2265,35 @@ def time_units_and_trim_mth(ds, y1, yN):
 
 # kwargs like gridded_ds_dim='ungridded_target_ds_dim'
 # e.g.: lon='patches1d_ixy', lat='patches1d_jxy'
-def ungrid(gridded_xr, ungridded_target_ds, coords_var, **kwargs):
+def ungrid(gridded_xr, ungridded_target_ds, coords_var=None, target_dim="patch", **kwargs):
     
     # Remove any empties from ungridded_target_ds
     for key, selection in kwargs.items():
         if isinstance(ungridded_target_ds[selection].values[0], str):
             # print(f"Removing ungridded_target_ds patches where {selection} is empty")
             isel_list = [i for i, x in enumerate(ungridded_target_ds[selection]) if x != ""]
-            ungridded_target_ds = ungridded_target_ds.copy().isel({'patch': isel_list})
+            ungridded_target_ds = ungridded_target_ds.copy().isel({target_dim: isel_list})
             
             ### I don't think this is necessary
             # unique_ungridded_selection = ungridded_target_ds[selection].values
             # isel_list = [i for i, x in enumerate(gridded_xr[key].values) if x in unique_ungridded_selection]
             # gridded_xr = gridded_xr.isel({key: isel_list})
     
-    new_coords = ungridded_target_ds[coords_var].coords
+    if coords_var is not None:
+        new_coords = ungridded_target_ds[coords_var].coords
         
     isel_dict = {}
     for key, selection in kwargs.items():
         if key in ['lon', 'lat']:
             isel_dict[key] = xr.DataArray([int(x)-1 for x in ungridded_target_ds[selection].values],
-                                          dims = 'patch')
+                                          dims = target_dim)
         else:
             values_list = list(gridded_xr[key].values)
             isel_dict[key] = xr.DataArray([values_list.index(x) for x in ungridded_target_ds[selection].values],
-                                          dims = 'patch')
-    ungridded_da = gridded_xr.isel(isel_dict, drop=True).assign_coords(new_coords)
+                                          dims = target_dim)
+    ungridded_da = gridded_xr.isel(isel_dict, drop=True)
+    if coords_var is not None:
+        ungridded_da = ungridded_da.assign_coords(new_coords)
     return ungridded_da
 
 
