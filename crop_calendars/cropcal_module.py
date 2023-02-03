@@ -1943,10 +1943,35 @@ def open_lu_ds(filename, y1, yN, existing_ds, ungrid=True):
                                 drop=True)\
                             .assign_coords(new_coords)
     for v in existing_ds:
-        if "patches1d_" in v:
+        if "patches1d_" in v or "grid1d_" in v:
             ds[v] = existing_ds[v]
     ds['lon'] = dsg['lon']
     ds['lat'] = dsg['lat']
+    
+    # Which crops are irrigated?
+    is_irrigated = np.full_like(ds['patches1d_itype_veg'], False)
+    for vegtype_str in np.unique(ds['patches1d_itype_veg_str'].values):
+        if "irrigated" not in vegtype_str:
+            continue
+        vegtype_int = utils.ivt_str2int(vegtype_str)
+        is_this_vegtype = np.where(ds['patches1d_itype_veg'].values == vegtype_int)[0]
+        is_irrigated[is_this_vegtype] = True
+    ["irrigated" in x for x in ds['patches1d_itype_veg_str'].values]
+    ds['IRRIGATED'] = xr.DataArray(data=is_irrigated,
+                                   coords=ds['patches1d_itype_veg_str'].coords,
+                                   attrs={'long_name': 'Is patch irrigated?'})
+    
+    # How much area is irrigated?
+    ds['IRRIGATED_AREA_CFT'] = ds['IRRIGATED'] * ds['AREA_CFT']
+    ds['IRRIGATED_AREA_CFT'].attrs = {'long name': 'CFT area (irrigated types only)',
+                                      'units': 'm^2'}
+    ds['IRRIGATED_AREA_GRID'] = (ds['IRRIGATED_AREA_CFT']
+                                 .groupby(ds['patches1d_gi'])
+                                 .sum()
+                                 .rename({'patches1d_gi': 'gridcell'}))
+    ds['IRRIGATED_AREA_GRID'].attrs = {'long name': 'Irrigated area in gridcell',
+                                      'units': 'm^2'}
+    
     return ds
     
 
