@@ -84,6 +84,9 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
         
         if ticklabels is not None:
             cbar.set_ticks(ticklabels)
+            if units.lower() == "month":
+                cbar.set_ticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
+                units == "Month"
         elif cbar_max is not None and im.get_clim()[1] > cbar_max:
             ticks = cbar.get_ticks()
             if ticks[-2] > cbar_max:
@@ -95,7 +98,8 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
             cbar.ax.set_xticklabels(ticklabels)
         cbar.set_label(label=units, fontsize=fontsize['axislabels'])
         cbar.ax.tick_params(labelsize=fontsize['ticklabels'])
-     
+        if "month" in units.lower():
+            cbar.ax.tick_params(length=0)
     
     
     if lonlat_bin_width:

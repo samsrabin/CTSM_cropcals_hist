@@ -322,7 +322,35 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                     extend = "neither"
                 else:
                     vrange = [1, 365]
-        else:
+        elif units == "month":
+            if plotting_diffs:
+                this_map_vals = (this_map - refcase_map).values
+                this_map_vals[this_map_vals > 6] -= 12
+                this_map_vals[this_map_vals < -6] += 12
+                this_map = xr.DataArray(data = this_map_vals,
+                                        coords = this_map.coords,
+                                        attrs = this_map.attrs)
+                
+                if diff_cmap:
+                    cmap = diff_cmap
+                else:
+                    cmap = diverging_map
+                    
+                manual_colors = True
+                bounds = np.arange(-6.5, 7.5, 1)
+                cmap_to_use = cm.get_cmap(cmap)
+                extend = "neither"
+                ticklabels_to_use = np.arange(-6,7,1)
+                units="months"
+            else:
+                manual_colors = True
+                bounds = np.arange(0.5, 13.5, 1)
+                cmap_to_use = cm.get_cmap('twilight_shifted')
+                extend = "neither"
+                ticklabels_to_use = np.arange(1,13,1)
+                units = "Month"
+                
+        else: # other units
             if time_dim in this_map.dims:
                 this_map = this_map.mean(dim=time_dim)
             this_map *= var_info['multiplier']
@@ -469,7 +497,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
         
         # Get colormap
         abs_cmap = abs_cmap_default
-        if "DATE" in this_var:
+        if "DATE" in this_var or "PKMTH" in this_var:
             abs_cmap = "twilight_shifted"
         if ("YIELD" in this_var or "PROD" in this_var) and ref_casename:
             diff_cmap = "BrBG"
@@ -545,6 +573,10 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                 cbar_ax = fig.add_axes(cbar_pos)
                 fig.tight_layout()
                 cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=units)
+                if "PKMTH" in this_var:
+                    cb.set_ticks(np.arange(1,13))
+                    cb.set_ticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
+                    cb.ax.tick_params(length=0)
                 cb.ax.tick_params(labelsize=fontsize['ticklabels'])
                 cb.set_label(units, fontsize=fontsize['titles'])
             

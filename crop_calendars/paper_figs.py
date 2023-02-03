@@ -707,6 +707,11 @@ varList = {
         'time_dim':   'time',
         'units':      'km$^3$ yr$^-1$',
         'multiplier': 1e-9},
+    'QIRRIG_DEMAND_PATCH_PKMTH': {
+        'suptitle':   'Mean irrigation water demand: Peak month',
+        'time_dim':   "time", # Only used to set label "Year"
+        'units':      'month',
+        'multiplier': 1},
 }
 
 nx = 2
