@@ -247,10 +247,25 @@ if incl_irrig:
     print("Calculating irrigation totals...")
     for i, (casename, case) in enumerate(cases.items()):
         mms_to_m3d = 1e-3 * 60*60*24
-        mms_to_m3d_patch = reses[case['res']]['ds']['AREA_CFT'] * mms_to_m3d
+        area_cft = reses[case['res']]['ds']['AREA_CFT']
+        
+        area_cft_timemax = area_cft.max(dim="time")
+        area_irrig_grid_timemax =  reses[case['res']]['ds']['IRRIGATED_AREA_GRID'].max(dim="time")
+        mms_to_m3d_patch = area_cft * mms_to_m3d
         mms_to_m3d_grid = case['ds']['AREA_GRID'] * mms_to_m3d
         for v in case['ds']:
-            if "QIRRIG" not in v or "_FRAC_" in v:
+            if "QIRRIG" not in v:
+                continue
+            
+            # Mask where no area
+            if "patch" in case['ds'][v].dims:
+                case['ds'][v] = case['ds'][v].where(area_cft_timemax > 0)
+            elif "gridcell" in case['ds'][v].dims:
+                case['ds'][v] = case['ds'][v].where(area_irrig_grid_timemax > 0)
+            else:
+                print(f"Unable to mask no-area members of {v}")
+            
+            if "_FRAC_" in v:
                 continue
             
             # Calculate total patch-level irrigation (mm/s → m3)
