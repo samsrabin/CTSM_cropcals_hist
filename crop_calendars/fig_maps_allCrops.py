@@ -98,8 +98,9 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
         lu_ds = reses[case0['res']]['ds']
 
         # Get mean production over period of interest
-        ds0 = cc.get_yield_ann(ds0, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
-        ds1 = cc.get_yield_ann(ds1, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
+        if "PROD" in thisVar or "YIELD" in thisVar:
+            ds0 = cc.get_yield_ann(ds0, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
+            ds1 = cc.get_yield_ann(ds1, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
 
         this_ds = ds1.copy()
         if is_diffdiff:
@@ -111,8 +112,8 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             if undiff_prod_var in this_ds:
                 this_ds[diff_prod_var] = np.fabs(ds1[undiff_prod_var]) - np.fabs(ds0[undiff_prod_var])
         else:
-            this_ds['YIELD_ANN_DIFF'] = ds1['YIELD_ANN'] - ds0['YIELD_ANN']
-            this_ds['PROD_ANN_DIFF'] = ds1['PROD_ANN'] - ds0['PROD_ANN']
+            thisVar_base = thisVar.replace("_DIFF", "")
+            this_ds[thisVar] = ds1[thisVar_base] - ds0[thisVar_base]
         this_ds = this_ds\
                 .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
         
