@@ -512,6 +512,8 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
         abs_cmap = abs_cmap_default
         if "DATE" in this_var or "PKMTH" in this_var:
             abs_cmap = "twilight_shifted"
+        elif "IRRIG" in this_var:
+            abs_cmap = "plasma_r"
         if ("YIELD" in this_var or "PROD" in this_var) and ref_casename:
             diff_cmap = "BrBG"
         else:
