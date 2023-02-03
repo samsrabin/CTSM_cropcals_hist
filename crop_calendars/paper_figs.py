@@ -702,6 +702,11 @@ varList = {
         'time_dim':   'gs',
         'units':      'fraction',
         'multiplier': 1},
+    'IRRIG_DEMAND_PATCH_ANN': {
+        'suptitle':   'Mean irrigation water demand',
+        'time_dim':   'time',
+        'units':      'km$^3$ yr$^-1$',
+        'multiplier': 1e-9},
 }
 
 nx = 2
