@@ -98,7 +98,7 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
             cbar.ax.set_xticklabels(ticklabels)
         cbar.set_label(label=units, fontsize=fontsize['axislabels'])
         cbar.ax.tick_params(labelsize=fontsize['ticklabels'])
-        if "month" in units.lower():
+        if units is not None and "month" in units.lower():
             cbar.ax.tick_params(length=0)
     
     
