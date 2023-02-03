@@ -1599,7 +1599,7 @@ min_viable_hui = "ggcmi3"
 
 
 for (this_var, var_info) in varList.items():
-    cases = maps_allCrops(cases, these_cases, reses, this_var, var_info, outDir_figs, cropList_combined_clm_nototal, min_viable_hui=min_viable_hui)
+    cases = maps_allCrops(cases, these_cases, reses, this_var, var_info, outDir_figs, cropList_combined_clm_nototal, min_viable_hui=min_viable_hui, ny=3, nx=2, figsize=(14,16))
 
 print("Done.")
 

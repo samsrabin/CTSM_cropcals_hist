@@ -66,13 +66,37 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
             vmin = None
             vmax = None
         im, cb = make_map(ax, this_map.where(area_map_sum>1e4), fontsize, show_cbar=True, vmin=vmin, vmax=vmax, cmap=cmap, extend_nonbounds=None)
-        cb.set_label(label=varInfo['units'], fontsize=fontsize['axislabels'])
-        ax.set_title(crop, fontsize=fontsize['titles'])
         
+        show_cbar_label = True
+        cbar_label_x = 0.5
+        cbar_labelpad = 0.4
+        if ny==3 and nx==2:
+            cbar_labelpad = -33
+            cbar_label_x = 1.098
+            if c % 2:
+                show_cbar_label = False
+        if show_cbar_label:
+            cb.set_label(label=varInfo['units'], fontsize=fontsize['axislabels'], x=cbar_label_x, labelpad=cbar_labelpad)
+        
+        ax.set_title(crop, fontsize=fontsize['titles'])
+    
+    hspace = None
+    suptitle_y = 0.98
+    if ny==3 and nx==2:
+        hspace = -0.4
+        this_suptitle = this_suptitle.replace(": ", ":\n")
+        suptitle_y = 0.79
+    elif ny==2 and nx==3:
+        hspace = 0
+        suptitle_y = 0.82
+    
     fig.suptitle(this_suptitle,
                 fontsize=fontsize['suptitle'],
-                y=0.82)
-    plt.subplots_adjust(hspace=0)
+                y=suptitle_y)
+    plt.subplots_adjust(hspace=hspace)
+    
+    # plt.show()
+    # return
 
     fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)
     plt.close()
