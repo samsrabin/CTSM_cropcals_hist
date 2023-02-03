@@ -297,8 +297,61 @@ if incl_irrig:
                 grid_index_var = 'patches1d_gi'
                 case['ds'][v3] = case['ds'][v2].groupby(case['ds'][grid_index_var]).sum().rename({grid_index_var: 'grid'})
                 case['ds'][v3].attrs = case['ds'][v2].attrs
-    print("Done.")
+        
+# Calculate monthly climatological means
+any_so_far = False
+for casename, case in cases.items():
+    for v in case['ds']:
+        if "time_mth" not in case['ds'][v].dims or "MTHMEANS" in v:
+            continue
+        if not any_so_far:
+            print("Calculating monthly climatological means...")
+            any_so_far = True
+        if "MTH" not in v:
+            raise RuntimeError(f"Unsure how to rename {v}")
+        v2 = v.replace('MTH', 'MTHMEANS')
+        case['ds'][v2] = case['ds'][v].groupby(case['ds']['time_mth'].dt.month).mean()
+        case['ds'][v2].attrs = case['ds'][v].attrs
+        if 'long_name' in case['ds'][v].attrs:
+            case['ds'][v2].attrs['long_name'] += " (monthly climatological mean)"
 
+# Calculate peak months
+any_so_far = False
+for casename, case in cases.items():
+    for v in case['ds']:
+        if "month" not in case['ds'][v].dims:
+            continue
+        if not any_so_far:
+            print("Calculating peak months...")
+            any_so_far = True
+        
+        thismax = case['ds'][v].max(dim="month")
+        
+        # Get pkmonth array
+        if "patch" in case['ds'][v].dims:
+            shapevar = 'patches1d_lon'
+        elif "gridcell" in case['ds'][v].dims:
+            shapevar = 'grid1d_lon'
+        else:
+            raise RuntimeError(f"Decide how/whether to calculate peak months for {v}")
+        pkmonth = np.full(case['ds'][shapevar].shape, np.nan)
+        if np.all(np.isnan(thismax)):
+            raise RuntimeError("thismax is all NaN")
+        for m in np.arange(1,13):
+            thismonth_is_max = np.where(np.isclose(case['ds'][v].sel(month=m), thismax))[0]
+            pkmonth[thismonth_is_max] = m
+        if np.any((pkmonth <= 0) & (~np.isnan(thismax))):
+            raise RuntimeError("Error filling pkmonth")
+        
+        # Save as DataArray
+        if "MTHMEANS" not in v:
+            raise RuntimeError(f"Unsure how to rename {v}")
+        v2 = v.replace("MTHMEANS", "PKMTH")
+        case['ds'][v2] = xr.DataArray(data=pkmonth,
+                                      coords=case['ds'][shapevar].coords,
+                                      attrs={'units': 'peak month'})
+        
+print("Done")
 
 # %% Import GGCMI sowing and harvest dates, and check sims
 
