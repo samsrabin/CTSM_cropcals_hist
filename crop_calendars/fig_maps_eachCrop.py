@@ -34,16 +34,17 @@ def add_rowcol_labels(axes, fig_caselist, fontsize, nx, ny, rx_row_label):
         axes[a].yaxis.set_label_coords(-0.05, 0.5)
 
     # Add column labels
-    topmost = np.arange(nx)
-    column_labels = ['Rainfed', 'Irrigated']
-    for a, ax in enumerate(axes):
-        if a not in topmost:
-            nearest_topmost = a % nx
-            axes[a].sharex(axes[nearest_topmost])
-    for i, a in enumerate(topmost):
-        axes[a].set_title(f"{column_labels[i]}",
-                        fontsize=fontsize['titles'],
-                        y=1.1)
+    if nx > 1:
+        topmost = np.arange(nx)
+        column_labels = ['Rainfed', 'Irrigated']
+        for a, ax in enumerate(axes):
+            if a not in topmost:
+                nearest_topmost = a % nx
+                axes[a].sharex(axes[nearest_topmost])
+        for i, a in enumerate(topmost):
+            axes[a].set_title(f"{column_labels[i]}",
+                            fontsize=fontsize['titles'],
+                            y=1.1)
 
 
 def get_colorbar_chunks(im, ax, this_var, cmap_name, is_diff):
@@ -179,14 +180,17 @@ def get_rx_case(cases, fig_caselist, ny, this_var):
     return rx_parent_casename, rx_ds, rx_row_label, ny
 
 
-def get_figure_info(ny, ref_casename):
+def get_figure_info(ny, nx, ref_casename):
     hspace = None
     if ny == 1:
         print("WARNING: Check that the layout looks good for ny == 1")
         figsize = (24, 7.5)	  # width, height
         suptitle_ypos = 0.85
     elif ny == 2:
-        figsize = (15, 8.5)		# width, height
+        if nx == 1:
+            figsize = (10, 8.5)		# width, height
+        else:
+            figsize = (15, 8.5)		# width, height
         if ref_casename:
             suptitle_xpos = 0.515
             suptitle_ypos = 0.95
@@ -387,51 +391,55 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
             if not np.any(np.abs(this_map) > 0):
                 print(f'		{casename} identical to {ref_casename}!')
                 cbar_units += ": None!"
-            
+        
         rainfed_types = [x for x in found_types if "irrigated" not in x]
-        subplot_num = nx*c+1
-        subplot_str = chr(ord('`') + subplot_num) # or ord('@') for capital
-        if new_axes:
-            ax = fig.add_subplot(ny,nx,subplot_num,projection=ccrs.PlateCarree(), ylabel="mirntnt")
-            axes.append(ax)
-            cb = None
-        else:
-            ax = axes[i*2]
-            cb = cbs[i*2]
-        thisCrop = thisCrop_main
-        this_map_sel = this_map.copy().sel(ivt_str=thisCrop)
-        if plotting_diffs and not new_axes and force_diffmap_within_vrange:
-            this_map_sel_vals = this_map_sel.copy().values
-            this_map_sel_vals[np.where(this_map_sel_vals < diff_vmin)] = diff_vmin
-            this_map_sel_vals[np.where(this_map_sel_vals > diff_vmax)] = diff_vmax
-            this_map_sel = xr.DataArray(data=this_map_sel_vals,
-                                        coords=this_map_sel.coords,
-                                        attrs=this_map_sel.attrs)
-            if extend is None:
-                extend = "both"
-        elif extend is None:
-            extend = "neither"
-        if cmap_to_use is None:
-            cmap_to_use = cmap
-        
-        # Check current map's extremes against previous extremes
-        if plotting_diffs:
-            allmaps_diff_min = min(allmaps_diff_min, np.nanmin(this_map_sel))
-            allmaps_diff_max = max(allmaps_diff_max, np.nanmax(this_map_sel))
-        else:
-            allmaps_min = min(allmaps_min, np.nanmin(this_map_sel))
-            allmaps_max = max(allmaps_max, np.nanmax(this_map_sel))
-        
-        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, subplot_label=subplot_str, cbar_max=cbar_max)
-        if new_axes:
-            ims.append(im)
-            cbs.append(cb)
-        else:
-            ims[i*2] = im
-            cbs[i*2] = cb
+        if len(rainfed_types) > 0:
+            subplot_num = nx*c+1
+            subplot_str = chr(ord('`') + subplot_num) # or ord('@') for capital
+            if new_axes:
+                ax = fig.add_subplot(ny,nx,subplot_num,projection=ccrs.PlateCarree(), ylabel="mirntnt")
+                axes.append(ax)
+                cb = None
+            else:
+                ax = axes[i*2]
+                cb = cbs[i*2]
+            thisCrop = thisCrop_main
+            this_map_sel = this_map.copy().sel(ivt_str=thisCrop)
+            if plotting_diffs and not new_axes and force_diffmap_within_vrange:
+                this_map_sel_vals = this_map_sel.copy().values
+                this_map_sel_vals[np.where(this_map_sel_vals < diff_vmin)] = diff_vmin
+                this_map_sel_vals[np.where(this_map_sel_vals > diff_vmax)] = diff_vmax
+                this_map_sel = xr.DataArray(data=this_map_sel_vals,
+                                            coords=this_map_sel.coords,
+                                            attrs=this_map_sel.attrs)
+                if extend is None:
+                    extend = "both"
+            elif extend is None:
+                extend = "neither"
+            if cmap_to_use is None:
+                cmap_to_use = cmap
+            
+            # Check current map's extremes against previous extremes
+            if plotting_diffs:
+                allmaps_diff_min = min(allmaps_diff_min, np.nanmin(this_map_sel))
+                allmaps_diff_max = max(allmaps_diff_max, np.nanmax(this_map_sel))
+            else:
+                allmaps_min = min(allmaps_min, np.nanmin(this_map_sel))
+                allmaps_max = max(allmaps_max, np.nanmax(this_map_sel))
+            
+            im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, subplot_label=subplot_str, cbar_max=cbar_max)
+            if new_axes:
+                ims.append(im)
+                cbs.append(cb)
+            else:
+                ims[i*2] = im
+                cbs[i*2] = cb
 
         irrigated_types = [x for x in found_types if "irrigated" in x]
-        subplot_num = nx*c+2
+        if len(rainfed_types) > 0:
+            subplot_num = nx*c+2
+        else:
+            subplot_num = nx*c+1
         subplot_str = chr(ord('`') + subplot_num) # or ord('@') for capital
         if new_axes:
             ax = fig.add_subplot(ny,nx,subplot_num,projection=ccrs.PlateCarree())
@@ -483,9 +491,14 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
     return units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors
 
 
-def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_viable_hui, mxmats_tmp, nx, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList, chunk_colorbar=False):
+def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_viable_hui, mxmats_tmp, nx_in, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList, chunk_colorbar=False):
 
     for (this_var, var_info) in varList.items():
+        
+        if "IRRIG" in this_var:
+            nx = nx_in - 1
+        else:
+            nx = nx_in
         
         if var_info['time_dim'] == "time":
             yrange_str = f'{plot_y1}-{plot_yN}'
@@ -527,7 +540,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
             fig_caselist = [ref_casename] + [x for x in fig_caselist if x != ref_casename]
         
         # Now set some figure parameters based on # cases
-        cbar_pos, figsize, hspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos = get_figure_info(ny, ref_casename)
+        cbar_pos, figsize, hspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos = get_figure_info(ny, nx, ref_casename)
 
         for thisCrop_main in clm_types:
             this_suptitle = thisCrop_main.capitalize() + ": " + suptitle
@@ -552,6 +565,8 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
             
             print(f'    {thisCrop_out}...')
             found_types = [x for x in clm_types_rfir if thisCrop_main in x]
+            if "IRRIG" in this_var:
+                found_types = [x for x in found_types if "irrigated" in x]
             
             c = -1
             fig = plt.figure(figsize=figsize)
