@@ -805,13 +805,16 @@ def detrend(ps_in):
     return ps_out
 
 
-def equalize_colorbars(ims, center0=False, this_var=None):
-    vmin = np.inf
-    vmax = -np.inf
-    nims = len(ims)
-    for im in ims:
-        vmin = min(vmin, im.get_clim()[0])
-        vmax = max(vmax, im.get_clim()[1])
+def equalize_colorbars(ims, center0=False, this_var=None, vrange=None):
+    if vrange is None:
+        vmin = np.inf
+        vmax = -np.inf
+        for im in ims:
+            vmin = min(vmin, im.get_clim()[0])
+            vmax = max(vmax, im.get_clim()[1])
+    else:
+        vmin = vrange[0]
+        vmax = vrange[1]
     
     extend = "neither"
     if this_var == "HUIFRAC" and vmax > 1:
