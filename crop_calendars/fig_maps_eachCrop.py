@@ -601,6 +601,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                 plt.subplots_adjust(hspace=hspace)
             
             # plt.show()
+            # return
             
             fig.savefig(fig_outfile,
                         bbox_inches='tight', facecolor='white', dpi=dpi)
