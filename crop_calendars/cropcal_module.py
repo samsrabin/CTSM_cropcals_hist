@@ -815,16 +815,16 @@ def equalize_colorbars(ims, center0=False, this_var=None):
     
     extend = "neither"
     if this_var == "HUIFRAC" and vmax > 1:
-            vmax = 1
-            extend = "max"
+        vmax = 1
+        extend = "max"
     
     if center0:
-            v = np.max(np.abs([vmin, vmax]))
-            vmin = -v
-            vmax = v
+        v = np.max(np.abs([vmin, vmax]))
+        vmin = -v
+        vmax = v
     
-    for i in np.arange(nims):
-        ims[i].set_clim(vmin, vmax)
+    for im in ims:
+        im.set_clim(vmin, vmax)
     
     vrange = [vmin, vmax]
     
