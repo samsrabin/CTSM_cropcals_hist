@@ -21,6 +21,7 @@ from matplotlib import cm
 from matplotlib.ticker import MultipleLocator
 
 fontsize = {'axis_label': 28,
+            'legend': 28,
             'suptitle': 36,
             'title': 30,
             'tick_label': 24}
@@ -53,7 +54,7 @@ def get_figs_axes(ny, nx, figsize, sharex=True):
     return f_list, axes_list
 
 
-def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel, y1, yN, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None):
+def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel, y1, yN, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None, show_legend=False, ylabel_xcoord=-0.125):
     
     da = xr.DataArray(data = ydata_this,
                             coords = {'Case': caselist,
@@ -119,12 +120,17 @@ def make_1crop_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
     else:
         ax_this.set_xlabel("")
     ax_this.set_ylabel(ylabel, fontsize=fontsize['axis_label'])
-    ax_this.yaxis.set_label_coords(-0.125, 0.5)
-    if ax_this.get_legend():
+    ax_this.yaxis.set_label_coords(ylabel_xcoord, 0.5)
+    if not show_legend and ax_this.get_legend():
         ax_this.get_legend().remove()
+    elif show_legend:
+        ax_this.legend(handles = ax_this.lines,
+                    labels = caselist,
+                    loc = None,
+                    fontsize=fontsize['legend'])
 
 
-def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabel, ylabel, equalize_scatter_axes, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None):
+def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabel, ylabel, equalize_scatter_axes, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None):
     
     for i, casename in enumerate(caselist):
         if "CLM Default" in casename:
@@ -194,10 +200,13 @@ def make_1crop_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabe
         ax_this.get_legend().remove()
 
 
-def finishup_allcrops_lines(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=None, hide_suptitle=True):
+def finishup_lines(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=None, hide_suptitle=True, filename=None):
     # Delete unused axes, if any
-    for a in np.arange(c+1, ny*nx):
-        f_this.delaxes(axes_this[a])
+    if isinstance(axes_this, np.ndarray):
+        for a in np.arange(c+1, ny*nx):
+            f_this.delaxes(axes_this[a])
+    elif not isinstance(axes_this, np.ndarray):
+        axes_this = np.array([axes_this])
         
     if mxmat_limited:
         suptitle += " (limited season length)"
@@ -207,11 +216,12 @@ def finishup_allcrops_lines(c, ny, nx, axes_this, f_this, suptitle, outDir_figs,
                         x = 0.1, horizontalalignment = 'left',
                         fontsize=fontsize['suptitle'])
     
-    f_this.legend(handles = axes_this[0].lines,
-                  labels = fig_caselist,
-                  loc = "upper center",
-                  ncol = int(np.ceil(len(fig_caselist)/2)),
-                  fontsize=28)
+    if fig_caselist is not None:
+        f_this.legend(handles = axes_this[0].lines,
+                    labels = fig_caselist,
+                    loc = "upper center",
+                    ncol = int(np.ceil(len(fig_caselist)/2)),
+                    fontsize=fontsize['legend'])
     
     min_viable_hui_str = ""
     if min_viable_hui_list is not None and min_viable_hui_list != ["ggcmi3"]:
@@ -219,12 +229,14 @@ def finishup_allcrops_lines(c, ny, nx, axes_this, f_this, suptitle, outDir_figs,
         for x in min_viable_hui_list:
             min_viable_hui_str += "_" + str(x)
 
-    f_this.savefig(outDir_figs + "Timeseries " + suptitle + " by crop" + min_viable_hui_str + ".pdf",
+    if filename is None:
+        filename = "Timeseries " + suptitle + " by crop" + min_viable_hui_str + ".pdf"
+    f_this.savefig(os.path.join(outDir_figs, filename),
                    bbox_inches='tight')
     plt.close(f_this)
 
 
-def finishup_allcrops_scatter(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, mxmat_limited, fig_caselist, inds_sim):
+def finishup_scatter(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, mxmat_limited, fig_caselist, inds_sim):
     # Delete unused axes, if any
     for a in np.arange(c+1, ny*nx):
         f_this.delaxes(axes_this[a])
@@ -243,7 +255,7 @@ def finishup_allcrops_scatter(c, ny, nx, axes_this, f_this, suptitle, outDir_fig
                   labels = [fig_caselist[x] for x in inds_sim],
                   loc = "upper center",
                   ncol = int(np.ceil(len(fig_caselist)/2)),
-                  fontsize=28)
+                  fontsize=fontsize['legend'])
 
     f_this.savefig(outDir_figs + "Scatter " + suptitle + " by crop.pdf",
                    bbox_inches='tight')
@@ -319,7 +331,7 @@ def get_CLM_ts_prod_y(case, lu_ds, use_annual_yields, min_viable_hui, mxmats, th
 
 
 
-def global_timeseries_irrig(thisVar, cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=False, ny=2, nx=4, plot_y1=1980, plot_yN=2010):
+def global_timeseries_irrig_inclcrops(thisVar, cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=False, ny=2, nx=4, plot_y1=1980, plot_yN=2010):
     
     if not noFigs:
         # f_lines_area, axes_lines_area = get_figs_axes(ny, nx, figsize)
@@ -376,16 +388,53 @@ def global_timeseries_irrig(thisVar, cases, reses, cropList_combined_clm, outDir
         if not noFigs:
             xlabel = "Year"
             subplot_str = chr(ord('`') + c+1) # or ord('@') for capital
-            # make_1crop_lines(ax_lines_area, ydata_area, fig_caselist, thisCrop_clm, "Mha", xlabel, plot_y1, plot_yN)
-            make_1crop_lines(ax_lines_irrig, ydata_irrig, fig_caselist, thisCrop_clm, "km$^3$", xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
+            # make_1plot_lines(ax_lines_area, ydata_area, fig_caselist, thisCrop_clm, "Mha", xlabel, plot_y1, plot_yN)
+            make_1plot_lines(ax_lines_irrig, ydata_irrig, fig_caselist, thisCrop_clm, "km$^3$", xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
             
     # Finish up and save
     if not noFigs:
         print("Finishing and saving...")
-        # finishup_allcrops_lines(c, ny, nx, axes_lines_area, f_lines_area, "Global crop area", outDir_figs, fig_caselist)
-        finishup_allcrops_lines(c, ny, nx, axes_lines_irrig, f_lines_irrig, f"Global irrigation {thisVar.split('_')[1].lower()}", outDir_figs, None, fig_caselist)
+        # finishup_lines(c, ny, nx, axes_lines_area, f_lines_area, "Global crop area", outDir_figs, fig_caselist)
+        finishup_lines(c, ny, nx, axes_lines_irrig, f_lines_irrig, f"Global irrigation {thisVar.split('_')[1].lower()}", outDir_figs, None, fig_caselist)
 
     print("Done.")
+    
+
+def global_timeseries_irrig_allcrops(thisVar, cases, outDir_figs, figsize=(35, 18), noFigs=False, plot_y1=1980, plot_yN=2010):
+    
+    if not noFigs:
+        f = plt.figure(figsize=figsize, facecolor="white")
+        ax = f.add_axes([0,0,1,1])
+        
+    # Get included cases
+    fig_caselist = [x for x in cases]
+    for casename in fig_caselist:
+        if thisVar not in cases[casename]['ds']:
+            fig_caselist.remove(casename)
+    
+    # CLM outputs
+    first_case = True
+    for casename, case in cases.items():
+        if casename not in fig_caselist:
+            continue
+        ts_thisVar_y = case['ds'][thisVar].sum(dim="gridcell") * 1e-9 # m3 to km3
+        ts_thisVar_y = ts_thisVar_y.sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+        
+        # Save
+        if first_case:
+            ydata_thisVar = np.expand_dims(ts_thisVar_y.values, axis=0)
+            first_case = False
+        else:
+            ydata_thisVar = np.concatenate((ydata_thisVar,
+                                            np.expand_dims(ts_thisVar_y.values, axis=0)),
+                                           axis=0)
+    
+    # Make figure
+    if not noFigs:
+        xlabel = "Year"
+        figtitle = "Global irrigation withdrawals"
+        make_1plot_lines(ax, ydata_thisVar, fig_caselist, figtitle, "km$^3$", xlabel, plot_y1, plot_yN, show_legend=True, ylabel_xcoord=-0.075)
+        finishup_lines(None, 1, 1, ax, f, "", outDir_figs, False, None, filename=figtitle+".pdf")
 
 
 def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, \
@@ -721,11 +770,11 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                 ylabel_area = "Global area (Mha)"
                 ylabel_prod = "Global production (Mt)"
                 ylabel_yield = label_yield
-            make_1crop_lines(ax_lines_area, ydata_area_touse, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
+            make_1plot_lines(ax_lines_area, ydata_area_touse, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
             if include_shiftsens:
-                make_1crop_lines(ax_lines_area_orig, ydata_area, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
-                make_1crop_lines(ax_lines_area_shiftL, ydata_area_shiftL, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
-                make_1crop_lines(ax_lines_area_shiftR, ydata_area_shiftR, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
+                make_1plot_lines(ax_lines_area_orig, ydata_area, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
+                make_1plot_lines(ax_lines_area_shiftL, ydata_area_shiftL, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
+                make_1plot_lines(ax_lines_area_shiftR, ydata_area_shiftR, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
             if no_xlabel:
                 xlabel = None
             elif yield_time_dim == "Year":
@@ -735,26 +784,26 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             noshift_symbols = ["", ""]
             shiftL_symbols = ["$^L$", "$^L$"]
             shiftR_symbols = ["$^R$", "$^R$"]
-            make_1crop_lines(ax_lines_prod, ydata_prod_touse, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shift_symbols, subplot_label=subplot_str)
+            make_1plot_lines(ax_lines_prod, ydata_prod_touse, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shift_symbols, subplot_label=subplot_str)
             if len(min_viable_hui_list) > 1:
                 bias_shifted = None
-            make_1crop_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=bias_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
-            make_1crop_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=bias_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
+            make_1plot_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=bias_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
+            make_1plot_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=bias_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
             
             if include_shiftsens:
-                make_1crop_lines(ax_lines_prod_orig, ydata_prod, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=noshift_symbols, subplot_label=subplot_str)
-                make_1crop_lines(ax_lines_prod_shiftL, ydata_prod_shiftL, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
-                make_1crop_lines(ax_lines_prod_shiftR, ydata_prod_shiftR, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
+                make_1plot_lines(ax_lines_prod_orig, ydata_prod, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=noshift_symbols, subplot_label=subplot_str)
+                make_1plot_lines(ax_lines_prod_shiftL, ydata_prod_shiftL, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
+                make_1plot_lines(ax_lines_prod_shiftR, ydata_prod_shiftR, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
                 if len(min_viable_hui_list) > 1:
                     bias0 = None
                     bias_shiftL = None
                     bias_shiftR = None
-                make_1crop_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=bias_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
-                make_1crop_lines(ax_lines_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftL, stats_round=bias_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
-                make_1crop_lines(ax_lines_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftR, stats_round=bias_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
-                make_1crop_lines(ax_lines_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=bias_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
-                make_1crop_lines(ax_lines_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftL, stats_round=bias_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
-                make_1crop_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftR, stats_round=bias_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
+                make_1plot_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=bias_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
+                make_1plot_lines(ax_lines_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftL, stats_round=bias_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
+                make_1plot_lines(ax_lines_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftR, stats_round=bias_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
+                make_1plot_lines(ax_lines_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=bias_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
+                make_1plot_lines(ax_lines_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftL, stats_round=bias_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
+                make_1plot_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftR, stats_round=bias_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
             
             # Scatter plots
             if include_scatter:
@@ -768,38 +817,38 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                     xlabel_yield_scatter = label_yield
                     if remove_scatter_bias:
                         xlabel_yield_scatter += ", bias removed"
-                make_1crop_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref_touse, stats_round=corrcoef_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
+                make_1plot_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref_touse, stats_round=corrcoef_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
                 if include_shiftsens:
-                    make_1crop_scatter(ax_scatter_yield_dt_orig, ydata_yield_dt[o,:], ydata_yield_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref, stats_round=corrcoef_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
-                    make_1crop_scatter(ax_scatter_yield_dt_shiftL, ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm,xlabel_yield_scatter,  ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffL, stats_round=corrcoef_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
-                    make_1crop_scatter(ax_scatter_yield_dt_shiftR, ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffR, stats_round=corrcoef_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
+                    make_1plot_scatter(ax_scatter_yield_dt_orig, ydata_yield_dt[o,:], ydata_yield_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref, stats_round=corrcoef_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
+                    make_1plot_scatter(ax_scatter_yield_dt_shiftL, ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm,xlabel_yield_scatter,  ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffL, stats_round=corrcoef_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
+                    make_1plot_scatter(ax_scatter_yield_dt_shiftR, ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffR, stats_round=corrcoef_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
             
     # Finish up and save
     if not noFigs:
         print("Finishing and saving...")
-        finishup_allcrops_lines(c, ny, nx, axes_lines_area, f_lines_area, "Global crop area", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
-        finishup_allcrops_lines(c, ny, nx, axes_lines_prod, f_lines_prod, "Global crop production", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
-        finishup_allcrops_lines(c, ny, nx, axes_lines_yield, f_lines_yield, "Global crop yield", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
-        finishup_allcrops_lines(c, ny, nx, axes_lines_yield_dt, f_lines_yield_dt, "Global crop yield (detrended)", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+        finishup_lines(c, ny, nx, axes_lines_area, f_lines_area, "Global crop area", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+        finishup_lines(c, ny, nx, axes_lines_prod, f_lines_prod, "Global crop production", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+        finishup_lines(c, ny, nx, axes_lines_yield, f_lines_yield, "Global crop yield", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+        finishup_lines(c, ny, nx, axes_lines_yield_dt, f_lines_yield_dt, "Global crop yield (detrended)", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
         if include_shiftsens:
-            finishup_allcrops_lines(c, ny, nx, axes_lines_area_orig, f_lines_area_orig, "Global crop area no-shift", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
-            finishup_allcrops_lines(c, ny, nx, axes_lines_area_shiftL, f_lines_area_shiftL, "Global crop area shiftL", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
-            finishup_allcrops_lines(c, ny, nx, axes_lines_area_shiftR, f_lines_area_shiftR, "Global crop area shiftR", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
-            finishup_allcrops_lines(c, ny, nx, axes_lines_prod_orig, f_lines_prod_orig, "Global crop production no-shift", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
-            finishup_allcrops_lines(c, ny, nx, axes_lines_prod_shiftL, f_lines_prod_shiftL, "Global crop production shiftL", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
-            finishup_allcrops_lines(c, ny, nx, axes_lines_prod_shiftR, f_lines_prod_shiftR, "Global crop production shiftR", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
-            finishup_allcrops_lines(c, ny, nx, axes_lines_yield_orig, f_lines_yield_orig, "Global crop yield no-shift", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
-            finishup_allcrops_lines(c, ny, nx, axes_lines_yield_shiftL, f_lines_yield_shiftL, "Global crop yield shiftL", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
-            finishup_allcrops_lines(c, ny, nx, axes_lines_yield_shiftR, f_lines_yield_shiftR, "Global crop yield shiftR", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
-            finishup_allcrops_lines(c, ny, nx, axes_lines_yield_dt_orig, f_lines_yield_dt_orig, "Global crop yield (detrended) no-shift", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
-            finishup_allcrops_lines(c, ny, nx, axes_lines_yield_dt_shiftL, f_lines_yield_dt_shiftL, "Global crop yield (detrended) shiftL", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
-            finishup_allcrops_lines(c, ny, nx, axes_lines_yield_dt_shiftR, f_lines_yield_dt_shiftR, "Global crop yield (detrended) shiftR", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+            finishup_lines(c, ny, nx, axes_lines_area_orig, f_lines_area_orig, "Global crop area no-shift", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+            finishup_lines(c, ny, nx, axes_lines_area_shiftL, f_lines_area_shiftL, "Global crop area shiftL", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+            finishup_lines(c, ny, nx, axes_lines_area_shiftR, f_lines_area_shiftR, "Global crop area shiftR", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+            finishup_lines(c, ny, nx, axes_lines_prod_orig, f_lines_prod_orig, "Global crop production no-shift", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+            finishup_lines(c, ny, nx, axes_lines_prod_shiftL, f_lines_prod_shiftL, "Global crop production shiftL", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+            finishup_lines(c, ny, nx, axes_lines_prod_shiftR, f_lines_prod_shiftR, "Global crop production shiftR", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+            finishup_lines(c, ny, nx, axes_lines_yield_orig, f_lines_yield_orig, "Global crop yield no-shift", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+            finishup_lines(c, ny, nx, axes_lines_yield_shiftL, f_lines_yield_shiftL, "Global crop yield shiftL", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+            finishup_lines(c, ny, nx, axes_lines_yield_shiftR, f_lines_yield_shiftR, "Global crop yield shiftR", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+            finishup_lines(c, ny, nx, axes_lines_yield_dt_orig, f_lines_yield_dt_orig, "Global crop yield (detrended) no-shift", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+            finishup_lines(c, ny, nx, axes_lines_yield_dt_shiftL, f_lines_yield_dt_shiftL, "Global crop yield (detrended) shiftL", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
+            finishup_lines(c, ny, nx, axes_lines_yield_dt_shiftR, f_lines_yield_dt_shiftR, "Global crop yield (detrended) shiftR", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
         if include_scatter:
-            finishup_allcrops_scatter(c, ny, nx, axes_scatter_yield_dt, f_scatter_yield_dt, "Global crop yield (detrended)", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
+            finishup_scatter(c, ny, nx, axes_scatter_yield_dt, f_scatter_yield_dt, "Global crop yield (detrended)", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
             if include_shiftsens:
-                finishup_allcrops_scatter(c, ny, nx, axes_scatter_yield_dt_orig, f_scatter_yield_dt_orig, "Global crop yield (detrended) no-shift", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
-                finishup_allcrops_scatter(c, ny, nx, axes_scatter_yield_dt_shiftL, f_scatter_yield_dt_shiftL, "Global crop yield (detrended) shiftL", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
-                finishup_allcrops_scatter(c, ny, nx, axes_scatter_yield_dt_shiftR, f_scatter_yield_dt_shiftR, "Global crop yield (detrended) shiftR", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
+                finishup_scatter(c, ny, nx, axes_scatter_yield_dt_orig, f_scatter_yield_dt_orig, "Global crop yield (detrended) no-shift", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
+                finishup_scatter(c, ny, nx, axes_scatter_yield_dt_shiftL, f_scatter_yield_dt_shiftL, "Global crop yield (detrended) shiftL", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
+                finishup_scatter(c, ny, nx, axes_scatter_yield_dt_shiftR, f_scatter_yield_dt_shiftR, "Global crop yield (detrended) shiftR", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
 
     print("Done.")
     return cases

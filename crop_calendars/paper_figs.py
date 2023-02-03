@@ -1,12 +1,14 @@
 # %% Setup
 
-which_cases = "main2.2022"
+# which_cases = "main2.2022"
+which_cases = "main2"
+# which_cases = "ctsm_lu_5.0_vs_5.2"
 # which_cases = "originalCLM"
 # which_cases = "originalBaseline" # As originalCLM, but without cmip6
 # which_cases = "diagnose"
 
 # Include irrigation?
-incl_irrig = False
+incl_irrig = True
 
 # Yields will be set to zero unless HUI at harvest is ≥ min_viable_hui
 min_viable_hui = 1
@@ -41,7 +43,7 @@ import re
 import importlib
 import pandas as pd
 import cftime
-from fig_global_timeseries import global_timeseries_yieldetc, global_timeseries_irrig
+from fig_global_timeseries import global_timeseries_yieldetc, global_timeseries_irrig_inclcrops, global_timeseries_irrig_allcrops
 from fig_maps_allCrops import *
 from fig_maps_eachCrop import maps_eachCrop
 
@@ -563,8 +565,9 @@ else:
 cases = global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, equalize_scatter_axes=equalize_scatter_axes, extra=extra, figsize=figsize, include_scatter=include_scatter, include_shiftsens=include_shiftsens, min_viable_hui_list=min_viable_hui, mxmats=mxmats_tmp, noFigs=noFigs, ny=2, nx=4, obs_for_fig=obs_for_fig, plot_y1=plot_y1, plot_yN=plot_yN, remove_scatter_bias=remove_scatter_bias, bias_round=bias_round, corrcoef_round=corrcoef_round, use_annual_yields=use_annual_yields, w=w)
 
 if incl_irrig:
-    global_timeseries_irrig("IRRIG_DEMAND_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
-    global_timeseries_irrig("IRRIG_APPLIED_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
+    global_timeseries_irrig_inclcrops("IRRIG_DEMAND_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
+    global_timeseries_irrig_inclcrops("IRRIG_APPLIED_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
+    global_timeseries_irrig_allcrops("IRRIG_FROM_SURFACE_GRID_ANN", cases, outDir_figs, figsize=(16,10), noFigs=noFigs, plot_y1=plot_y1, plot_yN=plot_yN)
 
 
 # %% Make maps of individual crops (rainfed, irrigated)
