@@ -227,6 +227,10 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
     else:
         cbar_max = None
     
+    allmaps_min = np.inf
+    allmaps_max = -np.inf
+    allmaps_diff_min = np.inf
+    allmaps_diff_max = -np.inf
     for i, casename in enumerate(fig_caselist):
         
         plotting_diffs = ref_casename and casename != ref_casename
@@ -381,6 +385,15 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
             extend = "neither"
         if cmap_to_use is None:
             cmap_to_use = cmap
+        
+        # Check current map's extremes against previous extremes
+        if plotting_diffs:
+            allmaps_diff_min = min(allmaps_diff_min, np.nanmin(this_map_sel))
+            allmaps_diff_max = max(allmaps_diff_max, np.nanmax(this_map_sel))
+        else:
+            allmaps_min = min(allmaps_min, np.nanmin(this_map_sel))
+            allmaps_max = max(allmaps_max, np.nanmax(this_map_sel))
+        
         im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, subplot_label=subplot_str, cbar_max=cbar_max)
         if new_axes:
             ims.append(im)
@@ -415,6 +428,15 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 extend = "neither"
         if cmap_to_use is None:
             cmap_to_use = cmap
+        
+        # Check current map's extremes against previous extremes
+        if plotting_diffs:
+            allmaps_diff_min = min(allmaps_diff_min, np.nanmin(this_map_sel))
+            allmaps_diff_max = max(allmaps_diff_max, np.nanmax(this_map_sel))
+        else:
+            allmaps_min = min(allmaps_min, np.nanmin(this_map_sel))
+            allmaps_max = max(allmaps_max, np.nanmax(this_map_sel))
+        
         im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, subplot_label=subplot_str, cbar_max=cbar_max)
         if new_axes:
             ims.append(im)
@@ -422,7 +444,15 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
         else:
             ims[i*2 + 1] = im
             cbs[i*2 + 1] = cb
-    return units, vrange, fig, ims, axes, cbs, manual_colors
+            
+    vrange = [allmaps_min, allmaps_max]
+    if not np.isinf(allmaps_diff_min):
+        vmax_diff = max(np.abs([allmaps_diff_min, allmaps_diff_max]))
+        vrange_diff = [-vmax_diff, vmax_diff]
+    else:
+        vrange_diff = None
+    
+    return units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors
 
 
 def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_viable_hui, mxmats_tmp, nx, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList, chunk_colorbar=False):
@@ -500,7 +530,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
             ims = []
             axes = []
             cbs = []
-            units, vrange, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, abs_cmap=abs_cmap, diff_cmap=diff_cmap)
+            units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, abs_cmap=abs_cmap, diff_cmap=diff_cmap)
 
             fig.suptitle(this_suptitle,
                             x = suptitle_xpos,
@@ -520,10 +550,10 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
             
             if not manual_colors:
                 if ref_casename:
-                    extend, eq_vrange = cc.equalize_colorbars(ims[:nx], this_var=this_var)
-                    extend, diff_eq_vrange = cc.equalize_colorbars(ims[nx:], this_var=this_var)
-                elif not vrange:
-                    extend, eq_vrange = cc.equalize_colorbars(ims, this_var=this_var)
+                    extend, eq_vrange = cc.equalize_colorbars(ims[:nx], this_var=this_var, vrange=vrange)
+                    extend, diff_eq_vrange = cc.equalize_colorbars(ims[nx:], this_var=this_var, vrange=vrange_diff)
+                else:
+                    extend, eq_vrange = cc.equalize_colorbars(ims, this_var=this_var, vrange=vrange)
                 
                 # Chunk colorbar
                 cbar_ticklabels = None
@@ -552,7 +582,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                         diff_Ncolors = None
                         diff_this_cmap = None
                         diff_cbar_ticklabels = None
-                    units, vrange, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange)
+                    units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange)
                 
                 # Redraw all-subplot colorbar 
                 if not ref_casename:
