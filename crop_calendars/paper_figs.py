@@ -265,7 +265,7 @@ if incl_irrig:
             else:
                 print(f"Unable to mask no-area members of {v}")
             
-            if "_FRAC_" in v:
+            if "_FRAC_" in v or "_MTHMEANS" in v or "_PKMONTH" in v:
                 continue
             
             # Calculate total patch-level irrigation (mm/s → m3)
@@ -319,7 +319,7 @@ for casename, case in cases.items():
 any_so_far = False
 for casename, case in cases.items():
     for v in case['ds']:
-        if "month" not in case['ds'][v].dims:
+        if "month" not in case['ds'][v].dims or "_PKMONTH" in v:
             continue
         if not any_so_far:
             print("Calculating peak months...")
