@@ -241,7 +241,7 @@ for i, (casename, case) in enumerate(cases.items()):
 print("Done.")
  
 
-# %% Calculate irrigation totals
+# %% Calculate irrigation totals and/or monthly climatological means
 
 if incl_irrig:
     print("Calculating irrigation totals...")
@@ -274,7 +274,7 @@ if incl_irrig:
             if v2_da.attrs['units'] != 'mm/s':
                 print(f"Not calculating total for {v} (units {v2_da.attrs['units']}, not mm/s)")
                 continue
-            elif "MTH" in v:
+            elif "time_mth" in case['ds'][v].dims:
                 print(f"Not calculating total for {v} (monthly-fying areas too memory-intensive)")
                 continue
                 days_in_month = v2_da['time_mth'].dt.days_in_month
