@@ -246,15 +246,16 @@ print("Done.")
 if incl_irrig:
     print("Calculating irrigation totals...")
     for i, (casename, case) in enumerate(cases.items()):
-        mms_to_m3d = 1e-3 * 60*60*24
+        mms_to_mmd = 60*60*24
+        mmd_to_m3d = 1e-3
         area_cft = reses[case['res']]['ds']['AREA_CFT']
         
         area_cft_timemax = area_cft.max(dim="time")
         area_irrig_grid_timemax =  reses[case['res']]['ds']['IRRIGATED_AREA_GRID'].max(dim="time")
-        mms_to_m3d_patch = area_cft * mms_to_m3d
-        mms_to_m3d_grid = case['ds']['AREA_GRID'] * mms_to_m3d
+        mmd_to_m3d_patch = area_cft * mmd_to_m3d
+        mmd_to_m3d_grid = case['ds']['AREA_GRID'] * mmd_to_m3d
         for v in case['ds']:
-            if "QIRRIG" not in v:
+            if "QIRRIG" not in v or "_PKMTH" in v:
                 continue
             
             # Mask where no area
@@ -268,22 +269,31 @@ if incl_irrig:
             if "_FRAC_" in v or "_MTHMEANS" in v or "_PKMONTH" in v:
                 continue
             
+            # Convert mm/s to mm/day
+            v_da = case['ds'][v]
+            if v_da.attrs['units'] == 'mm/s':
+                v_da *= mms_to_mmd
+                v_da.attrs['units'] = "mm/d"
+            else:
+                print(f"Not calculating total for {v} (units {v_da.attrs['units']}, not mm/s)")
+                continue
+            
             # Calculate total patch-level irrigation (mm/s → m3)
             v2 = v.replace('QIRRIG', 'IRRIG')
             v2_da = case['ds'][v].copy()
-            if v2_da.attrs['units'] != 'mm/s':
-                print(f"Not calculating total for {v} (units {v2_da.attrs['units']}, not mm/s)")
-                continue
+            if v2_da.attrs['units'] != 'mm/d':
+                raise RuntimeError(f"How are {v} units {v2_da.attrs['units']} not mm/d?")
             elif "time_mth" in case['ds'][v].dims:
                 print(f"Not calculating total for {v} (monthly-fying areas too memory-intensive)")
                 continue
                 days_in_month = v2_da['time_mth'].dt.days_in_month
                 v2_da *= days_in_month * mms_to_m3d_patch
-            elif "ANN" in v:
+            
+            if "ANN" in v:
                 if "PATCH" in v:
-                    v2_da *= mms_to_m3d_patch * 365
+                    v2_da *= mmd_to_m3d_patch * 365
                 elif "GRID" in v:
-                    v2_da *= mms_to_m3d_grid * 365
+                    v2_da *= mmd_to_m3d_grid * 365
                 else:
                     raise RuntimeError(f"Unsure how to get total for {v}")
             else:
