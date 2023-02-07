@@ -1055,10 +1055,11 @@ print("Done.")
  
     
 # %% Make line plots, FAOSTAT vs. CLM, of top 10 countries for each crop
+importlib.reload(cc)
 
 # Yield settings
-min_viable_hui = 1.0
-mxmat_limited = True
+min_viable_hui = "ggcmi3"
+mxmat_limited = False
 
 Ntop = 10
 # top_y1 = 1961 # First year of FAO data
@@ -1067,9 +1068,9 @@ top_yN = 2009
 overwrite = True
 portrait = False
 
-# which_to_plot = "Yield"
+which_to_plot = "Yield"
 # which_to_plot = "Detrended yield"
-which_to_plot = "Yield anomaly"
+# which_to_plot = "Yield anomaly"
 
 if mxmat_limited:
     mxmats_tmp = mxmats
