@@ -242,18 +242,20 @@ print("Done.")
  
 
 # %% Calculate irrigation totals and/or monthly climatological means
+def get_case_info_for_irrig_totals(case, reses):
+    mmd_to_m3d = 1e-3
+    area_cft = reses[case['res']]['ds']['AREA_CFT']
+    area_cft_timemax = area_cft.max(dim="time")
+    area_irrig_grid_timemax =  reses[case['res']]['ds']['IRRIGATED_AREA_GRID'].max(dim="time")
+    mmd_to_m3d_patch = area_cft * mmd_to_m3d
+    mmd_to_m3d_grid = case['ds']['AREA_GRID'] * mmd_to_m3d
+    return area_cft_timemax, area_irrig_grid_timemax, mmd_to_m3d_patch, mmd_to_m3d_grid
 
 if incl_irrig:
+    mms_to_mmd = 60*60*24
     print("Calculating irrigation totals...")
     for i, (casename, case) in enumerate(cases.items()):
-        mms_to_mmd = 60*60*24
-        mmd_to_m3d = 1e-3
-        area_cft = reses[case['res']]['ds']['AREA_CFT']
-        
-        area_cft_timemax = area_cft.max(dim="time")
-        area_irrig_grid_timemax =  reses[case['res']]['ds']['IRRIGATED_AREA_GRID'].max(dim="time")
-        mmd_to_m3d_patch = area_cft * mmd_to_m3d
-        mmd_to_m3d_grid = case['ds']['AREA_GRID'] * mmd_to_m3d
+        area_cft_timemax, area_irrig_grid_timemax, mmd_to_m3d_patch, mmd_to_m3d_grid = get_case_info_for_irrig_totals(case, reses)
         for v in case['ds']:
             if "QIRRIG" not in v or "_PKMTH" in v:
                 continue
@@ -311,6 +313,7 @@ if incl_irrig:
 # Calculate monthly climatological means
 any_so_far = False
 for casename, case in cases.items():
+    area_cft_timemax, area_irrig_grid_timemax, mmd_to_m3d_patch, mmd_to_m3d_grid = get_case_info_for_irrig_totals(case, reses)
     for v in case['ds']:
         if "time_mth" not in case['ds'][v].dims or "MTHMEANS" in v:
             continue
@@ -361,6 +364,9 @@ for casename, case in cases.items():
                                       coords=case['ds'][shapevar].coords,
                                       attrs={'units': 'peak month'})
         
+    # Get peak month irrigation use as a fraction of supply
+    case = cc.get_irrigation_use_relative_to_supply(case)
+    
 print("Done")
 
 # %% Import GGCMI sowing and harvest dates, and check sims

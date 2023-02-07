@@ -1105,6 +1105,71 @@ def get_gs_len_da(this_da):
     return this_da
 
 
+def get_irrigation_use_relative_to_supply(case):
+    
+    # Get MONTH of each gridcell-year's peak irrigation use
+    ind = np.arange(12,case['ds'].dims["time_mth"],12)
+    yearly_split = np.split(case['ds']['QIRRIG_FROM_SURFACE_GRID_MTH'].values, ind, axis=0)
+    case['ds']['QIRRIG_FROM_SURFACE_GRID_PKMTH_ANN'] = xr.DataArray(
+        data=np.argmax(yearly_split, axis=1),
+        coords={'time': case['ds']['time'],
+                'gridcell': case['ds']['gridcell']},
+        attrs={'long_name': 'Peak month of irrigation use',
+            'units': 'month'}
+    )
+
+    # Get VALUE of each gridcell-year's max monthly irrigation use
+    case['ds']['QIRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'] = case['ds']['QIRRIG_FROM_SURFACE_GRID_MTH'].groupby(case['ds']['time_mth'].dt.year).max()
+
+    # Convert the above from mm/d to m3/d
+    case['ds']['IRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'] = case['ds']['QIRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'] * case['ds']['AREA_GRID'] * 1e-3
+    case['ds']['IRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'].attrs['units'] = 'm^3/d'
+
+    # Get the value of water SUPPLY in each gridcell-year's peak month of irrigation USE
+    irrig_supply_grid_valpkmthwithdrawal_ann = np.full_like(case['ds']['QIRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'], np.nan)
+    yearly_split = np.split(case['ds']['IRRIG_SUPPLY_GRID_MTH'].values, ind, axis=0)
+    for y in np.arange(len(yearly_split)):
+        thisYear_IRRIG_SUPPLY_GRID_MTH_mg = yearly_split[y]
+        # gridcells_with_supply = np.where(np.nansum(yearly_split[0],axis=0) > 0)[0]
+        thisYear_QIRRIG_FROM_SURFACE_GRID_PKMTH_g = case['ds']['QIRRIG_FROM_SURFACE_GRID_PKMTH_ANN'].isel(time=y)
+        
+        # # I'm sure there's a more efficient way to do this.
+        # # YES. See below.
+        # valpkmth_thisyear_g = np.full_like(case['ds']['IRRIG_SUPPLY_GRID_PKMTH'], np.nan)
+        # for i in np.arange(len(gridcells_with_supply)):
+        #     g = gridcells_with_supply[i]
+        #     valpkmth_thisyear_g[g] = thisYear_IRRIG_SUPPLY_GRID_MTH_mg[thisYear_QIRRIG_FROM_SURFACE_GRID_PKMTH_g[g],g]
+        # irrig_supply_grid_valpkmthwithdrawal_ann[y,:] = valpkmth_thisyear_g
+        
+        # This is MUCH faster and should produce the same result, except for giving zeroes where the above gave NaNs
+        test_take_along_axis = np.squeeze(np.take_along_axis(thisYear_IRRIG_SUPPLY_GRID_MTH_mg, np.expand_dims(thisYear_QIRRIG_FROM_SURFACE_GRID_PKMTH_g, axis=0), 0))
+        # if np.any((test_take_along_axis != valpkmth_thisyear_g) & ~(np.isnan(valpkmth_thisyear_g) & (test_take_along_axis==0))):
+        #     raise RuntimeError("Mismatch between inefficient method and take_along_axis")
+        
+        irrig_supply_grid_valpkmthwithdrawal_ann[y,:] = test_take_along_axis
+        where_no_irrigation = np.where(thisYear_QIRRIG_FROM_SURFACE_GRID_PKMTH_g==0)[0]
+        irrig_supply_grid_valpkmthwithdrawal_ann[y,where_no_irrigation] = np.nan
+    case['ds']['IRRIG_SUPPLY_GRID_VALPKMTHWITHDRAWAL_ANN'] = xr.DataArray(
+        data=irrig_supply_grid_valpkmthwithdrawal_ann,
+        coords=case['ds']['QIRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'].coords,
+        attrs={'long_name': 'Main channel river volume in month of peak irrigation demand',
+            'units': "m3"}
+    )
+
+    # Get each gridcell-year's max monthly irrigation use as a fraction of the supply in that month. 48* because irrigation happens at the level of individual timesteps; because numerator is per day and denominator is mean of per timestep, we multiply denominator by 48.
+    case['ds']['IRRIG_WITHDRAWAL_FRAC_SUPPLY_VALPKMONTHWITHDRAWAL_ANN'] = xr.DataArray(
+        data=case['ds']['IRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'] / (48*case['ds']['IRRIG_SUPPLY_GRID_VALPKMTHWITHDRAWAL_ANN']),
+        coords=case['ds']['IRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'].coords,
+        attrs={"units": "unitless"}
+    )
+
+    # Take the mean across all years of the above
+    case['ds']['IRRIG_WITHDRAWAL_FRAC_SUPPLY_VALPKMONTHWITHDRAWAL'] = case['ds']['IRRIG_WITHDRAWAL_FRAC_SUPPLY_VALPKMONTHWITHDRAWAL_ANN'].mean(dim="year")
+    case['ds']['IRRIG_WITHDRAWAL_FRAC_SUPPLY_VALPKMONTHWITHDRAWAL'].attrs['units'] = 'unitless'
+    
+    return case
+
+
 def get_mean_byCountry(fao, top_y1, top_yN):
    return fao.query(f'Year>={top_y1} & Year<={top_yN}').groupby(['Crop','Element','Area'])['Value'].mean()
 
@@ -1831,10 +1896,10 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
                 raise RuntimeError("Unexpectedly found some irrigation using groundwater")
             
             # Rename this variable so that it has a QIRRIG prefix
-            irrig_ds_grid = irrig_ds_grid.rename({"VOLRMCH": "QIRRIG_SUPPLY"})
-            irrig_ds_grid["QIRRIG_SUPPLY"].attrs['long_name'] = irrig_ds_grid["QIRRIG_SUPPLY"].attrs['long_name'] + " (aka VOLRMCH)"
+            irrig_ds_grid = irrig_ds_grid.rename({"VOLRMCH": "IRRIG_SUPPLY"})
+            irrig_ds_grid["IRRIG_SUPPLY"].attrs['long_name'] = irrig_ds_grid["IRRIG_SUPPLY"].attrs['long_name'] + " (aka VOLRMCH)"
             
-            vars_to_save = ['QIRRIG_FROM_SURFACE', 'QIRRIG_SUPPLY']
+            vars_to_save = ['QIRRIG_FROM_SURFACE', 'IRRIG_SUPPLY']
             
             # Append _GRID to distinguish from patch-level irrigation data
             rename_dict = {}
@@ -1849,7 +1914,7 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
             # Calculate irrigation as fraction of main river channel volume
             # (Do it here instead of process_monthly_irrig() because monthly doesn't add to annual.)
             for t in ['MTH', 'ANN']:
-                this_ds_gs[f'QIRRIG_FROM_SURFACE_FRAC_RIVER_GRID_{t}'] = this_ds_gs[f'QIRRIG_FROM_SURFACE_GRID_{t}'] / this_ds_gs[f'QIRRIG_SUPPLY_GRID_{t}']
+                this_ds_gs[f'QIRRIG_FROM_SURFACE_FRAC_RIVER_GRID_{t}'] = this_ds_gs[f'QIRRIG_FROM_SURFACE_GRID_{t}'] / this_ds_gs[f'IRRIG_SUPPLY_GRID_{t}']
                 this_ds_gs[f'QIRRIG_FROM_SURFACE_FRAC_RIVER_GRID_{t}'] = this_ds_gs[f'QIRRIG_FROM_SURFACE_FRAC_RIVER_GRID_{t}'].assign_coords(this_ds_gs[f'QIRRIG_FROM_SURFACE_GRID_{t}'].coords)
 
             # Ensure gridcells are same-ordered between patch- and gridcell-level datasets
@@ -2278,6 +2343,8 @@ def time_units_and_trim(ds, y1, yN, dt_type):
     
     # Trim
     ds = ds.sel(time=slice(f"{y1}-01-01", f"{yN}-01-01"))
+    if "time_mth" in ds.dims:
+        ds = ds.sel(time_mth=slice(f"{y1}-01-01", f"{yN}-12-31"))
         
     return ds
 
