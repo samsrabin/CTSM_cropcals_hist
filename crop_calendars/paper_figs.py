@@ -750,7 +750,7 @@ if mxmat_limited:
 else:
     mxmats_tmp = None
 
-maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_viable_hui, mxmats_tmp, nx, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList)
+maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_viable_hui, mxmats_tmp, nx, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList, chunk_colorbar=chunk_colorbar)
     
 print('Done making maps.')
 
