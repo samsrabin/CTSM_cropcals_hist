@@ -79,7 +79,7 @@ plt.rc('font',**{'family':'sans-serif','sans-serif':['Arial']})
 #	 * clm5_0: lnd/clm2/paramdata/clm50_params.c211112.nc
 #	 * clm4_5: lnd/clm2/paramdata/clm45_params.c211112.nc
 paramfile_dir = "/Users/Shared/CESM_inputdata/lnd/clm2/paramdata/"
-my_clm_ver = 51
+my_clm_ver = 50
 my_clm_subver = "c211112"
 pattern = os.path.join(paramfile_dir, f"*{my_clm_ver}_params.{my_clm_subver}.nc")
 paramfile = glob.glob(pattern)
