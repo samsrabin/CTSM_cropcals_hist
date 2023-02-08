@@ -66,8 +66,11 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
         plt.text(0, 0.95, f"({subplot_label})", transform=ax.transAxes,
              fontsize=fontsize['axislabels'])
     
+    # # Country borders
     # ax.add_feature(cfeature.BORDERS, linewidth=linewidth, edgecolor="white")
     # ax.add_feature(cfeature.BORDERS, linewidth=linewidth*0.6)
+    
+    # Coastlines
     ax.coastlines(linewidth=linewidth, color="white")
     ax.coastlines(linewidth=linewidth*0.6)
     
