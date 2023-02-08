@@ -1105,69 +1105,67 @@ def get_gs_len_da(this_da):
     return this_da
 
 
-def get_irrigation_use_relative_to_supply(case):
+def get_irrigation_use_relative_to_supply(cases):
     
-    # Get MONTH of each gridcell-year's peak irrigation use
-    ind = np.arange(12,case['ds'].dims["time_mth"],12)
-    yearly_split = np.split(case['ds']['QIRRIG_FROM_SURFACE_GRID_MTH'].values, ind, axis=0)
-    case['ds']['QIRRIG_FROM_SURFACE_GRID_PKMTH_ANN'] = xr.DataArray(
-        data=np.argmax(yearly_split, axis=1),
-        coords={'time': case['ds']['time'],
-                'gridcell': case['ds']['gridcell']},
-        attrs={'long_name': 'Peak month of irrigation use',
-            'units': 'month'}
-    )
-
-    # Get VALUE of each gridcell-year's max monthly irrigation use
-    case['ds']['QIRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'] = case['ds']['QIRRIG_FROM_SURFACE_GRID_MTH'].groupby(case['ds']['time_mth'].dt.year).max()
-
-    # Convert the above from mm/d to m3/d
-    case['ds']['IRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'] = case['ds']['QIRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'] * case['ds']['AREA_GRID'] * 1e-3
-    case['ds']['IRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'].attrs['units'] = 'm^3/d'
-
-    # Get the value of water SUPPLY in each gridcell-year's peak month of irrigation USE
-    irrig_supply_grid_valpkmthwithdrawal_ann = np.full_like(case['ds']['QIRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'], np.nan)
-    yearly_split = np.split(case['ds']['IRRIG_SUPPLY_GRID_MTH'].values, ind, axis=0)
-    for y in np.arange(len(yearly_split)):
-        thisYear_IRRIG_SUPPLY_GRID_MTH_mg = yearly_split[y]
-        # gridcells_with_supply = np.where(np.nansum(yearly_split[0],axis=0) > 0)[0]
-        thisYear_QIRRIG_FROM_SURFACE_GRID_PKMTH_g = case['ds']['QIRRIG_FROM_SURFACE_GRID_PKMTH_ANN'].isel(time=y)
-        
-        # # I'm sure there's a more efficient way to do this.
-        # # YES. See below.
-        # valpkmth_thisyear_g = np.full_like(case['ds']['IRRIG_SUPPLY_GRID_PKMTH'], np.nan)
-        # for i in np.arange(len(gridcells_with_supply)):
-        #     g = gridcells_with_supply[i]
-        #     valpkmth_thisyear_g[g] = thisYear_IRRIG_SUPPLY_GRID_MTH_mg[thisYear_QIRRIG_FROM_SURFACE_GRID_PKMTH_g[g],g]
-        # irrig_supply_grid_valpkmthwithdrawal_ann[y,:] = valpkmth_thisyear_g
-        
-        # This is MUCH faster and should produce the same result, except for giving zeroes where the above gave NaNs
-        test_take_along_axis = np.squeeze(np.take_along_axis(thisYear_IRRIG_SUPPLY_GRID_MTH_mg, np.expand_dims(thisYear_QIRRIG_FROM_SURFACE_GRID_PKMTH_g, axis=0), 0))
-        # if np.any((test_take_along_axis != valpkmth_thisyear_g) & ~(np.isnan(valpkmth_thisyear_g) & (test_take_along_axis==0))):
-        #     raise RuntimeError("Mismatch between inefficient method and take_along_axis")
-        
-        irrig_supply_grid_valpkmthwithdrawal_ann[y,:] = test_take_along_axis
-        where_no_irrigation = np.where(thisYear_QIRRIG_FROM_SURFACE_GRID_PKMTH_g==0)[0]
-        irrig_supply_grid_valpkmthwithdrawal_ann[y,where_no_irrigation] = np.nan
-    case['ds']['IRRIG_SUPPLY_GRID_VALPKMTHWITHDRAWAL_ANN'] = xr.DataArray(
-        data=irrig_supply_grid_valpkmthwithdrawal_ann,
-        coords=case['ds']['QIRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'].coords,
-        attrs={'long_name': 'Main channel river volume in month of peak irrigation demand',
-            'units': "m3"}
-    )
-
-    # Get each gridcell-year's max monthly irrigation use as a fraction of the supply in that month. 48* because irrigation happens at the level of individual timesteps; because numerator is per day and denominator is mean of per timestep, we multiply denominator by 48.
-    case['ds']['IRRIG_WITHDRAWAL_FRAC_SUPPLY_VALPKMONTHWITHDRAWAL_ANN'] = xr.DataArray(
-        data=case['ds']['IRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'] / (48*case['ds']['IRRIG_SUPPLY_GRID_VALPKMTHWITHDRAWAL_ANN']),
-        coords=case['ds']['IRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'].coords,
-        attrs={"units": "unitless"}
-    )
-
-    # Take the mean across all years of the above
-    case['ds']['IRRIG_WITHDRAWAL_FRAC_SUPPLY_VALPKMONTHWITHDRAWAL'] = case['ds']['IRRIG_WITHDRAWAL_FRAC_SUPPLY_VALPKMONTHWITHDRAWAL_ANN'].mean(dim="year")
-    case['ds']['IRRIG_WITHDRAWAL_FRAC_SUPPLY_VALPKMONTHWITHDRAWAL'].attrs['units'] = 'unitless'
+    for casename, case in cases.items():
     
-    return case
+        # Get MONTH of each gridcell-year's peak irrigation use
+        ind = np.arange(12,case['ds'].dims["time_mth"],12)
+        yearly_split = np.split(case['ds']['QIRRIG_FROM_SURFACE_GRID_MTH'].values, ind, axis=0)
+        case['ds']['QIRRIG_FROM_SURFACE_GRID_PKMTH_ANN'] = xr.DataArray(
+            data=np.argmax(yearly_split, axis=1),
+            coords={'time': case['ds']['time'],
+                    'gridcell': case['ds']['gridcell']},
+            attrs={'long_name': 'Peak month of irrigation use',
+                'units': 'month'}
+        )
+
+        # Get VALUE of each gridcell-year's max monthly irrigation use
+        case['ds']['QIRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'] = case['ds']['QIRRIG_FROM_SURFACE_GRID_MTH'].groupby(case['ds']['time_mth'].dt.year).max()
+
+        # Convert the above from mm/d to m3/d
+        case['ds']['IRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'] = case['ds']['QIRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'] * case['ds']['AREA_GRID'] * 1e-3
+        case['ds']['IRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'].attrs['units'] = 'm^3/d'
+
+        # Get the value of water SUPPLY in each gridcell-year's peak month of irrigation USE
+        irrig_supply_grid_valpkmthwithdrawal_ann = np.full_like(case['ds']['QIRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'], np.nan)
+        yearly_split = np.split(case['ds']['IRRIG_SUPPLY_GRID_MTH'].values, ind, axis=0)
+        for y in np.arange(len(yearly_split)):
+            thisYear_IRRIG_SUPPLY_GRID_MTH_mg = yearly_split[y]
+            # gridcells_with_supply = np.where(np.nansum(yearly_split[0],axis=0) > 0)[0]
+            thisYear_QIRRIG_FROM_SURFACE_GRID_PKMTH_g = case['ds']['QIRRIG_FROM_SURFACE_GRID_PKMTH_ANN'].isel(time=y)
+            
+            # # I'm sure there's a more efficient way to do this.
+            # # YES. See below.
+            # valpkmth_thisyear_g = np.full_like(case['ds']['IRRIG_SUPPLY_GRID_PKMTH'], np.nan)
+            # for i in np.arange(len(gridcells_with_supply)):
+            #     g = gridcells_with_supply[i]
+            #     valpkmth_thisyear_g[g] = thisYear_IRRIG_SUPPLY_GRID_MTH_mg[thisYear_QIRRIG_FROM_SURFACE_GRID_PKMTH_g[g],g]
+            # irrig_supply_grid_valpkmthwithdrawal_ann[y,:] = valpkmth_thisyear_g
+            
+            # This is MUCH faster and should produce the same result, except for giving zeroes where the above gave NaNs
+            test_take_along_axis = np.squeeze(np.take_along_axis(thisYear_IRRIG_SUPPLY_GRID_MTH_mg, np.expand_dims(thisYear_QIRRIG_FROM_SURFACE_GRID_PKMTH_g, axis=0), 0))
+            # if np.any((test_take_along_axis != valpkmth_thisyear_g) & ~(np.isnan(valpkmth_thisyear_g) & (test_take_along_axis==0))):
+            #     raise RuntimeError("Mismatch between inefficient method and take_along_axis")
+            
+            irrig_supply_grid_valpkmthwithdrawal_ann[y,:] = test_take_along_axis
+            where_no_irrigation = np.where(thisYear_QIRRIG_FROM_SURFACE_GRID_PKMTH_g==0)[0]
+            irrig_supply_grid_valpkmthwithdrawal_ann[y,where_no_irrigation] = np.nan
+        case['ds']['IRRIG_SUPPLY_GRID_VALPKMTHWITHDRAWAL_ANN'] = xr.DataArray(
+            data=irrig_supply_grid_valpkmthwithdrawal_ann,
+            coords=case['ds']['QIRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'].coords,
+            attrs={'long_name': 'Main channel river volume in month of peak irrigation demand',
+                'units': "m3"}
+        )
+
+        # Get each gridcell-year's max monthly irrigation use as a fraction of the supply in that month. 48* because irrigation happens at the level of individual timesteps; because numerator is per day and denominator is mean of per timestep, we multiply denominator by 48.
+        case['ds']['IRRIG_WITHDRAWAL_FRAC_SUPPLY_VALPKMTHWITHDRAWAL_ANN'] = xr.DataArray(
+            data=case['ds']['IRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'] / (48*case['ds']['IRRIG_SUPPLY_GRID_VALPKMTHWITHDRAWAL_ANN']),
+            coords=case['ds']['IRRIG_FROM_SURFACE_GRID_VALPKMTH_ANN'].coords,
+            attrs={"units": "unitless"}
+        )
+    
+    return cases
 
 
 def get_mean_byCountry(fao, top_y1, top_yN):
@@ -1207,6 +1205,59 @@ def get_pct_harv_at_mature(harvest_reason_da):
     pct_harv_at_mature = Nharv_at_mature / Nharv * 100
     pct_harv_at_mature = np.format_float_positional(pct_harv_at_mature, precision=2, unique=False, fractional=False, trim='k') # Round to 2 significant digits
     return pct_harv_at_mature
+
+
+def get_peakmonth(cases, this_var, y1=None, yN=None):
+    
+    # Input checks
+    if y1 is None or yN is None:
+        raise RuntimeError("Deal with missing y1 and yN")
+    elif "_PKMTH" not in this_var:
+        raise RuntimeError(f"Can only process this_var with _PKMTH (not {this_var})")
+        
+    for casename, case in cases.items():
+        ds = case['ds']
+        
+        # Which variable are we starting with?
+        v = this_var.replace("_PKMTH", "_MTH")
+        if v not in ds:
+            raise RuntimeError(f"{this_var} not in cases['{casename}']['ds']")
+        if "time_mth" not in ds[v].dims:
+            raise RuntimeError(f"Requested peak month of {v} but 'time_mth' not in dims {ds[v].dims}")
+        
+        # Get monthly means
+        mthmeans = ds[v].groupby(ds['time_mth'].dt.month).mean()
+        mthmeans.attrs = ds[v].attrs
+        if 'long_name' in ds[v].attrs:
+            mthmeans.attrs['long_name'] += " (monthly climatological mean)"
+               
+        # Set up peak month array
+        if "patch" in mthmeans.dims:
+            shapevar = 'patches1d_lon'
+        elif "gridcell" in mthmeans.dims:
+            shapevar = 'grid1d_lon'
+        else:
+            raise RuntimeError(f"Which shapevar for dims {mthmeans.dims}?")
+        pkmth = np.full(ds[shapevar].shape, np.nan)
+        
+        # Get peak month
+        thismax = mthmeans.max(dim="month")
+        if np.all(np.isnan(thismax)):
+            raise RuntimeError("thismax is all NaN")
+        for m in np.arange(1,13):
+            thismonth_is_max = np.where(np.isclose(mthmeans.sel(month=m), thismax))[0]
+            pkmth[thismonth_is_max] = m
+        if np.any((pkmth <= 0) & (~np.isnan(thismax))):
+            raise RuntimeError("Error filling pkmth")
+        
+        # Save as DataArray"
+        ds[this_var] = xr.DataArray(data=pkmth,
+                                    coords=ds[shapevar].coords,
+                                    attrs={'units': 'peak month',
+                                           'y1': y1,
+                                           'yN': yN})
+        
+    return cases
 
 
 def get_reason_freq_map(Ngs, thisCrop_gridded, reason):

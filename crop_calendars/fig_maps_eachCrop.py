@@ -495,6 +495,11 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
 
     for (this_var, var_info) in varList.items():
         
+        added_var = False
+        if "_PKMTH" in this_var:
+            added_var = True
+            cases = cc.get_peakmonth(cases, this_var, y1=plot_y1, yN=plot_yN)
+        
         if "IRRIG" in this_var:
             nx = nx_in - 1
         else:
@@ -510,7 +515,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
         
         # Get colormap
         abs_cmap = abs_cmap_default
-        if "DATE" in this_var or "PKMTH" in this_var:
+        if "DATE" in this_var or "_PKMTH" in this_var:
             abs_cmap = "twilight_shifted"
         elif "IRRIG" in this_var:
             abs_cmap = "plasma_r"
@@ -590,7 +595,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                 cbar_ax = fig.add_axes(cbar_pos)
                 fig.tight_layout()
                 cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=units)
-                if "PKMTH" in this_var:
+                if "_PKMTH" in this_var:
                     cb.set_ticks(np.arange(1,13))
                     cb.set_ticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
                     cb.ax.tick_params(length=0)
@@ -655,3 +660,9 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
             fig.savefig(fig_outfile,
                         bbox_inches='tight', facecolor='white', dpi=dpi)
             plt.close()
+        
+        # Ensure we don't save temporary variables
+        if added_var:
+            for _, case in cases.items():
+                if this_var in case['ds']:
+                    case['ds'] = case['ds'].drop_vars(this_var)

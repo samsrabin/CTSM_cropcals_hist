@@ -241,23 +241,21 @@ for i, (casename, case) in enumerate(cases.items()):
 print("Done.")
  
 
-# %% Calculate irrigation totals and/or monthly climatological means
-def get_case_info_for_irrig_totals(case, reses):
-    mmd_to_m3d = 1e-3
-    area_cft = reses[case['res']]['ds']['AREA_CFT']
-    area_cft_timemax = area_cft.max(dim="time")
-    area_irrig_grid_timemax =  reses[case['res']]['ds']['IRRIGATED_AREA_GRID'].max(dim="time")
-    mmd_to_m3d_patch = area_cft * mmd_to_m3d
-    mmd_to_m3d_grid = case['ds']['AREA_GRID'] * mmd_to_m3d
-    return area_cft_timemax, area_irrig_grid_timemax, mmd_to_m3d_patch, mmd_to_m3d_grid
+# %% Calculate irrigation totals
+importlib.reload(cc)
 
 if incl_irrig:
     mms_to_mmd = 60*60*24
     print("Calculating irrigation totals...")
     for i, (casename, case) in enumerate(cases.items()):
-        area_cft_timemax, area_irrig_grid_timemax, mmd_to_m3d_patch, mmd_to_m3d_grid = get_case_info_for_irrig_totals(case, reses)
+        mmd_to_m3d = 1e-3
+        area_cft = reses[case['res']]['ds']['AREA_CFT']
+        area_cft_timemax = area_cft.max(dim="time")
+        area_irrig_grid_timemax =  reses[case['res']]['ds']['IRRIGATED_AREA_GRID'].max(dim="time")
+        mmd_to_m3d_patch = area_cft * mmd_to_m3d
+        mmd_to_m3d_grid = case['ds']['AREA_GRID'] * mmd_to_m3d
         for v in case['ds']:
-            if "QIRRIG" not in v or "_PKMTH" in v:
+            if "QIRRIG" not in v or "_FRAC_" in v:
                 continue
             
             # Mask where no area
@@ -267,10 +265,7 @@ if incl_irrig:
                 case['ds'][v] = case['ds'][v].where(area_irrig_grid_timemax > 0)
             else:
                 print(f"Unable to mask no-area members of {v}")
-            
-            if "_FRAC_" in v or "_MTHMEANS" in v or "_PKMONTH" in v:
-                continue
-            
+                        
             # Convert mm/s to mm/day
             v_da = case['ds'][v]
             if v_da.attrs['units'] == 'mm/s':
@@ -310,66 +305,9 @@ if incl_irrig:
                 case['ds'][v3] = case['ds'][v2].groupby(case['ds'][grid_index_var]).sum().rename({grid_index_var: 'grid'})
                 case['ds'][v3].attrs = case['ds'][v2].attrs
         
-# Calculate monthly climatological means
-any_so_far = False
-for casename, case in cases.items():
-    area_cft_timemax, area_irrig_grid_timemax, mmd_to_m3d_patch, mmd_to_m3d_grid = get_case_info_for_irrig_totals(case, reses)
-    for v in case['ds']:
-        if "time_mth" not in case['ds'][v].dims or "MTHMEANS" in v:
-            continue
-        if not any_so_far:
-            print("Calculating monthly climatological means...")
-            any_so_far = True
-        if "MTH" not in v:
-            raise RuntimeError(f"Unsure how to rename {v}")
-        v2 = v.replace('MTH', 'MTHMEANS')
-        case['ds'][v2] = case['ds'][v].groupby(case['ds']['time_mth'].dt.month).mean()
-        case['ds'][v2].attrs = case['ds'][v].attrs
-        if 'long_name' in case['ds'][v].attrs:
-            case['ds'][v2].attrs['long_name'] += " (monthly climatological mean)"
-
-# Calculate peak months
-any_so_far = False
-for casename, case in cases.items():
-    for v in case['ds']:
-        if "month" not in case['ds'][v].dims or "_PKMONTH" in v:
-            continue
-        if not any_so_far:
-            print("Calculating peak months...")
-            any_so_far = True
-        
-        thismax = case['ds'][v].max(dim="month")
-        
-        # Get pkmonth array
-        if "patch" in case['ds'][v].dims:
-            shapevar = 'patches1d_lon'
-        elif "gridcell" in case['ds'][v].dims:
-            shapevar = 'grid1d_lon'
-        else:
-            raise RuntimeError(f"Decide how/whether to calculate peak months for {v}")
-        pkmonth = np.full(case['ds'][shapevar].shape, np.nan)
-        if np.all(np.isnan(thismax)):
-            raise RuntimeError("thismax is all NaN")
-        for m in np.arange(1,13):
-            thismonth_is_max = np.where(np.isclose(case['ds'][v].sel(month=m), thismax))[0]
-            pkmonth[thismonth_is_max] = m
-        if np.any((pkmonth <= 0) & (~np.isnan(thismax))):
-            raise RuntimeError("Error filling pkmonth")
-        
-        # Save as DataArray
-        if "MTHMEANS" not in v:
-            raise RuntimeError(f"Unsure how to rename {v}")
-        v2 = v.replace("MTHMEANS", "PKMTH")
-        case['ds'][v2] = xr.DataArray(data=pkmonth,
-                                      coords=case['ds'][shapevar].coords,
-                                      attrs={'units': 'peak month'})
-        
-    # Get peak month irrigation use as a fraction of supply
-    case = cc.get_irrigation_use_relative_to_supply(case)
-    
-print("Done")
 
 # %% Import GGCMI sowing and harvest dates, and check sims
+importlib.reload(cc)
 
 for i, (casename, case) in enumerate(cases.items()):
     
