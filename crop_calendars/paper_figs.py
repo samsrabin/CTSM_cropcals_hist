@@ -1572,6 +1572,10 @@ varList = {
         'suptitle':   'Mean annual production bias rel. EarthStat',
         'units':      '∆ abs.\nbias (Mt)',
         'multiplier': 1e-6}, # t to Mt
+    'IRRIG_DEMAND_PATCH_ANN': {
+        'suptitle':   'Mean annual irrigation',
+        'units':      'km$^3$ yr$^{-1}$',
+        'multiplier': 1e-9}, # g to Mt
     'IRRIG_DEMAND_PATCH_ANN_DIFF': {
         'suptitle':   'Mean annual irrigation difference',
         'units':      'km$^3$ yr$^{-1}$',
