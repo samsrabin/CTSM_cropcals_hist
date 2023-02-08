@@ -604,11 +604,12 @@ min_viable_hui = "ggcmi3"
 mxmat_limited = False
 
 # Define reference case, if you want to plot differences
-# ref_casename = None
+ref_casename = None
 # ref_casename = 'CLM Default'
-ref_casename = 'rx'
+# ref_casename = 'rx'
 
 overwrite = True
+chunk_colorbar = False # Do not enable except for dates/gslen
 
 plot_y1 = 1980
 plot_yN = 2010
@@ -662,7 +663,7 @@ varList = {
     'IRRIG_DEMAND_PATCH_ANN': {
         'suptitle':   'Mean irrigation water demand',
         'time_dim':   'time',
-        'units':      'km$^3$ yr$^-1$',
+        'units':      'km$^3$ yr$^{-1}$',
         'multiplier': 1e-9},
     'QIRRIG_DEMAND_PATCH_PKMTH': {
         'suptitle':   'Mean irrigation water demand: Peak month',
