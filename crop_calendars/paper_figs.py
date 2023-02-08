@@ -179,6 +179,12 @@ for x in clm_types_main:
             clm_types_rfir.append(y)
 clm_types = np.unique([x.replace('irrigated_', '') for x in clm_types_rfir])
 
+# Get names for CLM crop production
+for _, case in cases.items():
+    case['ds']['patches1d_itype_combinedCropCLM_str'] = \
+        xr.DataArray(cc.fullname_to_combinedCrop(case['ds']['patches1d_itype_veg_str'].values, cropList_combined_clm),
+                     coords = case['ds']['patches1d_itype_veg_str'].coords)
+
 print("Done importing model output.")
 
 
@@ -361,18 +367,6 @@ fao_all = pd.read_csv("/Users/sam/Documents/git_repos/CTSM_cropcals_hist/crop_ca
 fao_all = cc.fao_data_preproc(fao_all)
 fao_prod, fao_prod_nosgc = cc.fao_data_get(fao_all, 'Production', y1, yN, fao_to_clm_dict, cropList_combined_clm)
 fao_area, fao_area_nosgc = cc.fao_data_get(fao_all, 'Area harvested', y1, yN, fao_to_clm_dict, cropList_combined_clm)
-
-
-# %% Get names for CLM crop production
-
-for i, (casename, case) in enumerate(cases.items()):
-    case_ds = case['ds']
-    lu_ds = reses[case['res']]['ds']
-    
-    # Figure-ready names
-    case_ds['patches1d_itype_combinedCropCLM_str'] = \
-        xr.DataArray(cc.fullname_to_combinedCrop(case_ds['patches1d_itype_veg_str'].values, cropList_combined_clm),
-                     coords = case_ds['patches1d_itype_veg_str'].coords)
 
 
 # %% Import FAO Earthstat (gridded FAO data)
