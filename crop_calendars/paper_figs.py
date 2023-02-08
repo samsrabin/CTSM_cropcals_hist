@@ -679,13 +679,13 @@ fontsize = {}
 if ref_casename:
     fontsize['titles'] = 14
     fontsize['axislabels'] = 12
-    fontsize['ticklabels'] = 8
+    fontsize['ticklabels'] = 12
     fontsize['suptitle'] = 16
 else:
-    fontsize['titles'] = 28
-    fontsize['axislabels'] = 24
-    fontsize['ticklabels'] = 24
-    fontsize['suptitle'] = 24
+    fontsize['titles'] = 18
+    fontsize['axislabels'] = 16
+    fontsize['ticklabels'] = 16
+    fontsize['suptitle'] = 20
     
 if mxmat_limited:
     mxmats_tmp = mxmats
