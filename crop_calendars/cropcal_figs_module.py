@@ -99,7 +99,7 @@ def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='vi
             ticklabels = [str(int(x)) for x in ticklabels]
             cbar.ax.set_xticks(ticks) # Calling this before set_xticklabels() avoids "UserWarning: FixedFormatter should only be used together with FixedLocator" (https://stackoverflow.com/questions/63723514/userwarning-fixedformatter-should-only-be-used-together-with-fixedlocator)
             cbar.ax.set_xticklabels(ticklabels)
-        cbar.set_label(label=units, fontsize=fontsize['axislabels'])
+        cbar.set_label(label=units, fontsize=fontsize['axislabels'], verticalalignment="center")
         cbar.ax.tick_params(labelsize=fontsize['ticklabels'])
         if units is not None and "month" in units.lower():
             cbar.ax.tick_params(length=0)
