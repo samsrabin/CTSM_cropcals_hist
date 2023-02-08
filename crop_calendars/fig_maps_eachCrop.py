@@ -563,7 +563,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                 diff_txt = f" Diff {rx_row_label}"
             elif ref_casename:
                 diff_txt = f" Diff {ref_casename}"
-            fig_outfile = outDir_figs + "Map " + suptitle + diff_txt + f" {thisCrop_out}.png"
+            fig_outfile = outDir_figs + "Map " + suptitle.replace(": ", "—") + diff_txt + f" {thisCrop_out}.png"
             if any(x in this_var for x in ["YIELD", "PROD"]):
                 fig_outfile = fig_outfile.replace(".png", f" {min_viable_hui}-mat.png")
             if os.path.exists(fig_outfile) and not overwrite:
