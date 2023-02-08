@@ -574,22 +574,24 @@ plot_yN = 2010
 noFigs = False
 
 # Set up figure
-ny = 2
-nx = 4
-# figsize = (14, 7.5)
-figsize = (35, 18)
+# ny = 2
+# nx = 4
+# figsize = (35, 18)
+ny = 3
+nx = 3
+figsize = (25, 18)
 
 
 if mxmat_limited:
     mxmats_tmp = mxmats
 else:
     mxmats_tmp = None
-
-cases = global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, equalize_scatter_axes=equalize_scatter_axes, extra=extra, figsize=figsize, include_scatter=include_scatter, include_shiftsens=include_shiftsens, min_viable_hui_list=min_viable_hui, mxmats=mxmats_tmp, noFigs=noFigs, ny=2, nx=4, obs_for_fig=obs_for_fig, plot_y1=plot_y1, plot_yN=plot_yN, remove_scatter_bias=remove_scatter_bias, bias_round=bias_round, corrcoef_round=corrcoef_round, use_annual_yields=use_annual_yields, w=w)
+    
+cases = global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_area, fao_area_nosgc, fao_prod, fao_prod_nosgc, outDir_figs, reses, yearList, equalize_scatter_axes=equalize_scatter_axes, extra=extra, figsize=figsize, include_scatter=include_scatter, include_shiftsens=include_shiftsens, min_viable_hui_list=min_viable_hui, mxmats=mxmats_tmp, noFigs=noFigs, ny=ny, nx=nx, obs_for_fig=obs_for_fig, plot_y1=plot_y1, plot_yN=plot_yN, remove_scatter_bias=remove_scatter_bias, bias_round=bias_round, corrcoef_round=corrcoef_round, use_annual_yields=use_annual_yields, w=w)
 
 if incl_irrig:
-    global_timeseries_irrig_inclcrops("IRRIG_DEMAND_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
-    global_timeseries_irrig_inclcrops("IRRIG_APPLIED_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=noFigs, ny=2, nx=4, plot_y1=plot_y1, plot_yN=plot_yN)
+    global_timeseries_irrig_inclcrops("IRRIG_DEMAND_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=figsize, noFigs=noFigs, ny=ny, nx=nx, plot_y1=plot_y1, plot_yN=plot_yN)
+    global_timeseries_irrig_inclcrops("IRRIG_APPLIED_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=figsize, noFigs=noFigs, ny=ny, nx=nx, plot_y1=plot_y1, plot_yN=plot_yN)
     global_timeseries_irrig_allcrops("IRRIG_FROM_SURFACE_GRID_ANN", cases, outDir_figs, figsize=(16,10), noFigs=noFigs, plot_y1=plot_y1, plot_yN=plot_yN)
 
 

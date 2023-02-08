@@ -48,14 +48,13 @@ def reduce_yticks(ax):
             raise RuntimeWarning("Not sure how to trim an odd number of yticks")
         
 
-def get_figs_axes(ny, nx, figsize, sharex=True):
+def get_figs_axes(ny, nx, figsize, sharex=False):
     f_list, axes_list = plt.subplots(ny, nx, figsize=figsize, sharex=sharex)
     axes_list = axes_list.flatten()
     return f_list, axes_list
 
 
-def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel, y1, yN, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None, show_legend=False, ylabel_xcoord=-0.125):
-    
+def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel, y1, yN, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None, show_legend=False, ylabel_xcoord=-0.125, ny=None):
     da = xr.DataArray(data = ydata_this,
                             coords = {'Case': caselist,
                                       'x_name': np.arange(y1,yN+1)})
@@ -77,9 +76,9 @@ def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
             color = grays[i]
         else:
             color = cm.Dark2(i-2)
-        if (casename == "CLM Default" and "Original baseline" in caselist) or (casename in ["Prescribed Sowing", "Prescribed Maturity"]) or "min. HUI 1" in casename:
+        if (casename == "CLM Default" and "Original baseline" in caselist) or (casename in ["Prescribed Sowing", "Prescribed Maturity"]) or "1)" in casename:
             linestyle = ":"
-        elif "min. HUI 0" in casename:
+        elif "0)" in casename:
             linestyle = "--"
         else:
             linestyle = "-"
@@ -88,7 +87,10 @@ def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
                                   linewidth=3)
     
     if subplot_label is not None:
-        ax_this.text(0.02, 0.93, f"({subplot_label})", transform=ax_this.transAxes, fontsize=fontsize['axis_label'])
+        ypos = 0.93 # From before, with ny=4
+        if ny == 3:
+            ypos = 0.9
+        ax_this.text(0.02, ypos, f"({subplot_label})", transform=ax_this.transAxes, fontsize=fontsize['axis_label'])
     
     thisTitle = r"$\bf{" + thisCrop_clm.replace(" ", "\ ") + "}$"
     if stats2 is not None:
@@ -116,9 +118,14 @@ def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
     reduce_yticks(ax_this)
     if xlabel is not None:
         ax_this.set_xlabel(xlabel, fontsize=fontsize['axis_label'])
-        ax_this.xaxis.set_label_coords(0.5, -0.1)
+        ypos = -0.1 # From before, with ny=4
+        if ny == 3:
+            ypos=-0.15
+        ax_this.xaxis.set_label_coords(0.5, ypos)
     else:
         ax_this.set_xlabel("")
+        ax_this.set_xticklabels("")
+    
     ax_this.set_ylabel(ylabel, fontsize=fontsize['axis_label'])
     ax_this.yaxis.set_label_coords(ylabel_xcoord, 0.5)
     if not show_legend and ax_this.get_legend():
@@ -130,7 +137,7 @@ def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
                     fontsize=fontsize['legend'])
 
 
-def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabel, ylabel, equalize_scatter_axes, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None):
+def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabel, ylabel, equalize_scatter_axes, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None, ny=2):
     
     for i, casename in enumerate(caselist):
         if "CLM Default" in casename:
@@ -153,8 +160,10 @@ def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabe
         plt.plot(xdata, m*xdata+b, color=color)
     
     if subplot_label is not None:
-        ax_this.text(0.02, 0.93, f"({subplot_label})", transform=ax_this.transAxes,
-             fontsize=fontsize['axis_label'])
+        ypos = 0.93 # From before, with ny=4
+        if ny == 3:
+            ypos = 0.9
+        ax_this.text(0.02, ypos, f"({subplot_label})", transform=ax_this.transAxes, fontsize=fontsize['axis_label'])
     
     if equalize_scatter_axes:
         xlim = ax_this.get_xlim()
@@ -240,6 +249,9 @@ def finishup_scatter(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, mxmat_
     # Delete unused axes, if any
     for a in np.arange(c+1, ny*nx):
         f_this.delaxes(axes_this[a])
+    
+    if ny==3 and nx==3:
+        f_this.subplots_adjust(hspace=0.3)
         
     if mxmat_limited:
         suptitle += " (limited season length)"
@@ -386,10 +398,19 @@ def global_timeseries_irrig_inclcrops(thisVar, cases, reses, cropList_combined_c
                         
         # Make plots for this crop
         if not noFigs:
-            xlabel = "Year"
+            no_xlabel = c < nx*(ny - 1)
+            if no_xlabel:
+                xlabel = None
+            else:
+                xlabel = "Year"
+            no_ylabel = c%nx
+            if no_ylabel:
+                ylabel = None
+            else:
+                ylabel = "km$^3$"
             subplot_str = chr(ord('`') + c+1) # or ord('@') for capital
             # make_1plot_lines(ax_lines_area, ydata_area, fig_caselist, thisCrop_clm, "Mha", xlabel, plot_y1, plot_yN)
-            make_1plot_lines(ax_lines_irrig, ydata_irrig, fig_caselist, thisCrop_clm, "km$^3$", xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
+            make_1plot_lines(ax_lines_irrig, ydata_irrig, fig_caselist, thisCrop_clm, ylabel, xlabel, plot_y1, plot_yN, subplot_label=subplot_str, ny=ny)
             
     # Finish up and save
     if not noFigs:
@@ -466,11 +487,16 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             f_lines_yield_dt_shiftL, axes_lines_yield_dt_shiftL = get_figs_axes(ny, nx, figsize)
             f_lines_yield_dt_shiftR, axes_lines_yield_dt_shiftR = get_figs_axes(ny, nx, figsize)
         if include_scatter:
-            f_scatter_yield_dt, axes_scatter_yield_dt = get_figs_axes(ny, nx, figsize, sharex=False)
+            figsize_scatter = figsize
+            if ny == 3:
+                figsize_scatter = list(figsize_scatter)
+                figsize_scatter[1] *= 1
+                figsize_scatter = tuple(figsize_scatter)
+            f_scatter_yield_dt, axes_scatter_yield_dt = get_figs_axes(ny, nx, figsize_scatter, sharex=False)
             if include_shiftsens:
-                f_scatter_yield_dt_orig, axes_scatter_yield_dt_orig = get_figs_axes(ny, nx, figsize, sharex=False)
-                f_scatter_yield_dt_shiftL, axes_scatter_yield_dt_shiftL = get_figs_axes(ny, nx, figsize, sharex=False)
-                f_scatter_yield_dt_shiftR, axes_scatter_yield_dt_shiftR = get_figs_axes(ny, nx, figsize, sharex=False)
+                f_scatter_yield_dt_orig, axes_scatter_yield_dt_orig = get_figs_axes(ny, nx, figsize_scatter, sharex=False)
+                f_scatter_yield_dt_shiftL, axes_scatter_yield_dt_shiftL = get_figs_axes(ny, nx, figsize_scatter, sharex=False)
+                f_scatter_yield_dt_shiftR, axes_scatter_yield_dt_shiftR = get_figs_axes(ny, nx, figsize_scatter, sharex=False)
 
     # Get list 
     fig_caselist = ["FAOSTAT"]
@@ -481,7 +507,10 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
         for (casename, case) in cases.items():
             fig_casename = casename
             if min_viable_hui != "ggcmi3":
-                fig_casename += f" (min. HUI {min_viable_hui})"
+                if nx==3:
+                    fig_casename += f" ({min_viable_hui})"
+                else:
+                    fig_casename += f" (min. HUI {min_viable_hui})"
             fig_caselist.append(fig_casename)
 
     mxmat_limited = mxmats is not None
@@ -755,7 +784,7 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
         # Make plots for this crop
         if not noFigs:
             subplot_str = chr(ord('`') + c+1) # or ord('@') for capital
-            no_xlabel = c < nx*(ny - 1)
+            no_xlabel = c < nx*(ny - 1) and not (nx==3 and c==5 and len(cropList_combined_clm + [extra])==8)
             if no_xlabel:
                 xlabel = None
             else:
@@ -770,11 +799,11 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                 ylabel_area = "Global area (Mha)"
                 ylabel_prod = "Global production (Mt)"
                 ylabel_yield = label_yield
-            make_1plot_lines(ax_lines_area, ydata_area_touse, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
+            make_1plot_lines(ax_lines_area, ydata_area_touse, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str, ny=ny)
             if include_shiftsens:
-                make_1plot_lines(ax_lines_area_orig, ydata_area, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
-                make_1plot_lines(ax_lines_area_shiftL, ydata_area_shiftL, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
-                make_1plot_lines(ax_lines_area_shiftR, ydata_area_shiftR, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str)
+                make_1plot_lines(ax_lines_area_orig, ydata_area, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str, ny=ny)
+                make_1plot_lines(ax_lines_area_shiftL, ydata_area_shiftL, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str, ny=ny)
+                make_1plot_lines(ax_lines_area_shiftR, ydata_area_shiftR, fig_caselist, thisCrop_clm, ylabel_area, xlabel, plot_y1, plot_yN, subplot_label=subplot_str, ny=ny)
             if no_xlabel:
                 xlabel = None
             elif yield_time_dim == "Year":
@@ -784,32 +813,32 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             noshift_symbols = ["", ""]
             shiftL_symbols = ["$^L$", "$^L$"]
             shiftR_symbols = ["$^R$", "$^R$"]
-            make_1plot_lines(ax_lines_prod, ydata_prod_touse, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shift_symbols, subplot_label=subplot_str)
+            make_1plot_lines(ax_lines_prod, ydata_prod_touse, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shift_symbols, subplot_label=subplot_str, ny=ny)
             if len(min_viable_hui_list) > 1:
                 bias_shifted = None
-            make_1plot_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=bias_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
-            make_1plot_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=bias_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
+            make_1plot_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=bias_round, shift_symbols=shift_symbols, subplot_label=subplot_str, ny=ny)
+            make_1plot_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=bias_round, shift_symbols=shift_symbols, subplot_label=subplot_str, ny=ny)
             
             if include_shiftsens:
-                make_1plot_lines(ax_lines_prod_orig, ydata_prod, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=noshift_symbols, subplot_label=subplot_str)
-                make_1plot_lines(ax_lines_prod_shiftL, ydata_prod_shiftL, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
-                make_1plot_lines(ax_lines_prod_shiftR, ydata_prod_shiftR, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
+                make_1plot_lines(ax_lines_prod_orig, ydata_prod, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=noshift_symbols, subplot_label=subplot_str, ny=ny)
+                make_1plot_lines(ax_lines_prod_shiftL, ydata_prod_shiftL, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shiftL_symbols, subplot_label=subplot_str, ny=ny)
+                make_1plot_lines(ax_lines_prod_shiftR, ydata_prod_shiftR, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shiftR_symbols, subplot_label=subplot_str, ny=ny)
                 if len(min_viable_hui_list) > 1:
                     bias0 = None
                     bias_shiftL = None
                     bias_shiftR = None
-                make_1plot_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=bias_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
-                make_1plot_lines(ax_lines_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftL, stats_round=bias_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
-                make_1plot_lines(ax_lines_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftR, stats_round=bias_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
-                make_1plot_lines(ax_lines_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=bias_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
-                make_1plot_lines(ax_lines_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftL, stats_round=bias_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
-                make_1plot_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftR, stats_round=bias_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
+                make_1plot_lines(ax_lines_yield_orig, ydata_yield, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=bias_round, shift_symbols=noshift_symbols, subplot_label=subplot_str, ny=ny)
+                make_1plot_lines(ax_lines_yield_shiftL, ydata_yield_shiftL, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftL, stats_round=bias_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str, ny=ny)
+                make_1plot_lines(ax_lines_yield_shiftR, ydata_yield_shiftR, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftR, stats_round=bias_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str, ny=ny)
+                make_1plot_lines(ax_lines_yield_dt_orig, ydata_yield_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias0, stats_round=bias_round, shift_symbols=noshift_symbols, subplot_label=subplot_str, ny=ny)
+                make_1plot_lines(ax_lines_yield_dt_shiftL, ydata_yield_shiftL_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftL, stats_round=bias_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str, ny=ny)
+                make_1plot_lines(ax_lines_yield_dt_shiftR, ydata_yield_shiftR_dt, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shiftR, stats_round=bias_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str, ny=ny)
             
             # Scatter plots
             if include_scatter:
                 xlabel_yield_scatter = None
                 ylabel_yield_scatter = None
-                if ylabel_yield is not None:
+                if ylabel_yield is not None and not (ny==3 and c!=3):
                     ylabel_yield_scatter = ylabel_yield
                     if remove_scatter_bias:
                         ylabel_yield_scatter += ", bias removed"
@@ -817,11 +846,11 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                     xlabel_yield_scatter = label_yield
                     if remove_scatter_bias:
                         xlabel_yield_scatter += ", bias removed"
-                make_1plot_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref_touse, stats_round=corrcoef_round, shift_symbols=shift_symbols, subplot_label=subplot_str)
+                make_1plot_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref_touse, stats_round=corrcoef_round, shift_symbols=shift_symbols, subplot_label=subplot_str, ny=ny)
                 if include_shiftsens:
-                    make_1plot_scatter(ax_scatter_yield_dt_orig, ydata_yield_dt[o,:], ydata_yield_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref, stats_round=corrcoef_round, shift_symbols=noshift_symbols, subplot_label=subplot_str)
-                    make_1plot_scatter(ax_scatter_yield_dt_shiftL, ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm,xlabel_yield_scatter,  ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffL, stats_round=corrcoef_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str)
-                    make_1plot_scatter(ax_scatter_yield_dt_shiftR, ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffR, stats_round=corrcoef_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str)
+                    make_1plot_scatter(ax_scatter_yield_dt_orig, ydata_yield_dt[o,:], ydata_yield_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref, stats_round=corrcoef_round, shift_symbols=noshift_symbols, subplot_label=subplot_str, ny=ny)
+                    make_1plot_scatter(ax_scatter_yield_dt_shiftL, ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm,xlabel_yield_scatter,  ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffL, stats_round=corrcoef_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str, ny=ny)
+                    make_1plot_scatter(ax_scatter_yield_dt_shiftR, ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffR, stats_round=corrcoef_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str, ny=ny)
             
     # Finish up and save
     if not noFigs:
