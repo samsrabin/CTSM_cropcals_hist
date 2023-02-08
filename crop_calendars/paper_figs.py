@@ -46,6 +46,7 @@ import cftime
 from fig_global_timeseries import global_timeseries_yieldetc, global_timeseries_irrig_inclcrops, global_timeseries_irrig_allcrops
 from fig_maps_allCrops import *
 from fig_maps_eachCrop import maps_eachCrop
+from fig_maps_grid import maps_gridlevel_vars
 
 # Ignore these annoying warnings
 import warnings
@@ -691,6 +692,37 @@ else:
 maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_viable_hui, mxmats_tmp, nx, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList, chunk_colorbar=chunk_colorbar)
     
 print('Done making maps.')
+
+
+# %% Make gridcell-level maps
+
+varList = {
+    'IRRIG_FROM_SURFACE_GRID_ANN': {
+        'suptitle':   'Irrigation from surface water',
+        'units':      'm3',
+        'multiplier': 1},
+    'QIRRIG_FROM_SURFACE_GRID_PKMTH': {
+        'suptitle':   'Mean peak month of irrigation',
+        'units':      'month',
+        'multiplier': 1},
+    'QIRRIG_FROM_SURFACE_GRID_PKMTH_DIFF': {
+        'suptitle':   'Difference in mean peak month of irrigation',
+        'units':      'months',
+        'multiplier': 1},
+    'IRRIG_WITHDRAWAL_FRAC_SUPPLY_VALPKMTHWITHDRAWAL_ANN': {
+        'suptitle':   'Mean irrigation use as frac. supply in annual peak month',
+        'units':      None,
+        'multiplier': 1},
+    'IRRIG_WITHDRAWAL_FRAC_SUPPLY_VALPKMTHWITHDRAWAL_ANN_DIFF': {
+        'suptitle':   'Difference in mean irrigation use as frac. supply in annual peak month',
+        'units':      None,
+        'multiplier': 1},
+}
+
+plot_y1 = 1980
+plot_yN = 2010
+
+maps_gridlevel_vars(cases, varList, outDir_figs=outDir_figs, y1=plot_y1, yN=plot_yN)
 
 
 # %% Make maps of harvest reasons
