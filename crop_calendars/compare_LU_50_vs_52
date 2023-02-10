@@ -1,0 +1,130 @@
+# %% Setup
+# res = '1deg'
+res = '2deg'
+y1 = 1980
+yN = 2009
+
+import numpy as np
+import xarray as xr
+import importlib
+from matplotlib import pyplot as plt
+import sys
+import os
+import cartopy.crs as ccrs
+
+# Import general CTSM Python utilities
+my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
+sys.path.append(my_ctsm_python_gallery)
+import utils
+
+outdir_figs = f"/Users/Shared/CESM_work/CropEvalData_ssr/ctsm50_vs_ctsm52.{res}"
+if not os.path.exists(outdir_figs):
+    os.makedirs(outdir_figs)
+
+
+# %% Import
+
+if res == '1deg':
+    file50 = "/Users/Shared/CESM_work/CropEvalData_ssr/ctsm_inputs_1deg/landuse.timeseries_0.9x1.25_hist_78pfts_CMIP6_simyr1850-2015_c170824.subset.nc"
+    file52 = "/Users/Shared/CESM_work/CropEvalData_ssr/ctsm_inputs_1deg/landuse_timeseries_globalctsm52histLUH2_0.9x1.25_hist_simyr1850-2015_c221017.subset.nc"
+elif res == '2deg':
+    file50 = '/Users/Shared/CESM_work/CropEvalData_ssr/landuse.timeseries_1.9x2.5_hist_78pfts_CMIP6_simyr1850-2015_c170824.nc4'
+    file52 = '/Users/Shared/CESM_work/CropEvalData_ssr/landuse.timeseries_1.9x2.5_hist_78_CMIP6_1850-2015_c230127.nlevurb5.nc'
+lu50 = utils.import_ds(file50, rename_lsmlatlon=True, timeSlice=slice(y1, yN))
+lu52 = utils.import_ds(file52, rename_lsmlatlon=True, timeSlice=slice(y1, yN))
+
+def process(ds):
+    ds['lon'] = ds['LONGXY'].isel(lat=0)
+    ds['lat'] = ds['LATIXY'].isel(lon=0)
+    ds = utils.lon_pm2idl(ds)
+    ds['AREA_CFT'] = 100 * ds['LANDFRAC_PFT'] * ds['PCT_CROP']*0.01 * ds['PCT_CFT']*0.01
+    ds['INCL_CFT'] = ds['AREA_CFT'].sum(dim=['lon', 'lat', 'time'])
+    ds['INCL_CFT'].load()
+    ds['AREA_CFT'] = ds['AREA_CFT'].where(ds['LANDFRAC_PFT'] > 0)
+    return ds
+lu50 = process(lu50)
+lu52 = process(lu52)
+# %%
+lu52['lat'] = lu50['lat']
+
+
+# %% Set up for plotting
+
+mgdcft_list = utils.define_mgdcrop_list()
+def is_this_vegtype_in_ds(ds, vegtype_str):
+    vegtype_int = utils.vegtype_str2int(vegtype_str)
+    da = ds['AREA_CFT'].sel(cft=vegtype_int)
+    da = da.max(dim='time')
+    return np.any(da.values > 0)
+inclcft_list_50 = [x for x in mgdcft_list if lu50['INCL_CFT'].sel(cft=utils.vegtype_str2int(x)) > 0]
+inclcft_list_52 = [x for x in mgdcft_list if lu52['INCL_CFT'].sel(cft=utils.vegtype_str2int(x)) > 0]
+inclcft_list = list(np.unique(inclcft_list_50 + inclcft_list_52))
+
+inclcrop_list = [x.replace('irrigated_', '') for x in inclcft_list]
+inclcrop_list = [x.replace('temperate_', '').replace('tropical_', '') for x in inclcrop_list]
+inclcrop_list = list(np.unique(inclcrop_list))
+
+def get_map(ds, thiscrop_str):
+    thiscrop_ints = [utils.vegtype_str2int(x)[0] for x in inclcft_list if thiscrop_str in x]
+    da = ds['AREA_CFT'].sel(cft=thiscrop_ints).mean(dim='time').sum(dim='cft').where(ds['LANDFRAC_PFT'] > 0)
+    da.attrs['long_name'] = thiscrop_str
+    da.attrs['units'] = '%'
+    return da
+
+def get_figs_axes(ny, nx, figsize, sharex=True, sharey=True):
+    f, axes_list = plt.subplots(ny, nx, figsize=figsize, sharex=sharex, sharey=sharey, subplot_kw={'projection': ccrs.PlateCarree()})
+    axes_list = axes_list.flatten()
+    return f, axes_list
+
+
+# %% Plot crop types (rainfed+irrigated, tropical+temperate)
+
+for thiscrop_str in inclcrop_list:
+    print(f"{thiscrop_str}...")
+    da50 = get_map(lu50, thiscrop_str)
+    da52 = get_map(lu52, thiscrop_str)
+    da52['lat'] = da50['lat']
+    da = da52 - da50
+    da.attrs = {'long_name': f"∆ {thiscrop_str}",
+                'units': '% pts.'}
+    da.plot()
+    plt.title(thiscrop_str)
+    # plt.figure(figsize=(12, 24))
+    plt.savefig(os.path.join(outdir_figs, f"{thiscrop_str}.png"))
+    plt.close()
+print('Done.')
+
+
+# %% Plot one figure for big 6
+
+linewidth = 1
+size = (18, 8.5)
+size = (18*2, 8.5*2)
+
+f, axes = get_figs_axes(2, 3, size)
+for i, thiscrop_str in enumerate(['corn', 'cotton', 'rice', 'soybean', 'sugarcane', 'spring_wheat']):
+    print(f"{thiscrop_str}...")
+    da50 = get_map(lu50, thiscrop_str)
+    da52 = get_map(lu52, thiscrop_str)
+    da = da52 - da50
+    da.attrs = {'long_name': f"∆ {thiscrop_str}",
+                'units': '% pts.'}
+    
+    ax = axes[i]
+    vmax = np.nanmax(np.abs(da.values))
+    im = ax.pcolormesh(da.lon.values, da.lat.values,
+                       da, shading="auto", cmap='RdBu_r',
+                       vmin =-vmax, vmax=vmax)
+    ax.set_extent([-180,180,-63,90],crs=ccrs.PlateCarree())
+    # ax.coastlines(linewidth=linewidth, color="white")
+    ax.coastlines(linewidth=linewidth*0.6)
+    ax.axis('off')
+    cbar = plt.colorbar(im, ax=ax, location='bottom')
+    cbar.ax.set_xlabel("ctsm52 - ctsm50 (% pts)", fontsize=25)
+    cbar.ax.tick_params(labelsize=22)
+    ax.set_title(thiscrop_str, fontsize=28, fontweight='bold')
+f.savefig(os.path.join(outdir_figs, "main6.png"),
+          facecolor='white',
+          bbox_inches='tight', pad_inches=0.25)
+plt.show()
+print('Done.')
