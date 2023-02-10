@@ -612,9 +612,11 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                 # Chunk colorbar
                 cbar_ticklabels = None
                 if chunk_colorbar:
+                    if not ("DATE" in this_var or this_var=="GSLEN"):
+                        raise RuntimeError(f"Do not chunk colorbar for {this_var}")
                     vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[0], axes[0], this_var, abs_cmap, False)
                     if ref_casename:
-                        diff_vmin, diff_vmax, diff_Ncolors, diff_this_cmap, diff_cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[2], axes[2], this_var, diff_cmap, True)
+                        diff_vmin, diff_vmax, diff_Ncolors, diff_this_cmap, diff_cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[-1], axes[-1], this_var, diff_cmap, True)
                         while diff_eq_vrange[1] <= diff_cbar_ticklabels[-2]:
                             diff_cbar_ticklabels = diff_cbar_ticklabels[1:-1]
                             diff_vmin = diff_cbar_ticklabels[0]
