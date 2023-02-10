@@ -54,6 +54,25 @@ def get_figs_axes(ny, nx, figsize, sharex=False):
     return f_list, axes_list
 
 
+def get_ydata_gridcells(thisVar, plot_y1, plot_yN, cases, fig_caselist):
+    first_case = True
+    for casename, case in cases.items():
+        if casename not in fig_caselist:
+            continue
+        ts_thisVar_y = case['ds'][thisVar].sum(dim="gridcell") * 1e-9 # m3 to km3
+        ts_thisVar_y = ts_thisVar_y.sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+        
+        # Save
+        if first_case:
+            ydata_thisVar = np.expand_dims(ts_thisVar_y.values, axis=0)
+            first_case = False
+        else:
+            ydata_thisVar = np.concatenate((ydata_thisVar,
+                                            np.expand_dims(ts_thisVar_y.values, axis=0)),
+                                           axis=0)
+    return ydata_thisVar
+
+
 def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel, y1, yN, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None, show_legend=False, ylabel_xcoord=-0.125, ny=None):
     da = xr.DataArray(data = ydata_this,
                             coords = {'Case': caselist,
@@ -343,7 +362,7 @@ def get_CLM_ts_prod_y(case, lu_ds, use_annual_yields, min_viable_hui, mxmats, th
 
 
 
-def global_timeseries_irrig_inclcrops(thisVar, cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=(35, 18), noFigs=False, ny=2, nx=4, plot_y1=1980, plot_yN=2010):
+def global_timeseries_irrig_inclcrops(thisVar, cases, reses, cropList_combined_clm, outDir_figs, extra="Total (all land)", figsize=(35, 18), noFigs=False, ny=2, nx=4, plot_y1=1980, plot_yN=2010):
     
     if not noFigs:
         # f_lines_area, axes_lines_area = get_figs_axes(ny, nx, figsize)
@@ -368,33 +387,27 @@ def global_timeseries_irrig_inclcrops(thisVar, cases, reses, cropList_combined_c
         for i, (casename, case) in enumerate(cases.items()):
             if casename not in fig_caselist:
                 continue
-            lu_ds = reses[case['res']]['ds']
             is_obs.append(False)
-        
-            # Area
-            incl_crops = get_incl_crops(thisCrop_clm, case['ds'].vegtype_str, cropList_combined_clm, only_irrigated=True)
-            ts_area_y = get_CLM_ts_area_y(case, lu_ds, thisCrop_clm, cropList_combined_clm, incl_crops=incl_crops)
             
-            # Irrigation
-            ts_irrig_y = get_sum_over_patches(case['ds'][thisVar] * 1e-9, # m3 to km3
-                                              incl_crops=incl_crops,
-                                              patches1d_itype_veg=case['ds']['patches1d_itype_veg'])
-            
-            # Trim to years of interest
-            ts_irrig_y = ts_irrig_y.sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
-            
-            # Save
-            if first_case:
-                ydata_area = np.expand_dims(ts_area_y.values, axis=0)
-                ydata_irrig = np.expand_dims(ts_irrig_y.values, axis=0)
-                first_case = False
+            if thisCrop_clm == "Total (all land)":
+                ydata_irrig = get_ydata_gridcells("IRRIG_FROM_SURFACE_GRID_ANN", plot_y1, plot_yN, cases, fig_caselist)
             else:
-                ydata_area = np.concatenate((ydata_area,
-                                            np.expand_dims(ts_area_y.values, axis=0)),
-                                            axis=0)
-                ydata_irrig = np.concatenate((ydata_irrig,
-                                            np.expand_dims(ts_irrig_y.values, axis=0)),
-                                            axis=0)
+
+                # Irrigation
+                incl_crops = get_incl_crops(thisCrop_clm, case['ds'].vegtype_str, cropList_combined_clm, only_irrigated=True)
+                ts_irrig_y = get_sum_over_patches(case['ds'][thisVar] * 1e-9, # m3 to km3
+                                                incl_crops=incl_crops,
+                                                patches1d_itype_veg=case['ds']['patches1d_itype_veg'])
+                ts_irrig_y = ts_irrig_y.sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+                
+                # Save
+                if first_case:
+                    ydata_irrig = np.expand_dims(ts_irrig_y.values, axis=0)
+                    first_case = False
+                else:
+                    ydata_irrig = np.concatenate((ydata_irrig,
+                                                np.expand_dims(ts_irrig_y.values, axis=0)),
+                                                axis=0)
                         
         # Make plots for this crop
         if not noFigs:
@@ -409,7 +422,6 @@ def global_timeseries_irrig_inclcrops(thisVar, cases, reses, cropList_combined_c
             else:
                 ylabel = "km$^3$"
             subplot_str = chr(ord('`') + c+1) # or ord('@') for capital
-            # make_1plot_lines(ax_lines_area, ydata_area, fig_caselist, thisCrop_clm, "Mha", xlabel, plot_y1, plot_yN)
             make_1plot_lines(ax_lines_irrig, ydata_irrig, fig_caselist, thisCrop_clm, ylabel, xlabel, plot_y1, plot_yN, subplot_label=subplot_str, ny=ny)
             
     # Finish up and save
@@ -434,21 +446,7 @@ def global_timeseries_irrig_allcrops(thisVar, cases, outDir_figs, figsize=(35, 1
             fig_caselist.remove(casename)
     
     # CLM outputs
-    first_case = True
-    for casename, case in cases.items():
-        if casename not in fig_caselist:
-            continue
-        ts_thisVar_y = case['ds'][thisVar].sum(dim="gridcell") * 1e-9 # m3 to km3
-        ts_thisVar_y = ts_thisVar_y.sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
-        
-        # Save
-        if first_case:
-            ydata_thisVar = np.expand_dims(ts_thisVar_y.values, axis=0)
-            first_case = False
-        else:
-            ydata_thisVar = np.concatenate((ydata_thisVar,
-                                            np.expand_dims(ts_thisVar_y.values, axis=0)),
-                                           axis=0)
+    ydata_thisVar = get_ydata_gridcells(thisVar, plot_y1, plot_yN, cases, fig_caselist)
     
     # Make figure
     if not noFigs:

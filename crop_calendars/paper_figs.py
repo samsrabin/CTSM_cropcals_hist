@@ -99,6 +99,7 @@ for i, mxmat in enumerate(paramfile_mxmats):
 
 # %% Import model output
 importlib.reload(cc)
+importlib.reload(utils)
 
 y1 = 1961
 yN = 2013
@@ -517,8 +518,10 @@ print('Done with import and setup.')
 
 
 
-# %% Compare area, production, and yield of individual crops
+# %% Compare area, production, yield, and irrigation of individual crops
 importlib.reload(cc)
+importlib.reload(sys.modules['fig_global_timeseries'])
+from fig_global_timeseries import global_timeseries_yieldetc, global_timeseries_irrig_inclcrops, global_timeseries_irrig_allcrops
 
 # # GGCMI setup, for reference:
 # min_viable_hui = "ggcmi3"
@@ -585,85 +588,88 @@ cases = global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, 
 
 if incl_irrig:
     global_timeseries_irrig_inclcrops("IRRIG_DEMAND_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=figsize, noFigs=noFigs, ny=ny, nx=nx, plot_y1=plot_y1, plot_yN=plot_yN)
-    global_timeseries_irrig_inclcrops("IRRIG_APPLIED_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (grains)", figsize=figsize, noFigs=noFigs, ny=ny, nx=nx, plot_y1=plot_y1, plot_yN=plot_yN)
+    global_timeseries_irrig_inclcrops("IRRIG_APPLIED_PATCH_ANN", cases, reses, cropList_combined_clm, outDir_figs, extra="Total (all land)", figsize=figsize, noFigs=noFigs, ny=ny, nx=nx, plot_y1=plot_y1, plot_yN=plot_yN)
     global_timeseries_irrig_allcrops("IRRIG_FROM_SURFACE_GRID_ANN", cases, outDir_figs, figsize=(16,10), noFigs=noFigs, plot_y1=plot_y1, plot_yN=plot_yN)
 
 
 # %% Make maps of individual crops (rainfed, irrigated)
+importlib.reload(cc)
 importlib.reload(sys.modules['fig_maps_eachCrop'])
 from fig_maps_eachCrop import maps_eachCrop
+importlib.reload(sys.modules['cropcal_figs_module'])
+from cropcal_figs_module import *
 
 # Yield settings
 min_viable_hui = "ggcmi3"
 mxmat_limited = False
 
 # Define reference case, if you want to plot differences
-ref_casename = None
-# ref_casename = 'CLM Default'
+# ref_casename = None
+ref_casename = 'CLM Default'
 # ref_casename = 'rx'
 
 overwrite = True
-chunk_colorbar = False # Do not enable except for dates/gslen
+chunk_colorbar = True # Do not enable except for dates/gslen
 
 plot_y1 = 1980
 plot_yN = 2010
 
 varList = {
-    'GDDHARV': {
-        'suptitle':   'Mean harvest requirement',
-        'time_dim':   'gs',
-        'units':      'GDD',
-        'multiplier': 1},
-    'YIELD_ANN': {
-        'suptitle':   'Mean annual yield',
-        'time_dim':   'time',
-        'units':      't/ha',
-        'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
-    'PROD_ANN': {
-        'suptitle':   'Mean annual production',
-        'time_dim':   'time',
-        'units':      'Mt',
-        'multiplier': 1e-12}, # g to Mt
-    'GSLEN': {
-        'suptitle':   'Mean growing season length',
-        'time_dim':   'gs',
-        'units':      'days',
-        'multiplier': 1},
-    'HDATES': {
-        'suptitle':   'Mean harvest date',
-        'time_dim':   'gs',
-        'units':      'day of year',
-        'multiplier': 1},
-    'HUI': {
-        'suptitle':   'Mean HUI at harvest',
-        'time_dim':   'gs',
-        'units':      'GDD',
-        'multiplier': 1},
-    'HUIFRAC': {
-        'suptitle':   'Mean HUI at harvest (fraction of required)',
-        'time_dim':   'gs',
-        'units':      'Fraction of required',
-        'multiplier': 1},
+    # 'GDDHARV': {
+    #     'suptitle':   'Mean harvest requirement',
+    #     'time_dim':   'gs',
+    #     'units':      'GDD',
+    #     'multiplier': 1},
+    # 'YIELD_ANN': {
+    #     'suptitle':   'Mean annual yield',
+    #     'time_dim':   'time',
+    #     'units':      't/ha',
+    #     'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
+    # 'PROD_ANN': {
+    #     'suptitle':   'Mean annual production',
+    #     'time_dim':   'time',
+    #     'units':      'Mt',
+    #     'multiplier': 1e-12}, # g to Mt
+    # 'GSLEN': {
+    #     'suptitle':   'Mean growing season length',
+    #     'time_dim':   'gs',
+    #     'units':      'days',
+    #     'multiplier': 1},
+    # 'HDATES': {
+    #     'suptitle':   'Mean harvest date',
+    #     'time_dim':   'gs',
+    #     'units':      'day of year',
+    #     'multiplier': 1},
+    # 'HUI': {
+    #     'suptitle':   'Mean HUI at harvest',
+    #     'time_dim':   'gs',
+    #     'units':      'GDD',
+    #     'multiplier': 1},
+    # 'HUIFRAC': {
+    #     'suptitle':   'Mean HUI at harvest (fraction of required)',
+    #     'time_dim':   'gs',
+    #     'units':      'Fraction of required',
+    #     'multiplier': 1},
     'SDATES': {
         'suptitle':   'Mean sowing date',
         'time_dim':   'gs',
         'units':      'day of year',
         'multiplier': 1},
-    'MATURE': {
-        'suptitle':   'Mature harvests',
-        'time_dim':   'gs',
-        'units':      'fraction',
-        'multiplier': 1},
-    'IRRIG_DEMAND_PATCH_ANN': {
-        'suptitle':   'Mean irrigation water demand',
-        'time_dim':   'time',
-        'units':      'km$^3$ yr$^{-1}$',
-        'multiplier': 1e-9},
-    'QIRRIG_DEMAND_PATCH_PKMTH': {
-        'suptitle':   'Mean irrigation water demand: Peak month',
-        'time_dim':   "time", # Only used to set label "Year"
-        'units':      'month',
-        'multiplier': 1},
+    # 'MATURE': {
+    #     'suptitle':   'Mature harvests',
+    #     'time_dim':   'gs',
+    #     'units':      'fraction',
+    #     'multiplier': 1},
+    # 'IRRIG_DEMAND_PATCH_ANN': {
+    #     'suptitle':   'Mean irrigation water demand',
+    #     'time_dim':   'time',
+    #     'units':      'km$^3$ yr$^{-1}$',
+    #     'multiplier': 1e-9},
+    # 'QIRRIG_DEMAND_PATCH_PKMTH': {
+    #     'suptitle':   'Mean irrigation water demand: Peak month',
+    #     'time_dim':   "time", # Only used to set label "Year"
+    #     'units':      'month',
+    #     'multiplier': 1},
 }
 
 nx = 2
@@ -692,6 +698,11 @@ print('Done making maps.')
 
 
 # %% Make gridcell-level maps
+importlib.reload(sys.modules['fig_maps_grid'])
+from fig_maps_grid import *
+importlib.reload(cc)
+importlib.reload(sys.modules['cropcal_figs_module'])
+from cropcal_figs_module import *
 
 varList = {
     'IRRIG_FROM_SURFACE_GRID_ANN': {
@@ -1537,6 +1548,10 @@ print("Done.")
 
 
 # %% Make maps of average production and/or yield for all crops
+importlib.reload(sys.modules['cropcal_figs_module'])
+from cropcal_figs_module import *
+importlib.reload(sys.modules['fig_maps_allCrops'])
+from fig_maps_allCrops import *
 
 these_cases = ['CLM Default', 'Prescribed Calendars']
 varList = {
@@ -1591,3 +1606,43 @@ for (this_var, var_info) in varList.items():
 
 print("Done.")
 
+
+# %% 
+
+def color_algo(maxval_in):
+    Ncolors = 9
+    
+    maxval = maxval_in
+    factor = 1
+    while maxval < Ncolors:
+        factor *= 10
+        maxval *= 10
+    if maxval % Ncolors > 0:
+        maxval = np.ceil(maxval / Ncolors)*Ncolors
+    vmin = -maxval / factor
+    vmax = maxval / factor
+    binwidth = 2*vmax / Ncolors
+    try:
+        bounds = np.arange(vmin, vmax + maxval_in/100, binwidth)
+    except:
+        print(f"maxval_in: {maxval_in}")
+        print(f"factor: {factor}")
+        print(f"maxval: {maxval}")
+        print(f"binwidth: {binwidth}")
+        stop
+    if bounds[-2] >= maxval_in:
+        print(f"maxval_in: {maxval_in}")
+        print(f"vmin: {vmin}")
+        print(f"vmax: {vmax}")
+        print(f"binwidth: {binwidth}")
+        print(f"factor: {factor}")
+        print(f"maxval: {maxval}")
+        print(f"bounds: {bounds}")
+        raise RuntimeError(f"maxval_in {maxval_in} not in top bin ({bounds[-2]},{bounds[-1]})")
+ 
+ 
+for i,x in enumerate(np.arange(0.01,19,0.07)):
+    if i>0 and i % 20 == 0:
+        print(i)
+    color_algo(x)
+print("All good")
