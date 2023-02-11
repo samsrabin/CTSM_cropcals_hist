@@ -63,9 +63,9 @@ def adjust_grainC(da_in, patches1d_itype_veg_str):
         elif np.any(tmp > 0):
             raise RuntimeError(f"You need to get a real dry-matter fraction for {thisCrop}")
         
-        # For sugarcane, also account for the fact that sugar is only 43% of dry matter
+        # For sugarcane, also account for the fact that sugar is only 43% of dry matter. Also derived from Irvine, Cane Sugar Handbook, 10th ed., 1977, P. 16. (see sugarcane.py)
         if thisCrop == "sugarcane":
-            tmp /= 1 - 0.43
+            tmp /= 0.43
         
         wet_tp[i_thisCrop, ...] = np.moveaxis(tmp, patch_dim, 0)
     
