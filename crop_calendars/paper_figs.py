@@ -565,7 +565,7 @@ obs_for_fig = "FAOSTAT"
 
 # Which years to include?
 plot_y1 = 1980
-plot_yN = 2010
+plot_yN = 2009
 
 # Do not actually make figures
 noFigs = False
