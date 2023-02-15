@@ -1170,6 +1170,120 @@ for c, thisCrop in enumerate(fao_crops):
 
 print("Done.")
 
+
+# %% Get country totals
+
+# country = "World"
+# country = "India"
+country = 'China, mld.'
+
+# thisCrop_str = None
+thisCrop_str = "sugarcane"
+
+stat_y1 = 1980
+stat_yN = 2009
+
+varList = {
+    'IRRIG_DEMAND_PATCH_ANN': {
+        'suptitle':   'Mean irrigation water demand',
+        'time_dim':   'time',
+        'units':      'km3/yr',
+        'multiplier': 1e-9,
+        'operation': 'sum'},
+    'PROD_ANN': {
+        'suptitle':   'Mean annual production',
+        'time_dim':   'time',
+        'units':      'Mt',
+        'multiplier': 1e-12, # g to Mt
+        'operation': 'sum'},
+    'AREA_ANN': {
+        'suptitle':   'Mean annual area',
+        'time_dim':   'time',
+        'units':      'Mha',
+        'multiplier': 1e-6 * 1e-4, # m2 to Mha
+        'operation': 'sum'},
+    'YIELD_ANN': {
+        'suptitle':   'Mean annual yield',
+        'time_dim':   'time',
+        'units':      't/ha',
+        'multiplier': 1e-6 * 1e4, # g/m2 to tons/ha
+        'operation': 'area-weighted mean'},
+    'NHARVEST_DISCREP': {
+        'suptitle':   'Mean N harvests that would be missed if only seeing max 1 per calendar year',
+        'time_dim':   'time',
+        'units':      'count',
+        'multiplier': 1,
+        'operation': 'sum'},
+}
+
+if country != "World":
+    if country not in countries_key.name.values:
+        raise RuntimeError(f"{country} not found in countries key")
+    country_id = int(countries_key.num[countries_key.name==country])
+print(f"{country}:")
+
+for (this_var, var_info) in varList.items():
+    print(f"{stat_y1}-{stat_yN} {var_info['suptitle']} ({var_info['units']}):")
+    for i, (casename, case) in enumerate(cases.items()):
+        if this_var == "AREA_ANN":
+            case_da = reses[case['res']]['ds']['AREA_CFT']
+        else:
+            case_da = case['ds'][this_var]
+        case_da = case_da.sel(time=slice(f"{stat_y1}-01-01", f"{stat_yN}-12-31"))
+        
+        # Get weights
+        if "patch" not in case_da.dims:
+            raise RuntimeError(f"Set up weights for dims {case_da.dims}")
+        Nyears = stat_yN - stat_y1 + 1
+        weights_time = xr.DataArray(data = np.full_like(case['ds']['patches1d_lon'], 1/Nyears),
+                                    coords = case['ds']['patches1d_lon'].coords)
+        if var_info['operation'] == "area-weighted mean":
+            weight_numerators_time = reses[case['res']]['ds']['AREA_CFT'].sel(time=slice(f"{stat_y1}-01-01", f"{stat_yN}-12-31"))
+            # print("You may not want to area-weight across years within each gridcell")
+            # weights_time = (weight_numerators_time / weight_numerators_time.sum(dim="time")).values
+            # weights_time[np.where(weight_numerators_time.sum(dim="time")==0)] = 0
+            # weights_time = xr.DataArray(data = weights_time,
+            #                             coords = weight_numerators_time.coords)
+            weight_numerators = weight_numerators_time.mean(dim="time")
+        else:
+            weight_numerators = None
+            
+        # Get time-averaged mean
+        case_da = (case_da * weights_time).sum(dim="time")
+        
+        # Mask not-included countries
+        if country != "World":
+            if "patch" not in case_da.dims:
+                raise RuntimeError(f"No country DataArray compatible with dims {case_da.dims}")
+            case_countries = reses[case['res']]['ds']['countries']
+            case_da = case_da.where(case_countries==country_id)
+            if var_info['operation'] == "area-weighted mean":
+                weight_numerators = weight_numerators.where(case_countries==country_id)
+        
+        # Mask not-included crops
+        if thisCrop_str is not None:
+            if "patch" not in case_da.dims:
+                raise RuntimeError(f"You can't distinguish crops in a DataArray with dims {case_da.dims}")
+            is_thisCrop = [True if thisCrop_str.lower() in x.lower() else False for x in case['ds']['patches1d_itype_combinedCropCLM_str'].values]
+            case_da = case_da.where(is_thisCrop)
+            if var_info['operation'] == "area-weighted mean":
+                weight_numerators = weight_numerators.where(is_thisCrop)
+        
+        # Perform the operation to get statistic
+        if var_info['operation'] == "sum":
+            value = case_da.sum().values
+        elif var_info['operation'] == "area-weighted mean":
+            weights = weight_numerators / weight_numerators.sum()
+            value = (case_da * weights).sum().values
+        else:
+            raise RuntimeError(f"Unsure how to process operation {var_info['operation']}")
+        
+        value *= var_info['multiplier']
+        print(f"   {casename}: {value}")
+    
+    
+    
+
     
 # %% Compare mean growing season length to GGCMI models
 
