@@ -44,7 +44,7 @@ def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_typ
     return this_map, time_dim
 
 
-def make_map(ax, this_map, fontsize, lonlat_bin_width=None, units=None, cmap='viridis', vrange=None, linewidth=1.0, this_title=None, show_cbar=False, bounds=None, extend_bounds='both', vmin=None, vmax=None, cbar=None, ticklabels=None, extend_nonbounds='both', subplot_label=None, cbar_max=None): 
+def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_max=None, cmap='viridis', extend_bounds='both', extend_nonbounds='both', linewidth=1.0, lonlat_bin_width=None, show_cbar=False, subplot_label=None, this_title=None, ticklabels=None, units=None, vmax=None, vmin=None, vrange=None): 
     
     if bounds is not None:
         norm = mcolors.BoundaryNorm(bounds, cmap.N, extend=extend_bounds)
