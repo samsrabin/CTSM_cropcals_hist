@@ -1895,6 +1895,13 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
     this_ds_gs = this_ds_gs.assign_coords({'cftime': this_ds['time_bounds'].isel({'hist_interval': 0})})
     this_ds_gs = this_ds_gs.assign_coords({"time": [t.year for t in this_ds_gs['cftime'].values]})
     
+    # Get number of harvests
+    this_ds_gs['NHARVESTS'] = (this_ds_gs['GDDHARV_PERHARV'] > 0).sum(dim="mxharvests")
+    # Get number of harvests that would be missed if only seeing max 1 per calendar year
+    if np.any(this_ds_gs['NHARVESTS'] > 2):
+        raise RuntimeError("How to get NHARVEST_DISCREP for NHARVESTS > 2?")
+    this_ds_gs['NHARVEST_DISCREP'] = (this_ds_gs['NHARVESTS'] == 2).astype(int)
+    
     # Import irrigation data, if doing so
     if incl_irrig:
     
