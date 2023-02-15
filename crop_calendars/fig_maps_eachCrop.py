@@ -224,7 +224,7 @@ def get_figure_info(ny, nx, ref_casename):
     return cbar_pos, figsize, hspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos
 
 
-def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False):
+def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False, save_netcdfs=False):
     
     if this_var == "GSLEN":
         cbar_max = gslen_colorbar_max
@@ -434,6 +434,8 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
             else:
                 ims[i*2] = im
                 cbs[i*2] = cb
+            if save_netcdfs:
+                this_map_sel.to_netcdf(f"/Users/sam/Downloads/{thisCrop_main}.nc")
 
         irrigated_types = [x for x in found_types if "irrigated" in x]
         if len(rainfed_types) > 0:
@@ -480,6 +482,8 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
         else:
             ims[i*2 + 1] = im
             cbs[i*2 + 1] = cb
+        if save_netcdfs:
+            this_map_sel.to_netcdf(f"/Users/sam/Downloads/{thisCrop_main}.nc")
             
     vrange = [allmaps_min, allmaps_max]
     if not np.isinf(allmaps_diff_min):
@@ -491,7 +495,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
     return units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors
 
 
-def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_viable_hui, mxmats_tmp, nx_in, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList, chunk_colorbar=False):
+def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_viable_hui, mxmats_tmp, nx_in, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList, chunk_colorbar=False, save_netcdfs=False):
 
     for (this_var, var_info) in varList.items():
         
@@ -580,7 +584,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
             ims = []
             axes = []
             cbs = []
-            units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, abs_cmap=abs_cmap, diff_cmap=diff_cmap)
+            units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, abs_cmap=abs_cmap, diff_cmap=diff_cmap, save_netcdfs=save_netcdfs)
 
             fig.suptitle(this_suptitle,
                             x = suptitle_xpos,
