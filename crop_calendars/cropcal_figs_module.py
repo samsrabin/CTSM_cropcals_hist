@@ -76,8 +76,8 @@ def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_max=None, cmap
     # ax.add_feature(cfeature.BORDERS, linewidth=linewidth*0.6)
     
     # Coastlines
-    ax.coastlines(linewidth=linewidth, color="white")
-    ax.coastlines(linewidth=linewidth*0.6)
+    ax.coastlines(linewidth=linewidth, color="white", alpha=0.5)
+    ax.coastlines(linewidth=linewidth*0.6, alpha=0.3)
     
     if this_title:
         ax.set_title(this_title, fontsize=fontsize['titles'])
