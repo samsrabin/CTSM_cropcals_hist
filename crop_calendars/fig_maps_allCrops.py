@@ -110,7 +110,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
             pct_absdiffs_masked_before = get_amount_masked(c, crop, this_map_timemean, sumdiff_beforemask, pct_absdiffs_masked_before, "difference not significant")
             
         # If doing so, mask out negligible cells
-        if False:
+        if 'mask_negligible' in varInfo and varInfo['mask_negligible']:
             
             # Show gray "underlay" map where crop is grown but masked
             if underlay is None:
