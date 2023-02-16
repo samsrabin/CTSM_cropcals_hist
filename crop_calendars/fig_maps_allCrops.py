@@ -36,6 +36,20 @@ def get_amount_masked(c, crop, this_map_timemean, sumdiff_beforemask, pct_absdif
     return pct_absdiffs_masked_before
 
 
+def get_lowest_threshold(this_map_timemean, frac_to_include):
+    flattened = np.abs(this_map_timemean.values).flatten()
+    flattened_is_ok = np.where(~np.isnan(flattened))
+    okflattened = flattened[flattened_is_ok]
+    oksorted = np.flip(np.sort(okflattened))
+    okcumsum = np.cumsum(oksorted)
+    okcumprop = okcumsum / np.sum(oksorted)
+    for i, x in enumerate(okcumprop):
+        if x >= frac_to_include:
+            break
+    lowest_threshold = oksorted[i]
+    return lowest_threshold
+
+
 def get_underlay(this_ds, area_map_sum):
     dummy_var = 'gridcell'
     dummy_data = np.full_like(this_ds[dummy_var].values, 1.0)
@@ -83,6 +97,8 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
         sumdiff_beforemask = np.nansum(np.abs(this_map_timemean.values))
         max_absdiff_beforemask = np.max(np.abs(this_map_timemean))
         pct_absdiffs_masked_before = 0
+        frac_to_include = 0.95
+        lowest_threshold = get_lowest_threshold(this_map_timemean, frac_to_include)
         
         # If doing so, mask out cells not significantly different from zero
         if 'mask_sig_diff_from_0' in varInfo and varInfo['mask_sig_diff_from_0']:
@@ -121,6 +137,19 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
             
             # Diagnostics
             pct_absdiffs_masked_before = get_amount_masked(c, crop, this_map_timemean, sumdiff_beforemask, pct_absdiffs_masked_before, "difference negligible")
+            
+        # If doing so, mask out all but cells comprising top 95% of absolute differences
+        if 'mask_lowest' in varInfo and varInfo['mask_lowest']:
+            
+            # Show gray "underlay" map where crop is grown but masked
+            if underlay is None:
+                underlay = get_underlay(this_ds, area_map_sum)
+            
+            # Mask all but top cells
+            this_map_timemean = this_map_timemean.where(np.abs(this_map_timemean) >= lowest_threshold)
+            
+            # Diagnostics
+            pct_absdiffs_masked_before = get_amount_masked(c, crop, this_map_timemean, sumdiff_beforemask, pct_absdiffs_masked_before, f"lowest, threshold {lowest_threshold}")
             
         # Get color bar info
         if is_diff:

@@ -1677,7 +1677,7 @@ varList = {
         'suptitle':   'Mean annual production',
         'units':      'Mt',
         'multiplier': 1e-12, # g to Mt
-        'mask_sig_diff_from_0': True},
+        'mask_lowest': True},
     'YIELD_ANN': {
         'suptitle':   'Mean annual yield',
         'units':      't/ha',
@@ -1702,7 +1702,7 @@ varList = {
         'suptitle':   'Mean annual production bias rel. EarthStat',
         'units':      '∆ abs.\nbias (Mt)',
         'multiplier': 1e-6, # t to Mt
-        'mask_sig_diff_from_0': True},
+        'mask_lowest': True},
     'IRRIG_DEMAND_PATCH_ANN': {
         'suptitle':   'Mean annual irrigation',
         'units':      'km$^3$ yr$^{-1}$',
@@ -1711,7 +1711,7 @@ varList = {
         'suptitle':   'Mean annual irrigation difference',
         'units':      'km$^3$ yr$^{-1}$',
         'multiplier': 1e-9, # m3 to km3
-        'mask_sig_diff_from_0': True},
+        'mask_lowest': True},
 }
 
 # Yield settings
