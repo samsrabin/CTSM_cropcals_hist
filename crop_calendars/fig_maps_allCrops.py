@@ -98,6 +98,8 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
         
         # Set up for masking
         underlay = None
+        underlay_color = [0.75, 0.75, 0.75, 1]
+        any_masked = False
         sumdiff_beforemask = np.nansum(np.abs(this_map_timemean.values))
         max_absdiff_beforemask = np.max(np.abs(this_map_timemean))
         pct_absdiffs_masked_before = 0
@@ -106,6 +108,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
         
         # If doing so, mask out cells not significantly different from zero
         if 'mask_sig_diff_from_0' in varInfo and varInfo['mask_sig_diff_from_0']:
+            any_masked = True
             
             # Show gray "underlay" map where crop is grown but masked
             if underlay is None:
@@ -131,6 +134,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
             
         # If doing so, mask out negligible cells
         if 'mask_negligible' in varInfo and varInfo['mask_negligible']:
+            any_masked = True
             
             # Show gray "underlay" map where crop is grown but masked
             if underlay is None:
@@ -142,18 +146,19 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
             # Diagnostics
             pct_absdiffs_masked_before = get_amount_masked(c, crop, this_map_timemean, sumdiff_beforemask, pct_absdiffs_masked_before, "difference negligible")
             
-        # If doing so, mask out all but cells comprising top 95% of absolute differences
+        # If doing so, mask out all but cells comprising top 95% of absolute differences.
+        # NOTE that we're not actually masking here. We are instead setting a special color for such cells.
         if 'mask_lowest' in varInfo and varInfo['mask_lowest']:
+            any_masked = True
             
-            # Show gray "underlay" map where crop is grown but masked
-            if underlay is None:
-                underlay = get_underlay(this_ds, area_map_sum)
-            
-            # Mask all but top cells
-            this_map_timemean = this_map_timemean.where(np.abs(this_map_timemean) >= lowest_threshold)
+            # FAKE-mask all but top cells
+            this_map_timemean_fake = this_map_timemean.where(np.abs(this_map_timemean) >= lowest_threshold)
             
             # Diagnostics
-            pct_absdiffs_masked_before = get_amount_masked(c, crop, this_map_timemean, sumdiff_beforemask, pct_absdiffs_masked_before, f"lowest, threshold {lowest_threshold}")
+            pct_absdiffs_masked_before = get_amount_masked(c, crop, this_map_timemean_fake, sumdiff_beforemask, pct_absdiffs_masked_before, f"lowest, threshold {lowest_threshold}")
+            
+            # Because this is just a fake mask we must not do any additional masking, real or fake, after this. If we do, then our diagnostics for that will be messed up. To ensure we don't try to do any subsequent masking, set this to None, which should throw an error in get_amount_masked().
+            pct_absdiffs_masked_before = None
             
         # Get color bar info
         if is_diff:
@@ -165,7 +170,10 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
         
         # Chunk colormap ONLY when masking
         this_cmap = cmap
-        if underlay is not None:
+        bounds = None
+        ticks_orig = None
+        cbar_spacing = "uniform"
+        if any_masked:
             if is_diff:
                 
                 # Make a temporary plot with the same color axis and colorbar settings we would use in make_map().
@@ -175,22 +183,23 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
                 
                 # Where did plt.colorbar() draw bin boundaries? These are referred to as "tick marks," but note that the extreme values might lie outside [vmin, vmax].
                 ticks_orig = cb0.get_ticks()
+                bounds = ticks_orig
                 
                 # In our plot, we will move vmin left and vmax right to ensure that the tick marks are the color bin boundaries.
-                if cb0.vmin < ticks_orig[0]:
-                    raise RuntimeError("Handle vmin < ticks_orig[0]")
-                elif cb0.vmax > ticks_orig[-1]:
-                    raise RuntimeError("Handle vmax > ticks_orig[-1]")
-                elif 0 not in ticks_orig:
-                    raise RuntimeError("Handle 0 not in ticks_orig")
-                vmin = ticks_orig[0]
-                vmax = ticks_orig[-1]
+                if cb0.vmin < bounds[0]:
+                    raise RuntimeError("Handle vmin < bounds[0]")
+                elif cb0.vmax > bounds[-1]:
+                    raise RuntimeError("Handle vmax > bounds[-1]")
+                elif 0 not in bounds:
+                    raise RuntimeError("Handle 0 not in bounds")
+                vmin = bounds[0]
+                vmax = bounds[-1]
                 
                 # Get number of color bins
-                Nbins = len(ticks_orig) - 1
-                bottom_of_topbin = ticks_orig[-2]
-                bottom_of_2ndbin = ticks_orig[-3]
-                binwidth = ticks_orig[-1] - ticks_orig[-2]
+                Nbins = len(bounds) - 1
+                bottom_of_topbin = bounds[-2]
+                bottom_of_2ndbin = bounds[-3]
+                binwidth = bounds[-1] - bounds[-2]
                 if Nbins < 8:
                     Nbins *= 2
                     bottom_of_2ndbin = bottom_of_topbin
@@ -205,9 +214,38 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
                     vmax -= binwidth
                     vmin += binwidth
                     Nbins-=2
-                
+                    if ticks_orig[0] < vmin:
+                        ticks_orig = ticks_orig[1:]
+                    if ticks_orig[-1] > vmax:
+                        ticks_orig = ticks_orig[:-1]
+                    
                 # Get new colormap with the right number of bins.
                 this_cmap = cm.get_cmap(cmap, Nbins)
+                if Nbins % 2:
+                    raise RuntimeError(f"Expected even number of color bins; got {Nbins}")
+                
+                # Special color for small-masked cells
+                if 'mask_lowest' in varInfo and varInfo['mask_lowest']:
+                    
+                    # Add near-zero bin
+                    bounds = np.concatenate((np.arange(vmin, -binwidth+1e-9, binwidth),
+                                             np.array([-lowest_threshold, lowest_threshold]),
+                                             np.arange(binwidth, vmax+1e-9, binwidth)))
+                    cbar_spacing = "proportional"        
+                    
+                    # Add color for that bin
+                    if underlay is not None:
+                        raise RuntimeError("You need a different color to distinguish mask_lowest cells from other-masked cells")
+                    if isinstance(this_cmap, mcolors.LinearSegmentedColormap):
+                        color_list = [this_cmap(x) for x in np.arange(0, 1+1e-9, 1/Nbins)]
+                        this_cmap = mcolors.ListedColormap(color_list)
+                    elif not isinstance(this_cmap, mcolors.ListedColormap):
+                        raise RuntimeError(f"Not sure how to get list of colors from {type(this_cmap)}")
+                    new_colors = np.concatenate((this_cmap.colors[:int(Nbins/2)],
+                                                 np.array([underlay_color]),
+                                                 this_cmap.colors[int(Nbins/2):]),
+                                                axis=0)
+                    this_cmap = mcolors.ListedColormap(new_colors)            
                 
                 # Remove our temporary plot and its colorbar.
                 plt.cla()
@@ -220,7 +258,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
             underlay = underlay.where(area_map_sum>low_area_threshold_m2)
         
         # Plot map
-        im, cb = make_map(ax, this_map_timemean.where(area_map_sum>1e4), fontsize, show_cbar=True, vmin=vmin, vmax=vmax, cmap=this_cmap, extend_nonbounds=None, underlay=underlay)
+        im, cb = make_map(ax, this_map_timemean, fontsize, show_cbar=True, vmin=vmin, vmax=vmax, cmap=this_cmap, extend_nonbounds=None, underlay=underlay, underlay_color=underlay_color, bounds=bounds, extend_bounds="neither", ticklabels=ticks_orig, cbar_spacing=cbar_spacing)
         
         show_cbar_label = True
         cbar_label_x = 0.5
@@ -234,6 +272,9 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
             cb.set_label(label=varInfo['units'], fontsize=fontsize['axislabels'], x=cbar_label_x, labelpad=cbar_labelpad)
         
         ax.set_title(crop, fontsize=fontsize['titles'])
+        
+        # plt.show()
+        # return
     
     hspace = None
     suptitle_y = 0.98

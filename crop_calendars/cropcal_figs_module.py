@@ -44,7 +44,7 @@ def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_typ
     return this_map, time_dim
 
 
-def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_max=None, cmap='viridis', extend_bounds='both', extend_nonbounds='both', linewidth=1.0, lonlat_bin_width=None, show_cbar=False, subplot_label=None, this_title=None, ticklabels=None, underlay=None, underlay_color=[0.75, 0.75, 0.75, 1], units=None, vmax=None, vmin=None, vrange=None):
+def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_max=None, cbar_spacing='uniform', cmap='viridis', extend_bounds='both', extend_nonbounds='both', linewidth=1.0, lonlat_bin_width=None, show_cbar=False, subplot_label=None, this_title=None, ticklabels=None, underlay=None, underlay_color=[0.75, 0.75, 0.75, 1], units=None, vmax=None, vmin=None, vrange=None):
     
     if underlay is not None:
         underlay_cmap = mcolors.ListedColormap(np.array([underlay_color, [1, 1, 1, 1]]))
@@ -56,8 +56,7 @@ def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_max=None, cmap
         im = ax.pcolormesh(this_map.lon.values, this_map.lat.values,
                            this_map, shading="auto",
                            norm=norm,
-                           cmap=cmap,
-                           vmin=vmin, vmax=vmax)
+                           cmap=cmap)
     else:
         im = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
                            this_map, shading="auto",
@@ -86,9 +85,9 @@ def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_max=None, cmap
             cbar.remove()
         
         if bounds is not None:
-            cbar = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), orientation='horizontal', fraction=0.1, pad=0.02)
+            cbar = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), orientation='horizontal', fraction=0.1, pad=0.02, spacing=cbar_spacing)
         else:    
-            cbar = plt.colorbar(im, ax=ax, orientation="horizontal", fraction=0.1, pad=0.02, extend=extend_nonbounds)
+            cbar = plt.colorbar(im, ax=ax, orientation="horizontal", fraction=0.1, pad=0.02, extend=extend_nonbounds, spacing=cbar_spacing)
         
         if ticklabels is not None:
             cbar.set_ticks(ticklabels)
