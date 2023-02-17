@@ -92,7 +92,7 @@ def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_max=None, cmap
         
         if ticklabels is not None:
             cbar.set_ticks(ticklabels)
-            if units.lower() == "month":
+            if units is not None and units.lower() == "month":
                 cbar.set_ticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
                 units == "Month"
         elif cbar_max is not None and im.get_clim()[1] > cbar_max:
