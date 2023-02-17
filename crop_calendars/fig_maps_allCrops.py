@@ -60,7 +60,7 @@ def get_underlay(this_ds, area_map_sum):
     return underlay
 
 
-def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, ds_in, this_suptitle, fig_outfile, is_diff, is_diffdiff):
+def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, ds_in, this_suptitle, fig_outfile, is_diff, is_diffdiff, low_area_threshold_m2):
     fig = plt.figure(figsize=figsize)
     
     if is_diff:
@@ -91,6 +91,10 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
         this_map = this_map.sum(dim="ivt_str")
         this_map *= varInfo['multiplier']
         this_map_timemean = this_map.mean(dim="time")
+        
+        # Mask where not much crop area?
+        if low_area_threshold_m2 is not None:
+            this_map_timemean = this_map_timemean.where(area_map_sum>low_area_threshold_m2)
         
         # Set up for masking
         underlay = None
@@ -210,7 +214,11 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
                 cb0.remove()
             else:
                 raise RuntimeError("How do you have an underlay without a difference map")
-            
+        
+        # Mask where not much crop area?
+        if underlay is not None and low_area_threshold_m2 is not None:
+            underlay = underlay.where(area_map_sum>low_area_threshold_m2)
+        
         # Plot map
         im, cb = make_map(ax, this_map_timemean.where(area_map_sum>1e4), fontsize, show_cbar=True, vmin=vmin, vmax=vmax, cmap=this_cmap, extend_nonbounds=None, underlay=underlay)
         
@@ -249,7 +257,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
     plt.close()
 
 
-def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cropList_combined_clm_nototal, dpi=150, figsize=figsize, min_viable_hui="ggcmi3", mxmats=None, ny=2, nx=3, plot_y1=1980, plot_yN=2009):
+def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cropList_combined_clm_nototal, dpi=150, figsize=figsize, low_area_threshold_m2=1e4, min_viable_hui="ggcmi3", mxmats=None, ny=2, nx=3, plot_y1=1980, plot_yN=2009):
     
     # Process variable info
     is_diff = thisVar[-5:] == "_DIFF"
@@ -288,7 +296,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
         this_ds = this_ds\
                 .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
         
-        make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, is_diff, is_diffdiff)
+        make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, is_diff, is_diffdiff, low_area_threshold_m2)
     
     
     else:
@@ -304,6 +312,6 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             fig_outfile = os.path.join(outDir_figs, f"Map {this_suptitle} {plot_y1}-{plot_yN}.png").replace('Mean annual ', '').replace(':', '')
             print(this_suptitle)
             
-            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, "DIFF" in thisVar, False)
+            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, "DIFF" in thisVar, False, low_area_threshold_m2)
     
     return cases
