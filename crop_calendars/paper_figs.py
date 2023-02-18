@@ -212,7 +212,7 @@ for i, (resname, res) in enumerate(reses.items()):
         continue
     print(f"Importing {resname}...")
     
-    res['ds'] = cc.open_lu_ds(res['lu_path'], y1, yN, case['ds'].sel(time=slice(y1,yN)))
+    res['ds'] = cc.open_lu_ds(res['lu_path'], y1, yN+1, case['ds'].sel(time=slice(y1,yN+1)))
     res['ds'] = res['ds'].assign_coords({"time": [cftime.DatetimeNoLeap(y, 1, 1, 0, 0, 0, 0, has_year_zero=True) for y in res['ds'].time.values]})
     res['dsg'] = xr.Dataset(data_vars={'AREA': utils.grid_one_variable(res['ds'], 'AREA')})
         
@@ -238,13 +238,53 @@ for i, (casename, case) in enumerate(cases.items()):
     case_ds, lu_ds, lat_tolerance = cc.round_lonlats_to_match_ds(case_ds, lu_ds, "lat", initial_tolerance)
         
     # Ensure that time axes are formatted the same
-    case_ds = cc.time_units_and_trim(case_ds, y1, yN, cftime.DatetimeNoLeap)
-    lu_ds = cc.time_units_and_trim(lu_ds, y1, yN, cftime.DatetimeNoLeap)
+    case_ds = cc.time_units_and_trim(case_ds, y1, yN+1, cftime.DatetimeNoLeap)
+    lu_ds = cc.time_units_and_trim(lu_ds, y1, yN+1, cftime.DatetimeNoLeap)
 
     # Save
     case['ds'] = case_ds
     case['ds'].load()
     reses[case['res']]['ds'] = lu_ds
+
+print("Generating crop area masks...")
+for i, (casename, case) in enumerate(cases.items()):
+    print(casename + "...")
+    lu_ds = reses[case['res']]['ds']
+    
+    # Ensure that 'time' axes line up
+    if not np.array_equal(case['ds']['time'].values, lu_ds['time'].values):
+        raise RuntimeError(f"Time axis mismatch between {casename} outputs and land use file")
+    
+    # Where was there crop area at sowing?
+    # Straightforward: 'time' axis lines up for model outputs and LU
+    case['ds']['croparea_positive_sowing'] = lu_ds['AREA_CFT'] > 0
+    
+    # Where was there crop area throughout the season? This is needed for variables with time axis 'gs' (growing season). Where harvest happened the same year as planting, we can just use croparea_positive_sowing. Elsewhere: Mask out cells where either sowing OR harvest year had 0 area.
+    # First, make sure the time/gs axes align correctly.
+    yearY_as_gs = lu_ds['time'].isel(time=slice(0, lu_ds.dims['time'] - 1)).dt.year.values
+    if not np.array_equal(yearY_as_gs, case['ds']['gs'].values):
+        raise RuntimeError("Growing season mismatch")
+    # Start with where there was crop area at sowing.
+    croparea_positive_wholeseason = case['ds']['croparea_positive_sowing'].isel(time=slice(0, lu_ds.dims['time'] - 1)).copy().values
+    # Where was crop area positive in years Y and Y+1? Need to use .values because time coordinates won't match.
+    croparea_positive_bothyears = ((lu_ds['AREA_CFT'].isel(time=slice(0, lu_ds.dims['time'] - 1)) > 0).values # sowing year
+                                 & (lu_ds['AREA_CFT'].isel(time=slice(1, lu_ds.dims['time'])) > 0).values) # harvest year
+    # In patch-growingseasons where harvest year is different from sowing year, use croparea_positive_bothyears instead of croparea_positive_sowing.
+    where_harvyear_not_sowyear = np.where((case['ds']['SYEARS'] != case['ds']['HYEARS']).values)
+    croparea_positive_wholeseason[where_harvyear_not_sowyear] = croparea_positive_bothyears[where_harvyear_not_sowyear]
+    # Convert that to DataArray, using time coordinate of year Y as growing season
+    case['ds']['croparea_positive_wholeseason'] = xr.DataArray(data=croparea_positive_wholeseason,
+                                                           coords={'patch': lu_ds['patch'],
+                                                                   'gs': yearY_as_gs})
+
+    # NOW we can trim the last year from the time axis, at least in this case's Dataset
+    case['ds'] = cc.time_units_and_trim(case['ds'], y1, yN, cftime.DatetimeNoLeap)
+    
+
+# And now that all that's done, trim the last year from land use data.
+for _, res in reses.items():
+    if 'ds' in res:
+        res['ds'] = cc.time_units_and_trim(res['ds'], y1, yN, cftime.DatetimeNoLeap)
 
 print("Done.")
  
