@@ -649,7 +649,6 @@ ref_casename = 'CLM Default'
 # ref_casename = 'rx'
 
 overwrite = True
-chunk_colorbar = False # Do not enable except for dates/gslen
 
 plot_y1 = 1980
 plot_yN = 2010
@@ -674,12 +673,14 @@ varList = {
         'suptitle':   'Mean growing season length',
         'time_dim':   'gs',
         'units':      'days',
-        'multiplier': 1},
+        'multiplier': 1,
+        'chunk_colorbar': True},
     'HDATES': {
         'suptitle':   'Mean harvest date',
         'time_dim':   'gs',
         'units':      'day of year',
-        'multiplier': 1},
+        'multiplier': 1,
+        'chunk_colorbar': True},
     'HUI': {
         'suptitle':   'Mean HUI at harvest',
         'time_dim':   'gs',
@@ -694,7 +695,8 @@ varList = {
         'suptitle':   'Mean sowing date',
         'time_dim':   'gs',
         'units':      'day of year',
-        'multiplier': 1},
+        'multiplier': 1,
+        'chunk_colorbar': True},
     'MATURE': {
         'suptitle':   'Mature harvests',
         'time_dim':   'gs',
@@ -732,7 +734,7 @@ if mxmat_limited:
 else:
     mxmats_tmp = None
 
-maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_viable_hui, mxmats_tmp, nx, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList, chunk_colorbar=chunk_colorbar)
+maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_viable_hui, mxmats_tmp, nx, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList)
     
 print('Done making maps.')
 
