@@ -34,14 +34,25 @@ def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_typ
         return xr.DataArray(), "continue"
     this_map = this_ds[this_var]
     
+    # Prepare to mask out patch-years with no area
+    if "gs" in this_map.dims:
+        croparea_ever_positive = this_ds['croparea_positive_wholeseason'].sum(dim="gs")
+    elif "time" in this_map.dims or this_var in ["QIRRIG_DEMAND_PATCH_PKMTH"]:
+        croparea_ever_positive = this_ds['croparea_positive_sowing'].sum(dim="time")
+    else:
+        raise RuntimeError(f"Unsure how to mask patch-years with no area for {this_var} with dims {this_map.dims}")
+    this_ds['croparea_ever_positive'] = croparea_ever_positive
+    
     # Grid the included vegetation types, if needed
     if "lon" not in this_map.dims:
         this_map = utils.grid_one_variable(this_ds, this_var, vegtype=found_types)
+        croparea_ever_positive = utils.grid_one_variable(this_ds, 'croparea_ever_positive', vegtype=found_types) > 0
     # If not, select the included vegetation types
     else:
         this_map = this_map.sel(ivt_str=found_types)
-    
-    return this_map, time_dim
+        croparea_ever_positive = this_ds['croparea_ever_positive'].sel(ivt_str=found_types) > 0
+        
+    return this_map, croparea_ever_positive, time_dim
 
 
 def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_max=None, cbar_spacing='uniform', cmap='viridis', extend_bounds='both', extend_nonbounds='both', linewidth=1.0, lonlat_bin_width=None, show_cbar=False, subplot_label=None, this_title=None, ticklabels=None, underlay=None, underlay_color=[0.75, 0.75, 0.75, 1], units=None, vmax=None, vmin=None, vrange=None):

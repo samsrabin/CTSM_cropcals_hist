@@ -254,6 +254,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
             ticklabels_to_use = None
             
         if casename == "rx":
+            # Get map
             time_dim = "time"
             these_rx_vars = ["gs1_" + str(x) for x in utils.vegtype_str2int(found_types)]
             this_map = xr.concat((rx_ds[x].assign_coords({'ivt_str': found_types[i]}) for i, x in enumerate(these_rx_vars)), dim="ivt_str")
@@ -262,13 +263,13 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 this_ds = xr.Dataset(data_vars={'tmp': this_map})
                 this_map = utils.grid_one_variable(this_ds, 'tmp')
                 
-            # Apply LU mask
-            parent_map, parent_time_dim = get_non_rx_map(var_info, cases, rx_parent_casename, this_var, thisCrop_main, found_types, plot_y1, plot_yN, ref_casename)
+            # Get mask
+            _, croparea_ever_positive, parent_time_dim = get_non_rx_map(var_info, cases, rx_parent_casename, this_var, thisCrop_main, found_types, plot_y1, plot_yN, ref_casename)
             if parent_time_dim == "continue":
                 raise RuntimeError("What should I do here?")
-            this_map = this_map.where(~np.isnan(parent_map.mean(dim=parent_time_dim)))
         else:
-            this_map, time_dim = get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_types, plot_y1, plot_yN, ref_casename)
+            # Get map and mask
+            this_map, croparea_ever_positive, time_dim = get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_types, plot_y1, plot_yN, ref_casename)
             if time_dim == "continue":
                 continue
         c += 1
@@ -405,6 +406,10 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 cb = cbs[i*2]
             thisCrop = thisCrop_main
             this_map_sel = this_map.copy().sel(ivt_str=thisCrop)
+            
+            # Mask where there was never actually any area of this crop. (Might be NaN because there was area of some OTHER kind of crop that got MAPPED to this crop.)
+            this_map_sel = this_map_sel.where(croparea_ever_positive.sel(ivt_str=thisCrop))
+            
             if plotting_diffs and not new_axes and force_diffmap_within_vrange:
                 this_map_sel_vals = this_map_sel.copy().values
                 this_map_sel_vals[np.where(this_map_sel_vals < diff_vmin)] = diff_vmin
@@ -466,6 +471,9 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 extend = "neither"
         if cmap_to_use is None:
             cmap_to_use = cmap
+            
+        # Mask where there was never actually any area of this crop. (Might be NaN because there was area of some OTHER kind of crop that got MAPPED to this crop.)
+        this_map_sel = this_map_sel.where(croparea_ever_positive.sel(ivt_str=thisCrop))
         
         # Check current map's extremes against previous extremes
         if plotting_diffs:
