@@ -177,7 +177,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
             if is_diff:
                 
                 # Make a temporary plot with the same color axis and colorbar settings we would use in make_map().
-                plt.pcolormesh(this_map_timemean.where(area_map_sum>1e4), vmin=vmin, vmax=vmax)
+                plt.pcolormesh(this_map_timemean, vmin=vmin, vmax=vmax)
                 cb0 = plt.colorbar(location="bottom")
                 cb0.ax.tick_params(labelsize=fontsize['ticklabels'])
                 
