@@ -60,8 +60,7 @@ def get_underlay(this_ds, area_map_sum):
     return underlay
 
 
-def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, ds_in, this_suptitle, fig_outfile, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side):
-    fig = plt.figure(figsize=figsize)
+def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, ds_in, this_suptitle, fig_outfile, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig):
     
     if is_diff:
         if is_diffdiff:
@@ -72,7 +71,8 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
         cmap = "viridis"
 
     for c, crop in enumerate(cropList_combined_clm_nototal):
-        ax = fig.add_subplot(ny,nx,c+1,projection=ccrs.PlateCarree())
+        thisPlot = c*Nvars + v + 1
+        ax = fig.add_subplot(ny, nx*Nvars, thisPlot, projection=ccrs.PlateCarree())
         
         # Which CFTs comprise this crop?
         where_thisCrop = np.where(ds_in['patches1d_itype_combinedCropCLM_str'] == crop)[0]
@@ -89,7 +89,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
         if "YIELD" in thisVar:
             this_map = this_map * weights_map
         this_map = this_map.sum(dim="ivt_str")
-        this_map *= varInfo['multiplier']
+        this_map *= varInfo['multiplier'][v]
         this_map_timemean = this_map.mean(dim="time")
         
         # Mask where not much crop area?
@@ -107,7 +107,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
         lowest_threshold = get_lowest_threshold(this_map_timemean, frac_to_include)
         
         # If doing so, mask out cells not significantly different from zero
-        if 'mask_sig_diff_from_0' in varInfo and varInfo['mask_sig_diff_from_0']:
+        if 'mask_sig_diff_from_0' in varInfo and varInfo['mask_sig_diff_from_0'][v]:
             any_masked = True
             
             # Show gray "underlay" map where crop is grown but masked
@@ -133,7 +133,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
             pct_absdiffs_masked_before = get_amount_masked(c, crop, this_map_timemean, sumdiff_beforemask, pct_absdiffs_masked_before, "difference not significant")
             
         # If doing so, mask out negligible cells
-        if 'mask_negligible' in varInfo and varInfo['mask_negligible']:
+        if 'mask_negligible' in varInfo and varInfo['mask_negligible'][v]:
             any_masked = True
             
             # Show gray "underlay" map where crop is grown but masked
@@ -148,7 +148,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
             
         # If doing so, mask out all but cells comprising top 95% of absolute differences.
         # NOTE that we're not actually masking here. We are instead setting a special color for such cells.
-        if 'mask_lowest' in varInfo and varInfo['mask_lowest']:
+        if 'mask_lowest' in varInfo and varInfo['mask_lowest'][v]:
             any_masked = True
             
             # FAKE-mask all but top cells
@@ -225,7 +225,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
                     raise RuntimeError(f"Expected even number of color bins; got {Nbins}")
                 
                 # Special color for small-masked cells
-                if 'mask_lowest' in varInfo and varInfo['mask_lowest']:
+                if 'mask_lowest' in varInfo and varInfo['mask_lowest'][v]:
                     
                     # Add near-zero bin
                     bounds = np.concatenate((np.arange(vmin, -binwidth+1e-9, binwidth),
@@ -267,11 +267,11 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
             underlay = underlay.where(area_map_sum>low_area_threshold_m2)
         
         # Plot map
-        subplot_str = chr(ord('`') + c+1) # or ord('@') for capital
+        subplot_str = chr(ord('`') + thisPlot) # or ord('@') for capital
         im, cb = make_map(ax, this_map_timemean, fontsize, show_cbar=True, vmin=vmin, vmax=vmax, cmap=this_cmap, extend_nonbounds=None, underlay=underlay, underlay_color=underlay_color, bounds=bounds, extend_bounds="neither", ticklabels=ticks_orig, cbar_spacing=cbar_spacing, subplot_label=subplot_str)
         
         show_cbar_label = True
-        cbar_label = varInfo['units']
+        cbar_label = varInfo['units'][v]
         cbar_label_x = 0.5
         cbar_labelpad = 0.4
         if ny==3 and nx==2:
@@ -288,12 +288,16 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
         if croptitle_side == "top":
             ax.set_title(crop, fontsize=fontsize['titles'])
         elif croptitle_side == "left":
-            ax.set_ylabel(crop, fontsize=fontsize['titles'])
+            if v==0:
+                ax.set_ylabel(crop, fontsize=fontsize['titles'])
         else:
             raise RuntimeError(f"Unexpected value for croptitle_side: {croptitle_side}")
         
+        if Nvars > 1 and c==0:
+            ax.set_title(this_suptitle, fontsize=fontsize['titles'])
+        
         # plt.show()
-        # return
+        # ererqrqwew
     
     hspace = None
     suptitle_y = 0.98
@@ -305,19 +309,17 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
         hspace = 0
         suptitle_y = 0.82
     
-    fig.suptitle(this_suptitle,
-                fontsize=fontsize['suptitle'],
-                y=suptitle_y)
-    plt.subplots_adjust(hspace=hspace)
+    if Nvars == 1:
+        fig.suptitle(this_suptitle,
+                    fontsize=fontsize['suptitle'],
+                    y=suptitle_y)
     
-    # plt.show()
-    # return
-
-    fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)
-    plt.close()
+    plt.subplots_adjust(hspace=hspace)
 
 
 def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cropList_combined_clm_nototal, crop_subset=None, croptitle_side="top", dpi=150, figsize=figsize, low_area_threshold_m2=1e4, min_viable_hui="ggcmi3", mxmats=None, ny=2, nx=3, plot_y1=1980, plot_yN=2009):
+    
+    fig = plt.figure(figsize=figsize)
     
     if crop_subset==cropList_combined_clm_nototal:
         crop_subset = None
@@ -328,59 +330,83 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             filename_suffix += crop
         cropList_combined_clm_nototal = crop_subset
     
-    # Process variable info
-    is_diff = thisVar[-5:] == "_DIFF"
-    if is_diff:
-        if len(these_cases) != 2:
-            raise RuntimeError(f"You must provide exactly 2 cases in these_cases for DIFF variables")
-    is_diffdiff = is_diff and thisVar.count("DIFF") == 2
-
-    if is_diff:
-        this_suptitle = f"{varInfo['suptitle']}: {these_cases[1]} minus {these_cases[0]}"
-        print(this_suptitle)
-        fig_outfile = os.path.join(outDir_figs, f"Map diff {this_suptitle} {plot_y1}-{plot_yN}{filename_suffix}.png").replace('Mean annual ', '').replace(':', '')
-        
-        case0 = cases[these_cases[0]]
-        ds0 = cases[these_cases[0]]['ds']
-        ds1 = cases[these_cases[1]]['ds']
-        lu_ds = reses[case0['res']]['ds']
-
-        # Get mean production over period of interest
-        if "PROD" in thisVar or "YIELD" in thisVar:
-            ds0 = cc.get_yield_ann(ds0, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
-            ds1 = cc.get_yield_ann(ds1, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
-
-        this_ds = ds1.copy()
-        if is_diffdiff:
-            diff_yield_var = thisVar.replace("PROD", "YIELD")
-            undiff_yield_var = "".join(diff_yield_var.rsplit("_DIFF", 1)) # Delete last occurrence of "_DIFF"
-            diff_prod_var = diff_yield_var.replace("YIELD", "PROD")
-            undiff_prod_var = undiff_yield_var.replace("YIELD", "PROD")
-            this_ds[diff_yield_var] = np.fabs(ds1[undiff_yield_var]) - np.fabs(ds0[undiff_yield_var])
-            if undiff_prod_var in this_ds:
-                this_ds[diff_prod_var] = np.fabs(ds1[undiff_prod_var]) - np.fabs(ds0[undiff_prod_var])
-        else:
-            thisVar_base = thisVar.replace("_DIFF", "")
-            this_ds[thisVar] = ds1[thisVar_base] - ds0[thisVar_base]
-        this_ds = this_ds\
-                .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
-        
-        make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side)
-    
-    
+    # Set up for one variable per column
+    multiCol = "." in thisVar
+    if multiCol:
+        if nx != 1:
+            raise RuntimeError("When doing one variable per column, nx must be 1")
+        varList = thisVar.split(".")
+        minus = ""
+        if "DIFF" in thisVar:
+            minus = f"{these_cases[1]} minus {these_cases[0]} "
+        fig_outfile = os.path.join(outDir_figs, f"{thisVar} {minus}{plot_y1}-{plot_yN}{filename_suffix}.png").replace('Mean annual ', '').replace(':', '')
     else:
-        for this_case in these_cases:
-            case = cases[this_case]
-            lu_ds = reses[case['res']]['ds']
-            this_ds = case['ds']
-            this_ds = cc.get_yield_ann(this_ds, min_viable_hui=min_viable_hui, mxmats=None, lu_ds=lu_ds)
-            this_ds = this_ds.copy()\
-                .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
-                
-            this_suptitle = f"{varInfo['suptitle']}: {this_case}"
-            fig_outfile = os.path.join(outDir_figs, f"Map {this_suptitle} {plot_y1}-{plot_yN}.png").replace('Mean annual ', '').replace(':', '')
+        varList = [thisVar]
+        for key in varInfo.keys():
+            varInfo[key] = [varInfo[key]]
+    Nvars = len(varList)
+        
+    for v, thisVar in enumerate(varList):
+    
+        # Process variable info
+        is_diff = thisVar[-5:] == "_DIFF"
+        if is_diff:
+            if len(these_cases) != 2:
+                raise RuntimeError(f"You must provide exactly 2 cases in these_cases for DIFF variables")
+        is_diffdiff = is_diff and thisVar.count("DIFF") == 2
+
+        if is_diff:
+            this_suptitle = f"{varInfo['suptitle'][v]}: {these_cases[1]} minus {these_cases[0]}"
             print(this_suptitle)
+            if not multiCol:
+                fig_outfile = os.path.join(outDir_figs, f"Map diff {this_suptitle} {plot_y1}-{plot_yN}{filename_suffix}.png").replace('Mean annual ', '').replace(':', '')
             
-            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, "DIFF" in thisVar, False, low_area_threshold_m2, croptitle_side)
+            case0 = cases[these_cases[0]]
+            ds0 = cases[these_cases[0]]['ds']
+            ds1 = cases[these_cases[1]]['ds']
+            lu_ds = reses[case0['res']]['ds']
+            
+            # Get mean production over period of interest
+            if "PROD" in thisVar or "YIELD" in thisVar:
+                ds0 = cc.get_yield_ann(ds0, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
+                ds1 = cc.get_yield_ann(ds1, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
+
+            this_ds = ds1.copy()
+            if is_diffdiff:
+                diff_yield_var = thisVar.replace("PROD", "YIELD")
+                undiff_yield_var = "".join(diff_yield_var.rsplit("_DIFF", 1)) # Delete last occurrence of "_DIFF"
+                diff_prod_var = diff_yield_var.replace("YIELD", "PROD")
+                undiff_prod_var = undiff_yield_var.replace("YIELD", "PROD")
+                this_ds[diff_yield_var] = np.fabs(ds1[undiff_yield_var]) - np.fabs(ds0[undiff_yield_var])
+                if undiff_prod_var in this_ds:
+                    this_ds[diff_prod_var] = np.fabs(ds1[undiff_prod_var]) - np.fabs(ds0[undiff_prod_var])
+            else:
+                thisVar_base = thisVar.replace("_DIFF", "")
+                this_ds[thisVar] = ds1[thisVar_base] - ds0[thisVar_base]
+            this_ds = this_ds\
+                    .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+            
+            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig)
+        
+        
+        else:
+            for this_case in these_cases:
+                case = cases[this_case]
+                lu_ds = reses[case['res']]['ds']
+                this_ds = case['ds']
+                this_ds = cc.get_yield_ann(this_ds, min_viable_hui=min_viable_hui, mxmats=None, lu_ds=lu_ds)
+                this_ds = this_ds.copy()\
+                    .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+                    
+                this_suptitle = f"{varInfo['suptitle'][v]}: {this_case}"
+                if not multiCol:
+                    fig_outfile = os.path.join(outDir_figs, f"Map {this_suptitle} {plot_y1}-{plot_yN}.png").replace('Mean annual ', '').replace(':', '')
+                print(this_suptitle)
+                
+                make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, "DIFF" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig)
+    
+    # plt.show()
+    fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)
+    plt.close()
     
     return cases

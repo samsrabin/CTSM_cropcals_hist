@@ -1712,7 +1712,8 @@ from fig_maps_allCrops import *
 these_cases = ['CLM Default', 'Prescribed Calendars']
 
 crop_subset = None; ny = 3; nx = 2; figsize = (14,16); croptitle_side="top"
-# crop_subset = ['Cotton', 'Rice', 'Sugarcane']; ny = 3; nx = 1; figsize = (8,18); croptitle_side="left"
+# crop_subset = ['Cotton', 'Rice', 'Sugarcane']; ny = 3; nx = 1; figsize = (14,16); croptitle_side="left"
+# crop_subset = ['Corn', 'Soybean', 'Wheat']; ny = 3; nx = 1; figsize = (14,16); croptitle_side="left"
 
 varList = {
     'PROD_ANN': {
@@ -1758,6 +1759,11 @@ varList = {
         'units':      'km$^3$ yr$^{-1}$',
         'multiplier': 1e-9, # m3 to km3
         'mask_lowest': True},
+    # 'PROD_ANN_DIFF.PROD_ANN_DIFFEARTHSTAT_DIFF': {
+    #     'suptitle':   ['Prod', 'Bias'],
+    #     'units':      ['Mt', '∆ abs.\nbias (Mt)'],
+    #     'multiplier': [1e-12, 1e-6], # g to Mt, t to Mt
+    #     'mask_lowest': [True, True]}
 }
 
 # Yield settings
