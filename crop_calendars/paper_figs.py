@@ -1711,8 +1711,8 @@ from fig_maps_allCrops import *
 
 these_cases = ['CLM Default', 'Prescribed Calendars']
 
-these_crops = cropList_combined_clm_nototal; ny = 3; nx = 2; figsize = (14,16); croptitle_side="top"
-# these_crops = ['Cotton', 'Rice', 'Sugarcane']; ny = 3; nx = 1; figsize = (8,18); croptitle_side="left"
+crop_subset = None; ny = 3; nx = 2; figsize = (14,16); croptitle_side="top"
+# crop_subset = ['Cotton', 'Rice', 'Sugarcane']; ny = 3; nx = 1; figsize = (8,18); croptitle_side="left"
 
 varList = {
     'PROD_ANN': {
@@ -1765,8 +1765,7 @@ min_viable_hui = "ggcmi3"
 
 
 for (this_var, var_info) in varList.items():
-    # cases = maps_allCrops(cases, these_cases, reses, this_var, var_info, outDir_figs, cropList_combined_clm_nototal, min_viable_hui=min_viable_hui, ny=3, nx=2, figsize=(14,16))
-    cases = maps_allCrops(cases, these_cases, reses, this_var, var_info, outDir_figs, these_crops, min_viable_hui=min_viable_hui, ny=ny, nx=nx, figsize=figsize, croptitle_side=croptitle_side)
+    cases = maps_allCrops(cases, these_cases, reses, this_var, var_info, outDir_figs, cropList_combined_clm_nototal, min_viable_hui=min_viable_hui, ny=ny, nx=nx, figsize=figsize, croptitle_side=croptitle_side, crop_subset=crop_subset)
 
 print("Done.")
 

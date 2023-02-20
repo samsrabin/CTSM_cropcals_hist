@@ -317,7 +317,16 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
     plt.close()
 
 
-def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cropList_combined_clm_nototal, croptitle_side="top", dpi=150, figsize=figsize, low_area_threshold_m2=1e4, min_viable_hui="ggcmi3", mxmats=None, ny=2, nx=3, plot_y1=1980, plot_yN=2009):
+def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cropList_combined_clm_nototal, crop_subset=None, croptitle_side="top", dpi=150, figsize=figsize, low_area_threshold_m2=1e4, min_viable_hui="ggcmi3", mxmats=None, ny=2, nx=3, plot_y1=1980, plot_yN=2009):
+    
+    if crop_subset==cropList_combined_clm_nototal:
+        crop_subset = None
+    filename_suffix = ""
+    if crop_subset is not None:
+        filename_suffix = " "
+        for crop in crop_subset:
+            filename_suffix += crop
+        cropList_combined_clm_nototal = crop_subset
     
     # Process variable info
     is_diff = thisVar[-5:] == "_DIFF"
@@ -329,7 +338,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
     if is_diff:
         this_suptitle = f"{varInfo['suptitle']}: {these_cases[1]} minus {these_cases[0]}"
         print(this_suptitle)
-        fig_outfile = os.path.join(outDir_figs, f"Map diff {this_suptitle} {plot_y1}-{plot_yN}.png").replace('Mean annual ', '').replace(':', '')
+        fig_outfile = os.path.join(outDir_figs, f"Map diff {this_suptitle} {plot_y1}-{plot_yN}{filename_suffix}.png").replace('Mean annual ', '').replace(':', '')
         
         case0 = cases[these_cases[0]]
         ds0 = cases[these_cases[0]]['ds']
