@@ -231,21 +231,30 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
                     bounds = np.concatenate((np.arange(vmin, -binwidth+1e-9, binwidth),
                                              np.array([-lowest_threshold, lowest_threshold]),
                                              np.arange(binwidth, vmax+1e-9, binwidth)))
-                    cbar_spacing = "proportional"        
+                    cbar_spacing = "proportional"
                     
                     # Add color for that bin
                     if underlay is not None:
                         raise RuntimeError("You need a different color to distinguish mask_lowest cells from other-masked cells")
                     if isinstance(this_cmap, mcolors.LinearSegmentedColormap):
-                        color_list = [this_cmap(x) for x in np.arange(0, 1+1e-9, 1/Nbins)]
+                        this_cmap = cm.get_cmap(cmap)
+                        color_list = [this_cmap(x) for x in np.arange(0, 1, 1/Nbins)]
+                        color_list = []
+                        for i, x in enumerate(np.arange(0, 1+1e-9, 1/Nbins)):
+                            color_list.append(this_cmap(x))
+                            if i>0 and color_list[i] == color_list[i-1]:
+                                print(f"{prev_x} → color_list[{i-1}] = {color_list[i-1]}")
+                                print(f"{x} → color_list[{i}] = {color_list[i]}")
+                                raise RuntimeError("Repeated color!")
+                            prev_x = x
                         this_cmap = mcolors.ListedColormap(color_list)
                     elif not isinstance(this_cmap, mcolors.ListedColormap):
                         raise RuntimeError(f"Not sure how to get list of colors from {type(this_cmap)}")
                     new_colors = np.concatenate((this_cmap.colors[:int(Nbins/2)],
                                                  np.array([underlay_color]),
-                                                 this_cmap.colors[int(Nbins/2):]),
+                                                 this_cmap.colors[int(Nbins/2)+1:]),
                                                 axis=0)
-                    this_cmap = mcolors.ListedColormap(new_colors)            
+                    this_cmap = mcolors.ListedColormap(new_colors)
                 
                 # Remove our temporary plot and its colorbar.
                 plt.cla()
