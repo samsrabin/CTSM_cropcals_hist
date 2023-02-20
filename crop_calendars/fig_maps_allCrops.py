@@ -60,7 +60,7 @@ def get_underlay(this_ds, area_map_sum):
     return underlay
 
 
-def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, ds_in, this_suptitle, fig_outfile, is_diff, is_diffdiff, low_area_threshold_m2):
+def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, ds_in, this_suptitle, fig_outfile, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side):
     fig = plt.figure(figsize=figsize)
     
     if is_diff:
@@ -261,6 +261,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
         im, cb = make_map(ax, this_map_timemean, fontsize, show_cbar=True, vmin=vmin, vmax=vmax, cmap=this_cmap, extend_nonbounds=None, underlay=underlay, underlay_color=underlay_color, bounds=bounds, extend_bounds="neither", ticklabels=ticks_orig, cbar_spacing=cbar_spacing)
         
         show_cbar_label = True
+        cbar_label = varInfo['units']
         cbar_label_x = 0.5
         cbar_labelpad = 0.4
         if ny==3 and nx==2:
@@ -268,17 +269,25 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
             cbar_label_x = 1.098
             if c % 2:
                 show_cbar_label = False
+        elif ny==3 and nx==1:
+            cbar_labelpad = 13
+            cbar_label = cbar_label.replace('\n', ' ')
         if show_cbar_label:
-            cb.set_label(label=varInfo['units'], fontsize=fontsize['axislabels'], x=cbar_label_x, labelpad=cbar_labelpad)
+            cb.set_label(label=cbar_label, fontsize=fontsize['axislabels'], x=cbar_label_x, labelpad=cbar_labelpad)
         
-        ax.set_title(crop, fontsize=fontsize['titles'])
+        if croptitle_side == "top":
+            ax.set_title(crop, fontsize=fontsize['titles'])
+        elif croptitle_side == "left":
+            ax.set_ylabel(crop, fontsize=fontsize['titles'])
+        else:
+            raise RuntimeError(f"Unexpected value for croptitle_side: {croptitle_side}")
         
         # plt.show()
         # return
     
     hspace = None
     suptitle_y = 0.98
-    if ny==3 and nx==2:
+    if ny==3:
         hspace = -0.4
         this_suptitle = this_suptitle.replace(": ", ":\n")
         suptitle_y = 0.79
@@ -298,7 +307,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, 
     plt.close()
 
 
-def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cropList_combined_clm_nototal, dpi=150, figsize=figsize, low_area_threshold_m2=1e4, min_viable_hui="ggcmi3", mxmats=None, ny=2, nx=3, plot_y1=1980, plot_yN=2009):
+def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cropList_combined_clm_nototal, croptitle_side="top", dpi=150, figsize=figsize, low_area_threshold_m2=1e4, min_viable_hui="ggcmi3", mxmats=None, ny=2, nx=3, plot_y1=1980, plot_yN=2009):
     
     # Process variable info
     is_diff = thisVar[-5:] == "_DIFF"
@@ -337,7 +346,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
         this_ds = this_ds\
                 .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
         
-        make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, is_diff, is_diffdiff, low_area_threshold_m2)
+        make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side)
     
     
     else:
@@ -353,6 +362,6 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             fig_outfile = os.path.join(outDir_figs, f"Map {this_suptitle} {plot_y1}-{plot_yN}.png").replace('Mean annual ', '').replace(':', '')
             print(this_suptitle)
             
-            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, "DIFF" in thisVar, False, low_area_threshold_m2)
+            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, "DIFF" in thisVar, False, low_area_threshold_m2, croptitle_side)
     
     return cases
