@@ -60,7 +60,7 @@ def get_underlay(this_ds, area_map_sum):
     return underlay
 
 
-def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats):
+def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats, posNeg):
     
     if is_diff:
         if is_diffdiff:
@@ -69,30 +69,55 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
             cmap = "BrBG"
     else:
         cmap = "viridis"
+    
+    if posNeg:
+        if Nvars > 1:
+            raise RuntimeError("posNeg not tested with Nvars > 1")
+        cropList = ["Crops decreasing", "Crops increasing"]
+    else:
+        cropList = cropList_combined_clm_nototal
 
-    for c, crop in enumerate(cropList_combined_clm_nototal):
+    for c, crop in enumerate(cropList):
         thisPlot = c*Nvars + v + 1
         ax = fig.add_subplot(ny, nx*Nvars, thisPlot, projection=ccrs.PlateCarree())
         
         # Which CFTs comprise this crop?
-        where_thisCrop = np.where(ds_in['patches1d_itype_combinedCropCLM_str'] == crop)[0]
-        theseCrops = np.unique(ds_in['patches1d_itype_veg_str'].isel(patch=where_thisCrop))
-        this_ds = ds_in.isel(patch=where_thisCrop)
-        
+        if crop in cropList_combined_clm_nototal:
+            where_thisCrop = np.where(ds_in['patches1d_itype_combinedCropCLM_str'] == crop)[0]
+            theseCrops = np.unique(ds_in['patches1d_itype_veg_str'].isel(patch=where_thisCrop))
+            this_ds = ds_in.isel(patch=where_thisCrop)
+        else:
+            # Include all of the 6 explicitly-simulated crops
+            if not posNeg:
+                raise RuntimeError(f"{crop} is not in cropList_combined_clm_nototal but this isn't a posNeg figure")
+            this_ds = ds_in
+            theseCrops = list()
+            for porc in cropList_combined_clm_nototal:
+                tmp = list(np.unique(np.unique(ds_in['patches1d_itype_veg_str'].isel(patch=np.where(ds_in['patches1d_itype_combinedCropCLM_str'] == porc)[0]))))
+                for tmpx in tmp:
+                    if tmpx not in theseCrops:
+                        theseCrops.append(tmpx)
+
         # Get area of these CFTs
         area_map = utils.grid_one_variable(this_ds.mean(dim="time"), "AREA_CFT", vegtype=list(theseCrops))
-        area_map_sum = area_map.sum(dim="ivt_str")
-        weights_map = area_map / area_map_sum
+        if not posNeg:
+            area_map_sum = area_map.sum(dim="ivt_str")
+            weights_map = area_map / area_map_sum
 
         # Grid data for those CFTs, getting their sum
         this_map = utils.grid_one_variable(this_ds, thisVar, vegtype=list(theseCrops))
         if "YIELD" in thisVar:
+            if posNeg:
+                raise RuntimeError("Area weighting not set up for posNeg because weights_map not yet generated")
             this_map = this_map * weights_map
-        this_map = this_map.sum(dim="ivt_str")
+        if not posNeg:
+            this_map = this_map.sum(dim="ivt_str")
         this_map *= varInfo['multiplier'][v]
         
         # Weight based on EarthStats data, if needed
         if "BIAS" in thisVar:
+            if posNeg:
+                raise RuntimeError("EarthStats weighting not tested for posNeg")
             if "PROD" in thisVar:
                 earthstats_weights_da = earthstats['Production'].sel(crop=crop)
             else:
@@ -105,6 +130,20 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
         
         # Get mean over time
         this_map_timemean = this_map_weighted.mean(dim="time")
+        
+        # If doing just positive-negative, select and sum the matching cells
+        if posNeg:
+            if crop == "Crops increasing":
+                this_map_timemean = this_map_timemean.where(this_map_timemean > 0)
+                area_map = area_map.where(this_map_timemean > 0)
+            elif crop == "Crops decreasing":
+                this_map_timemean = this_map_timemean.where(this_map_timemean < 0)
+                area_map = area_map.where(this_map_timemean < 0)
+            else:
+                RuntimeError(f"posNeg: crop {crop} not recognized")
+            this_map_timemean = this_map_timemean.sum(dim="ivt_str")
+            area_map_sum = area_map.sum(dim="ivt_str")
+            weights_map = area_map / area_map_sum
         
         # Mask where not much crop area?
         if low_area_threshold_m2 is not None:
@@ -126,6 +165,8 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
             
             # Show gray "underlay" map where crop is grown but masked
             if underlay is None:
+                if posNeg:
+                    raise RuntimeError("Underlay map not tested for posNeg")
                 underlay = get_underlay(this_ds, area_map_sum)
             
             # Get p-values for one-sample t-test
@@ -152,6 +193,8 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
             
             # Show gray "underlay" map where crop is grown but masked
             if underlay is None:
+                if posNeg:
+                    raise RuntimeError("Underlay map not tested for posNeg")
                 underlay = get_underlay(this_ds, area_map_sum)
             
             # Mask map where negligible (< 0.1% of max difference)
@@ -242,9 +285,23 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
                 if 'mask_lowest' in varInfo and varInfo['mask_lowest'][v]:
                     
                     # Add near-zero bin
-                    bounds = np.concatenate((np.arange(vmin, -binwidth+1e-9, binwidth),
-                                             np.array([-lowest_threshold, lowest_threshold]),
-                                             np.arange(binwidth, vmax+1e-9, binwidth)))
+                    if posNeg:
+                        if crop == "Crops decreasing":
+                            vmax = 0
+                            ticks_orig = ticks_orig[np.where(ticks_orig <= 0)]
+                            bounds = np.concatenate((np.arange(vmin, -binwidth+1e-9, binwidth),
+                                                     np.array([-lowest_threshold, 0])))
+                        elif crop == "Crops increasing":
+                            vmin = 0
+                            ticks_orig = ticks_orig[np.where(ticks_orig >= 0)]
+                            bounds = np.concatenate((np.array([0, lowest_threshold]),
+                                                     np.arange(binwidth, vmax+1e-9, binwidth)))
+                        else:
+                            raise RuntimeError(f"posNeg: Crop {crop} not recognized for color bar")
+                    else:
+                        bounds = np.concatenate((np.arange(vmin, -binwidth+1e-9, binwidth),
+                                                 np.array([-lowest_threshold, lowest_threshold]),
+                                                 np.arange(binwidth, vmax+1e-9, binwidth)))
                     cbar_spacing = "proportional"
                     
                     # Add color for that bin
@@ -264,10 +321,24 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
                         this_cmap = mcolors.ListedColormap(color_list)
                     elif not isinstance(this_cmap, mcolors.ListedColormap):
                         raise RuntimeError(f"Not sure how to get list of colors from {type(this_cmap)}")
-                    new_colors = np.concatenate((this_cmap.colors[:int(Nbins/2)],
-                                                 np.array([underlay_color]),
-                                                 this_cmap.colors[int(Nbins/2)+1:]),
-                                                axis=0)
+                    
+                    if posNeg:
+                        if crop == "Crops decreasing":
+                            new_colors = np.concatenate((this_cmap.colors[:int(Nbins/2)],
+                                                         np.array([underlay_color])),
+                                                        axis=0)
+                        elif crop == "Crops increasing":
+                            new_colors = np.concatenate((np.array([underlay_color]),
+                                                         this_cmap.colors[int(Nbins/2)+1:]),
+                                                        axis=0)
+                        else:
+                            raise RuntimeError(f"posNeg: Crop {crop} not recognized for color bar (2)")
+                    else:
+                        new_colors = np.concatenate((this_cmap.colors[:int(Nbins/2)],
+                                                     np.array([underlay_color]),
+                                                     this_cmap.colors[int(Nbins/2)+1:]),
+                                                    axis=0)
+                    
                     this_cmap = mcolors.ListedColormap(new_colors)
                 
                 # Remove our temporary plot and its colorbar.
@@ -294,6 +365,9 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
             if c % 2:
                 show_cbar_label = False
         elif ny==3 and nx==1:
+            cbar_labelpad = 13
+            cbar_label = cbar_label.replace('\n', ' ')
+        elif ny==1 and nx==2:
             cbar_labelpad = 13
             cbar_label = cbar_label.replace('\n', ' ')
         if show_cbar_label:
@@ -363,11 +437,19 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
     for v, thisVar in enumerate(varList):
     
         # Process variable info
-        is_diff = thisVar[-5:] == "_DIFF"
+        posNeg = "POSNEG" in thisVar
+        is_diff = thisVar.endswith("_DIFF") or thisVar.endswith("_DIFFPOSNEG")
         if is_diff:
             if len(these_cases) != 2:
                 raise RuntimeError(f"You must provide exactly 2 cases in these_cases for DIFF variables")
         is_diffdiff = is_diff and thisVar.replace("BIAS", "DIFF").count("DIFF") == 2
+        
+        # Special setup for posNeg
+        if posNeg:
+            ny = 1
+            nx = 2
+            plt.close(fig)
+            fig = plt.figure(figsize=(14, 3.75))
 
         if is_diff:
             this_suptitle = f"{varInfo['suptitle'][v]}"
@@ -398,6 +480,8 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
 
             this_ds = ds1.copy()
             if is_diffdiff:
+                if posNeg:
+                    raise RuntimeError("POSNEG not tested for difference-difference maps")
                 diff_yield_var = thisVar.replace("PROD", "YIELD")
                 undiff_yield_var = "".join(diff_yield_var.rsplit("_DIFF", 1)) # Delete last occurrence of "_DIFF"
                 diff_prod_var = diff_yield_var.replace("YIELD", "PROD")
@@ -409,12 +493,15 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 if undiff_prod_var in this_ds:
                     this_ds[diff_prod_var] = np.fabs(ds1[undiff_prod_var]) - np.fabs(ds0[undiff_prod_var])
             else:
-                thisVar_base = thisVar.replace("_DIFF", "")
+                if "DIFFPOSNEG" in thisVar:
+                    thisVar_base = thisVar.replace("_DIFFPOSNEG", "")
+                else:
+                    thisVar_base = thisVar.replace("_DIFF", "")
                 this_ds[thisVar] = ds1[thisVar_base] - ds0[thisVar_base]
             this_ds = this_ds\
                     .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
             
-            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds)
+            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg)
         
         
         else:
@@ -438,7 +525,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 else:
                     earthstats_ds = None
                 
-                make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "DIFF" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds)
+                make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "DIFF" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg)
     
     # plt.show()
     fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)
