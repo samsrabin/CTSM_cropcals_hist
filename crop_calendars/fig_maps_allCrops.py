@@ -370,10 +370,14 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
         is_diffdiff = is_diff and thisVar.replace("BIAS", "DIFF").count("DIFF") == 2
 
         if is_diff:
-            this_suptitle = f"{varInfo['suptitle'][v]}: {these_cases[1]} minus {these_cases[0]}"
+            this_suptitle = f"{varInfo['suptitle'][v]}"
+            minus = f": {these_cases[1]} minus {these_cases[0]}"
+            this_suptitle += minus
             print(this_suptitle)
             if not multiCol:
                 fig_outfile = os.path.join(outDir_figs, f"Map diff {this_suptitle} {plot_y1}-{plot_yN}{filename_suffix}.png").replace('Mean annual ', '').replace(':', '')
+            if 'suppress_difftext' in varInfo and varInfo['suppress_difftext']:
+                this_suptitle = this_suptitle.replace(minus, "")
             
             case0 = cases[these_cases[0]]
             ds0 = cases[these_cases[0]]['ds']

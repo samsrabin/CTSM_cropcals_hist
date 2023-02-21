@@ -1760,10 +1760,11 @@ varList = {
         'multiplier': 1e-9, # m3 to km3
         'mask_lowest': True},
     # 'PROD_ANN_DIFF.PROD_ANN_BIASEARTHSTAT_DIFF': {
-    #     'suptitle':   ['Prod', 'Bias'],
-    #     'units':      ['Mt', '∆ abs.\nbias (Mt)'],
+    #     'suptitle':   ['Change in production', 'Change in absolute bias'],
+    #     'units':      ['Mt', 'Mt'],
     #     'multiplier': [1e-12, 1e-6], # g to Mt, t to Mt
-    #     'mask_lowest': [True, True]}
+    #     'mask_lowest': [True, True],
+    #     'suppress_difftext': [True, True]}
 }
 
 # Yield settings
