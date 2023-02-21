@@ -60,7 +60,7 @@ def get_underlay(this_ds, area_map_sum):
     return underlay
 
 
-def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, ds_in, this_suptitle, fig_outfile, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig):
+def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig):
     
     if is_diff:
         if is_diffdiff:
@@ -386,7 +386,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             this_ds = this_ds\
                     .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
             
-            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig)
+            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, fig_outfile, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig)
         
         
         else:
@@ -403,7 +403,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                     fig_outfile = os.path.join(outDir_figs, f"Map {this_suptitle} {plot_y1}-{plot_yN}.png").replace('Mean annual ', '').replace(':', '')
                 print(this_suptitle)
                 
-                make_fig(thisVar, varInfo, cropList_combined_clm_nototal, dpi, figsize, ny, nx, plot_y1, plot_yN, this_ds, this_suptitle, fig_outfile, "DIFF" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig)
+                make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "DIFF" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig)
     
     # plt.show()
     fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)
