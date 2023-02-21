@@ -1734,18 +1734,18 @@ varList = {
         'units':      't/ha',
         'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
     'YIELD_ANN_DIFFEARTHSTAT': {
-        'suptitle':   'Mean annual yield bias rel. EarthStat',
+        'suptitle':   'Mean annual yield difference rel. EarthStat',
         'units':      't/ha',
         'multiplier': 1},
     'YIELD_ANN_DIFFEARTHSTAT_DIFF': {
-        'suptitle':   'Mean annual yield bias rel. EarthStat',
+        'suptitle':   'Mean annual yield difference rel. EarthStat',
         'units':      'Change in abs. bias (t/ha)',
         'multiplier': 1},
-    'PROD_ANN_DIFFEARTHSTAT': {
+    'PROD_ANN_BIASEARTHSTAT': {
         'suptitle':   'Mean annual production bias rel. EarthStat',
         'units':      'Mt',
         'multiplier': 1e-6}, # t to Mt
-    'PROD_ANN_DIFFEARTHSTAT_DIFF': {
+    'PROD_ANN_BIASEARTHSTAT_DIFF': {
         'suptitle':   'Mean annual production bias rel. EarthStat',
         'units':      '∆ abs.\nbias (Mt)',
         'multiplier': 1e-6, # t to Mt
@@ -1759,7 +1759,7 @@ varList = {
         'units':      'km$^3$ yr$^{-1}$',
         'multiplier': 1e-9, # m3 to km3
         'mask_lowest': True},
-    # 'PROD_ANN_DIFF.PROD_ANN_DIFFEARTHSTAT_DIFF': {
+    # 'PROD_ANN_DIFF.PROD_ANN_BIASEARTHSTAT_DIFF': {
     #     'suptitle':   ['Prod', 'Bias'],
     #     'units':      ['Mt', '∆ abs.\nbias (Mt)'],
     #     'multiplier': [1e-12, 1e-6], # g to Mt, t to Mt
@@ -1771,7 +1771,7 @@ min_viable_hui = "ggcmi3"
 
 
 for (this_var, var_info) in varList.items():
-    cases = maps_allCrops(cases, these_cases, reses, this_var, var_info, outDir_figs, cropList_combined_clm_nototal, min_viable_hui=min_viable_hui, ny=ny, nx=nx, figsize=figsize, croptitle_side=croptitle_side, crop_subset=crop_subset)
+    cases = maps_allCrops(cases, these_cases, reses, this_var, var_info, outDir_figs, cropList_combined_clm_nototal, earthstats=earthstats_gd, min_viable_hui=min_viable_hui, ny=ny, nx=nx, figsize=figsize, croptitle_side=croptitle_side, crop_subset=crop_subset)
 
 print("Done.")
 

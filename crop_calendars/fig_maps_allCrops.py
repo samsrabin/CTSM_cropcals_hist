@@ -60,7 +60,7 @@ def get_underlay(this_ds, area_map_sum):
     return underlay
 
 
-def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig):
+def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats):
     
     if is_diff:
         if is_diffdiff:
@@ -90,7 +90,21 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
             this_map = this_map * weights_map
         this_map = this_map.sum(dim="ivt_str")
         this_map *= varInfo['multiplier'][v]
-        this_map_timemean = this_map.mean(dim="time")
+        
+        # Weight based on EarthStats data, if needed
+        if "BIAS" in thisVar:
+            if "PROD" in thisVar:
+                earthstats_weights_da = earthstats['Production'].sel(crop=crop)
+            else:
+                raise RuntimeError(f"EarthStat weighting not set up for {thisVar}")
+            if not (np.array_equal(this_map.lon, earthstats_weights_da.lon) and np.array_equal(this_map.lat, earthstats_weights_da.lat) and np.array_equal(this_map.time, earthstats_weights_da.time)):
+                raise RuntimeError("Unexpected dim mismatch between this_map and EarthStats weights")
+            this_map_weighted = this_map.weighted(earthstats_weights_da.fillna(0))
+        else:
+            this_map_weighted = this_map
+        
+        # Get mean over time
+        this_map_timemean = this_map_weighted.mean(dim="time")
         
         # Mask where not much crop area?
         if low_area_threshold_m2 is not None:
@@ -317,7 +331,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
     plt.subplots_adjust(hspace=hspace)
 
 
-def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cropList_combined_clm_nototal, crop_subset=None, croptitle_side="top", dpi=150, figsize=figsize, low_area_threshold_m2=1e4, min_viable_hui="ggcmi3", mxmats=None, ny=2, nx=3, plot_y1=1980, plot_yN=2009):
+def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cropList_combined_clm_nototal, crop_subset=None, croptitle_side="top", dpi=150, earthstats=None, figsize=figsize, low_area_threshold_m2=1e4, min_viable_hui="ggcmi3", mxmats=None, ny=2, nx=3, plot_y1=1980, plot_yN=2009):
     
     fig = plt.figure(figsize=figsize)
     
@@ -353,7 +367,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
         if is_diff:
             if len(these_cases) != 2:
                 raise RuntimeError(f"You must provide exactly 2 cases in these_cases for DIFF variables")
-        is_diffdiff = is_diff and thisVar.count("DIFF") == 2
+        is_diffdiff = is_diff and thisVar.replace("BIAS", "DIFF").count("DIFF") == 2
 
         if is_diff:
             this_suptitle = f"{varInfo['suptitle'][v]}: {these_cases[1]} minus {these_cases[0]}"
@@ -370,6 +384,13 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             if "PROD" in thisVar or "YIELD" in thisVar:
                 ds0 = cc.get_yield_ann(ds0, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
                 ds1 = cc.get_yield_ann(ds1, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
+                
+            if "BIAS" in thisVar:
+                if earthstats is None:
+                    raise RuntimeError("Pass earthstats to maps_allCrops() if you want to calculate bias.")
+                earthstats_ds = earthstats[case0['res']].sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+            else:
+                earthstats_ds = None
 
             this_ds = ds1.copy()
             if is_diffdiff:
@@ -377,6 +398,9 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 undiff_yield_var = "".join(diff_yield_var.rsplit("_DIFF", 1)) # Delete last occurrence of "_DIFF"
                 diff_prod_var = diff_yield_var.replace("YIELD", "PROD")
                 undiff_prod_var = undiff_yield_var.replace("YIELD", "PROD")
+                if "BIAS" in thisVar:
+                    undiff_yield_var = undiff_yield_var.replace("BIAS", "DIFF")
+                    undiff_prod_var = undiff_prod_var.replace("BIAS", "DIFF")
                 this_ds[diff_yield_var] = np.fabs(ds1[undiff_yield_var]) - np.fabs(ds0[undiff_yield_var])
                 if undiff_prod_var in this_ds:
                     this_ds[diff_prod_var] = np.fabs(ds1[undiff_prod_var]) - np.fabs(ds0[undiff_prod_var])
@@ -386,7 +410,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             this_ds = this_ds\
                     .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
             
-            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, fig_outfile, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig)
+            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds)
         
         
         else:
@@ -403,7 +427,14 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                     fig_outfile = os.path.join(outDir_figs, f"Map {this_suptitle} {plot_y1}-{plot_yN}.png").replace('Mean annual ', '').replace(':', '')
                 print(this_suptitle)
                 
-                make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "DIFF" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig)
+                if "BIAS" in thisVar:
+                    if earthstats is None:
+                        raise RuntimeError("Pass earthstats to maps_allCrops() if you want to calculate bias.")
+                    earthstats_ds = earthstats[this_case['res']].sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+                else:
+                    earthstats_ds = None
+                
+                make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "DIFF" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds)
     
     # plt.show()
     fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)
