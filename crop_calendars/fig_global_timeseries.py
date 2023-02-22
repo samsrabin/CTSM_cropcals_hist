@@ -156,8 +156,9 @@ def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
                     fontsize=fontsize['legend'])
 
 
-def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabel, ylabel, equalize_scatter_axes, bottommiddle_plot, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None, ny=2):
+def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabel, ylabel, equalize_scatter_axes, bottommiddle_plot, stats2=None, stats_round=None, p=None, shift_symbols=None, subplot_label=None, ny=2):
     
+    p_symbols = []
     for i, casename in enumerate(caselist):
         if "CLM Default" in casename:
             color = [x/255 for x in [92, 219, 219]]
@@ -177,6 +178,17 @@ def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabe
         plt.scatter(xdata, ydata_this[i,:], color=color, s=100, alpha=0.8, facecolors=facecolors)
         m, b = np.polyfit(xdata, ydata_this[i,:], 1)
         plt.plot(xdata, m*xdata+b, color=color, linewidth=3)
+        
+        # Process stat significance
+        p_symbols.append("")
+        if p is not None:
+            # Levels and symbols after Müller et al. (2017) GGCMI evaluation
+            if p[i] < 0.001:
+                p_symbols[i] = "$^{***}$"
+            elif p[i] < 0.05:
+                p_symbols[i] = "$^{**}$"
+            elif p[i] < 0.01:
+                p_symbols[i] = "$^*$"
     
     if subplot_label is not None:
         ypos = 0.93 # From before, with ny=4
@@ -214,9 +226,9 @@ def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabe
             if stats_round is not None:
                 stats2 = np.round(stats2, stats_round)
             if shift_symbols is None:
-                thisTitle += f" ({stats2[0]} → {stats2[1]})"
+                thisTitle += f" ({stats2[0]}{p_symbols[0]} → {stats2[1]}{p_symbols[1]})"
             else:
-                thisTitle += f" ({shift_symbols[0]}{stats2[0]} → {shift_symbols[1]}{stats2[1]})"
+                thisTitle += f" ({shift_symbols[0]}{stats2[0]}{p_symbols[0]} → {shift_symbols[1]}{stats2[1]}{p_symbols[1]})"
     
     ax_this.title.set_text(thisTitle)
     ax_this.title.set_size(fontsize['title'])
@@ -746,26 +758,44 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             # Actually, no: I don't think Müller et al. (2017) weighted the global numbers.
             weights = np.full_like(weights, fill_value=1.0)
             
-            corrcoeff = [cc.weighted_pearsons_r(ydata_yield_dt[o,:], ydata_yield_dt[x,:], weights) for x in inds_sim]
+            corrcoeff = []
+            p = []
+            for x in inds_sim:
+                rval, pval = cc.weighted_pearsons_r(ydata_yield_dt[o,:], ydata_yield_dt[x,:], weights)
+                corrcoeff.append(rval)
+                p.append(pval)
             if verbose:
                 for i, casename in enumerate(fig_caselist[2:]):
-                    print(f"   {thisCrop_clm} r MM window={w} weighted {casename}: {np.round(corrcoeff[i], corrcoef_round)}")
+                    print(f"   {thisCrop_clm} r MM window={w} weighted {casename}: {np.round(corrcoeff[i], corrcoef_round)}, p = {p[i]}")
             if this_obs == obs_for_fig:
                 corrcoef_ref = corrcoeff
+                p_ref = p
                 
-            corrcoeffL = [cc.weighted_pearsons_r(ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[x,:], weights) for x in inds_sim]
+            corrcoeffL = []
+            pL = []
+            for x in inds_sim:
+                rval, pval = cc.weighted_pearsons_r(ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[x,:], weights)
+                corrcoeffL.append(rval)
+                pL.append(pval)
             if verbose:
                 for i, casename in enumerate(fig_caselist[2:]):
-                    print(f"   {thisCrop_clm} r MM window={w} unweighted shift LEFT {casename}: {np.round(corrcoeffL[i], corrcoef_round)}")
+                    print(f"   {thisCrop_clm} r MM window={w} unweighted shift LEFT {casename}: {np.round(corrcoeffL[i], corrcoef_round)}, p = {pL[i]}")
             if this_obs == obs_for_fig:
                 corrcoefL_ref = corrcoeffL
+                pL_ref = pL
             
-            corrcoeffR = [cc.weighted_pearsons_r(ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[x,:], weights) for x in inds_sim]
+            corrcoeffR = []
+            pR = []
+            for x in inds_sim:
+                rval, pval = cc.weighted_pearsons_r(ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[x,:], weights)
+                corrcoeffR.append(rval)
+                pR.append(pval)
             if verbose:
                 for i, casename in enumerate(fig_caselist[2:]):
-                    print(f"   {thisCrop_clm} r MM window={w} unweighted shift RIGHT {casename}: {np.round(corrcoeffR[i], corrcoef_round)}")
+                    print(f"   {thisCrop_clm} r MM window={w} unweighted shift RIGHT {casename}: {np.round(corrcoeffR[i], corrcoef_round)}, p = {pR[i]}")
             if this_obs == obs_for_fig:
                 corrcoefR_ref = corrcoeffR
+                pR_ref = pR
         
         ydata_area_touse = ydata_area.copy()
         ydata_prod_touse = ydata_prod.copy()
@@ -774,6 +804,7 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
         ydata_yield_biased_touse = ydata_yield.copy()
         ydata_yield_biased_dt_touse = ydata_yield_biased_dt.copy()
         corrcoef_ref_touse = corrcoef_ref.copy()
+        p_ref_touse = p_ref.copy()
         shift_symbols = []
         for i,s in enumerate(inds_sim):
             Lshift_better = corrcoefL_ref[i] >= 0.3 + corrcoef_ref[i]
@@ -793,6 +824,7 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                 ydata_yield_biased_touse[s,:] = ydata_yield_biased_shiftL[s,:]
                 ydata_yield_biased_dt_touse[s,:] = ydata_yield_biased_shiftL_dt[s,:]
                 corrcoef_ref_touse[i] = corrcoefL_ref[i]
+                p_ref_touse[i] = pL_ref[i]
                 shift_symbols.append("$^L$")
             elif Rshift_better:
                 if verbose:
@@ -804,6 +836,7 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                 ydata_yield_biased_touse[s,:] = ydata_yield_biased_shiftR[s,:]
                 ydata_yield_biased_dt_touse[s,:] = ydata_yield_biased_shiftR_dt[s,:]
                 corrcoef_ref_touse[i] = corrcoefR_ref[i]
+                p_ref_touse[i] = pR_ref[i]
                 shift_symbols.append("$^R$")
             else:
                 shift_symbols.append("")
@@ -877,11 +910,11 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                 bottommiddle_plot = not even_nx and c - (ny-1)*nx == 1
                 if xlabel is not None and (even_nx or bottommiddle_plot):
                     xlabel_yield_scatter = "Observed " + label_yield.lower()
-                make_1plot_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, bottommiddle_plot, stats2=corrcoef_ref_touse, stats_round=corrcoef_round, shift_symbols=shift_symbols, subplot_label=subplot_str, ny=ny)
+                make_1plot_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, bottommiddle_plot, stats2=corrcoef_ref_touse, stats_round=corrcoef_round, p=p_ref_touse, shift_symbols=shift_symbols, subplot_label=subplot_str, ny=ny)
                 if include_shiftsens:
-                    make_1plot_scatter(ax_scatter_yield_dt_orig, ydata_yield_dt[o,:], ydata_yield_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, bottommiddle_plot, stats2=corrcoef_ref, stats_round=corrcoef_round, shift_symbols=noshift_symbols, subplot_label=subplot_str, ny=ny)
-                    make_1plot_scatter(ax_scatter_yield_dt_shiftL, ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm,xlabel_yield_scatter,  ylabel_yield_scatter, equalize_scatter_axes, bottommiddle_plot, stats2=corrcoeffL, stats_round=corrcoef_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str, ny=ny)
-                    make_1plot_scatter(ax_scatter_yield_dt_shiftR, ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, bottommiddle_plot, stats2=corrcoeffR, stats_round=corrcoef_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str, ny=ny)
+                    make_1plot_scatter(ax_scatter_yield_dt_orig, ydata_yield_dt[o,:], ydata_yield_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, bottommiddle_plot, stats2=corrcoef_ref, stats_round=corrcoef_round, p=p_ref_touse, shift_symbols=noshift_symbols, subplot_label=subplot_str, ny=ny)
+                    make_1plot_scatter(ax_scatter_yield_dt_shiftL, ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm,xlabel_yield_scatter,  ylabel_yield_scatter, equalize_scatter_axes, bottommiddle_plot, stats2=corrcoeffL, stats_round=corrcoef_round, p=p_ref_touse, shift_symbols=shiftL_symbols, subplot_label=subplot_str, ny=ny)
+                    make_1plot_scatter(ax_scatter_yield_dt_shiftR, ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, bottommiddle_plot, stats2=corrcoeffR, stats_round=corrcoef_round, p=p_ref_touse, shift_symbols=shiftR_symbols, subplot_label=subplot_str, ny=ny)
             
     # Finish up and save
     scatter_title_paren = "detrended"

@@ -2457,7 +2457,15 @@ def weighted_cov(a, b, w):
     return np.sum(w*(a-ma)*(b-mb)) / np.sum(w)
     
 def weighted_pearsons_r(x, y, w):
-    return weighted_cov(x, y, w) / np.sqrt(weighted_cov(x, x, w)*weighted_cov(y, y, w))
+    r = weighted_cov(x, y, w) / np.sqrt(weighted_cov(x, x, w)*weighted_cov(y, y, w))
+    
+    # Significance testing after Müller et al. (2017)
+    n = len(x)
+    df = n - 2
+    t = r * np.sqrt(df) / np.sqrt(1 - r**2)
+    p = 1 - stats.t(df).cdf(t)
+    
+    return r, p
 
 def yield_anomalies(ps_in):
     if isinstance(ps_in, xr.DataArray):
