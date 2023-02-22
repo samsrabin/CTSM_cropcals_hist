@@ -14,7 +14,7 @@ import utils
 
 import numpy as np
 import xarray as xr
-from scipy import signal
+from scipy import signal, stats
 import matplotlib.pyplot as plt
 from matplotlib import collections as mplcollections
 from matplotlib import cm
@@ -223,12 +223,28 @@ def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabe
                 skip_this = True
                 print(f"Not adding stats to title because Nstats {len(stats2)} != 2")
         if not skip_this:
+            
+            # Fisher's z test for correlations
+            # https://garstats.wordpress.com/2019/06/17/compindcorr/
+            z0 = np.arctanh(stats2[0])
+            z1 = np.arctanh(stats2[1])
+            n = len(xdata)
+            z = (z0 - z1) / np.sqrt(2/(n-3))
+            corr_diff_p = 2*stats.norm().cdf(-np.abs(z))
+            if corr_diff_p < 0.1:
+                if z > 0:
+                    arrow = "↗"
+                else:
+                    arrow = "↘"
+            else:
+                arrow = "→"
+            
             if stats_round is not None:
                 stats2 = np.round(stats2, stats_round)
             if shift_symbols is None:
-                thisTitle += f" ({stats2[0]}{p_symbols[0]} → {stats2[1]}{p_symbols[1]})"
+                thisTitle += f" ({stats2[0]}{p_symbols[0]} {arrow} {stats2[1]}{p_symbols[1]})"
             else:
-                thisTitle += f" ({shift_symbols[0]}{stats2[0]}{p_symbols[0]} → {shift_symbols[1]}{stats2[1]}{p_symbols[1]})"
+                thisTitle += f" ({shift_symbols[0]}{stats2[0]}{p_symbols[0]} {arrow} {shift_symbols[1]}{stats2[1]}{p_symbols[1]})"
     
     ax_this.title.set_text(thisTitle)
     ax_this.title.set_size(fontsize['title'])
