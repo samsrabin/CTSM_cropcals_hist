@@ -716,25 +716,13 @@ varList = {
 
 nx = 2
 dpi = 150
-
-fontsize = {}
-if ref_casename:
-    fontsize['titles'] = 14
-    fontsize['axislabels'] = 12
-    fontsize['ticklabels'] = 12
-    fontsize['suptitle'] = 16
-else:
-    fontsize['titles'] = 18
-    fontsize['axislabels'] = 16
-    fontsize['ticklabels'] = 16
-    fontsize['suptitle'] = 20
     
 if mxmat_limited:
     mxmats_tmp = mxmats
 else:
     mxmats_tmp = None
 
-maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_viable_hui, mxmats_tmp, nx, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList)
+maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, mxmats_tmp, nx, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList)
     
 print('Done making maps.')
 

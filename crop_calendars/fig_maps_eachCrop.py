@@ -15,8 +15,13 @@ from cropcal_figs_module import *
 abs_cmap_default = 'rainbow'
 gslen_colorbar_max = 364
 
+fontsize = {}
+fontsize['titles'] = 18
+fontsize['axislabels'] = 14
+fontsize['ticklabels'] = 14
+fontsize['suptitle'] = 22
 
-def add_rowcol_labels(axes, fig_caselist, fontsize, nx, ny, rx_row_label):
+def add_rowcol_labels(axes, fig_caselist, nx, ny, rx_row_label):
     # Add row labels
     leftmost = np.arange(0, nx*ny, nx)
     for a, ax in enumerate(axes):
@@ -182,6 +187,7 @@ def get_rx_case(cases, fig_caselist, ny, this_var):
 
 def get_figure_info(ny, nx, ref_casename):
     hspace = None
+    cbar_labelpad = 4.0
     if ny == 1:
         print("WARNING: Check that the layout looks good for ny == 1")
         figsize = (24, 7.5)	  # width, height
@@ -201,17 +207,24 @@ def get_figure_info(ny, nx, ref_casename):
         new_sp_bottom = 0.11
         new_sp_left = None
     elif ny == 3:
-        figsize = (14, 10)	 # width, height
+        figsize = (14, 16)	 # width, height
         if ref_casename:
             suptitle_xpos = 0.5
-            suptitle_ypos = 0.96
+            suptitle_ypos = 0.77
         else:
-            suptitle_xpos = 0.55
-            suptitle_ypos = 0.98
-        cbar_pos = [0.2, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
+            suptitle_xpos = 0.5
+            suptitle_ypos = 0.85
+        if ref_casename:
+            cbar_pos = [0.2, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
+        else:
+            cbar_pos = [0.15, 0.14, 0.725, 0.025]  # left edge, bottom edge, width, height
         new_sp_bottom = 0.11 # default: 0.1
         new_sp_left = 0.125
-        hspace = 0.3
+        if ref_casename:
+            hspace = -0.4
+        else:
+            hspace = -0.6
+        cbar_labelpad = 13
     elif ny == 4:
         figsize = (22, 16)	 # width, height
         suptitle_xpos = 0.55
@@ -221,10 +234,11 @@ def get_figure_info(ny, nx, ref_casename):
         new_sp_left = 0.125
     else:
         raise ValueError(f"Set up for ny = {ny}")
-    return cbar_pos, figsize, hspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos
+    
+    return cbar_pos, figsize, hspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos, cbar_labelpad
 
 
-def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False, save_netcdfs=False):
+def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False, save_netcdfs=False, cbar_labelpad=4.0):
     
     if this_var == "GSLEN":
         cbar_max = gslen_colorbar_max
@@ -432,7 +446,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
                 allmaps_min = min(allmaps_min, np.nanmin(this_map_sel))
                 allmaps_max = max(allmaps_max, np.nanmax(this_map_sel))
             
-            im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, subplot_label=subplot_str, cbar_max=cbar_max)
+            im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, subplot_label=subplot_str, cbar_max=cbar_max, cbar_labelpad=cbar_labelpad)
             if new_axes:
                 ims.append(im)
                 cbs.append(cb)
@@ -483,7 +497,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
             allmaps_min = min(allmaps_min, np.nanmin(this_map_sel))
             allmaps_max = max(allmaps_max, np.nanmax(this_map_sel))
         
-        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, subplot_label=subplot_str, cbar_max=cbar_max)
+        im, cb = make_map(ax, this_map_sel, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, show_cbar=bool(ref_casename), vmin=vmin_to_use, vmax=vmax_to_use, cbar=cb, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, subplot_label=subplot_str, cbar_max=cbar_max, cbar_labelpad=cbar_labelpad)
         if new_axes:
             ims.append(im)
             cbs.append(cb)
@@ -503,7 +517,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_
     return units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors
 
 
-def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_viable_hui, mxmats_tmp, nx_in, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList, chunk_colorbar=False, save_netcdfs=False):
+def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, mxmats_tmp, nx_in, outDir_figs, overwrite, plot_y1, plot_yN, ref_casename, varList, chunk_colorbar=False, save_netcdfs=False):
 
     for (this_var, var_info) in varList.items():
         chunk_colorbar_thisVar = chunk_colorbar or ("chunk_colorbar" in var_info and var_info['chunk_colorbar'])
@@ -560,7 +574,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
             fig_caselist = [ref_casename] + [x for x in fig_caselist if x != ref_casename]
         
         # Now set some figure parameters based on # cases
-        cbar_pos, figsize, hspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos = get_figure_info(ny, nx, ref_casename)
+        cbar_pos, figsize, hspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos, cbar_labelpad = get_figure_info(ny, nx, ref_casename)
 
         for thisCrop_main in clm_types:
             this_suptitle = thisCrop_main.capitalize() + ": " + suptitle
@@ -593,7 +607,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
             ims = []
             axes = []
             cbs = []
-            units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar_thisVar, abs_cmap=abs_cmap, diff_cmap=diff_cmap, save_netcdfs=save_netcdfs)
+            units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar_thisVar, abs_cmap=abs_cmap, diff_cmap=diff_cmap, save_netcdfs=save_netcdfs, cbar_labelpad=cbar_labelpad)
 
             fig.suptitle(this_suptitle,
                             x = suptitle_xpos,
@@ -601,7 +615,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                             fontsize = fontsize['suptitle'])
 
             # Add row and column labels
-            add_rowcol_labels(axes, fig_caselist, fontsize, nx, ny, rx_row_label)
+            add_rowcol_labels(axes, fig_caselist, nx, ny, rx_row_label)
             
             # Draw all-subplot colorbar
             if not ref_casename:
@@ -613,7 +627,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                     cb.set_ticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
                     cb.ax.tick_params(length=0)
                 cb.ax.tick_params(labelsize=fontsize['ticklabels'])
-                cb.set_label(units, fontsize=fontsize['titles'])
+                cb.set_label(units, fontsize=fontsize['titles'], labelpad=cbar_labelpad)
             
             if not manual_colors:
                 if ref_casename:
@@ -651,7 +665,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                         diff_Ncolors = None
                         diff_this_cmap = None
                         diff_cbar_ticklabels = None
-                    units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, fontsize, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar_thisVar, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange)
+                    units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar_thisVar, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange, cbar_labelpad=cbar_labelpad)
                 
                 # Redraw all-subplot colorbar 
                 if not ref_casename:
@@ -660,12 +674,11 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, fontsize, lu_ds, min_vi
                     cb.remove()
                     cb = fig.colorbar(ims[0], cax=cbar_ax, orientation='horizontal', label=units, extend = extend)
                     cb.ax.tick_params(labelsize=fontsize['ticklabels'])
-                    cb.set_label(units, fontsize=fontsize['titles'])
+                    cb.set_label(units, fontsize=fontsize['titles'], labelpad=cbar_labelpad)
                     if cbar_ticklabels is not None:
                         cb.set_ticks(cb.get_ticks()) # Does nothing except to avoid "FixedFormatter should only be used together with FixedLocator" warning in call of cb.set_ticklabels() below
                         cb.set_ticklabels(cbar_ticklabels)
             
-            plt.subplots_adjust(bottom=new_sp_bottom, left=new_sp_left)
             if hspace is not None:
                 plt.subplots_adjust(hspace=hspace)
             
