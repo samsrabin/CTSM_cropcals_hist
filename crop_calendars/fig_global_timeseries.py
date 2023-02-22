@@ -225,6 +225,7 @@ def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabe
         if not skip_this:
             
             # Fisher's z test for correlations
+            # Fisher (1915, doi:10.2307/2331838)
             # https://garstats.wordpress.com/2019/06/17/compindcorr/
             z0 = np.arctanh(stats2[0])
             z1 = np.arctanh(stats2[1])
