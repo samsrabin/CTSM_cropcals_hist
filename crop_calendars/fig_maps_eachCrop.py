@@ -202,7 +202,7 @@ def get_figure_info(ny, nx, ref_casename):
         if nx == 1:
             figsize = (10, 8.5)		# width, height
         else:
-            figsize = (15, 8.5)		# width, height
+            figsize = (14, 8)		# width, height
         if ref_casename:
             suptitle_xpos = 0.515
             suptitle_ypos = 0.95
@@ -212,6 +212,7 @@ def get_figure_info(ny, nx, ref_casename):
         cbar_pos = [0.17, 0.05, 0.725, 0.025]	# left edge, bottom edge, width, height
         new_sp_bottom = 0.11
         new_sp_left = None
+        cbar_labelpad = 13
     elif ny == 3:
         figsize = (14, 16)	 # width, height
         if ref_casename:
