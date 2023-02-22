@@ -743,6 +743,8 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             
             # Weights should never be shifted, as they are observed values.
             weights = ydata_prod[o,:]
+            # Actually, no: I don't think Müller et al. (2017) weighted the global numbers.
+            weights = np.full_like(weights, fill_value=1.0)
             
             corrcoeff = [cc.weighted_pearsons_r(ydata_yield_dt[o,:], ydata_yield_dt[x,:], weights) for x in inds_sim]
             if verbose:
