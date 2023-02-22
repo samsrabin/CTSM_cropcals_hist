@@ -473,7 +473,7 @@ def global_timeseries_irrig_inclcrops(thisVar, cases, reses, cropList_combined_c
                         
         # Make plots for this crop
         if not noFigs:
-            no_xlabel = c < nx*(ny - 1)
+            no_xlabel = c < nx*(ny - 1) and not (nx==3 and c==5 and len(cropList_combined_clm + [extra])==8)
             if no_xlabel:
                 xlabel = None
             else:
