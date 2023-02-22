@@ -837,13 +837,9 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                 xlabel_yield_scatter = None
                 ylabel_yield_scatter = None
                 if ylabel_yield is not None and not (ny==3 and c!=3):
-                    ylabel_yield_scatter = ylabel_yield
-                    if remove_scatter_bias:
-                        ylabel_yield_scatter += ", bias removed"
+                    ylabel_yield_scatter = "Simulated " + ylabel_yield.lower()
                 if xlabel is not None:
-                    xlabel_yield_scatter = label_yield
-                    if remove_scatter_bias:
-                        xlabel_yield_scatter += ", bias removed"
+                    xlabel_yield_scatter = "Observed " + label_yield.lower()
                 make_1plot_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref_touse, stats_round=corrcoef_round, shift_symbols=shift_symbols, subplot_label=subplot_str, ny=ny)
                 if include_shiftsens:
                     make_1plot_scatter(ax_scatter_yield_dt_orig, ydata_yield_dt[o,:], ydata_yield_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref, stats_round=corrcoef_round, shift_symbols=noshift_symbols, subplot_label=subplot_str, ny=ny)
@@ -851,6 +847,9 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                     make_1plot_scatter(ax_scatter_yield_dt_shiftR, ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffR, stats_round=corrcoef_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str, ny=ny)
             
     # Finish up and save
+    scatter_title_paren = "detrended"
+    if remove_scatter_bias:
+        scatter_title_paren += ", bias removed"
     if not noFigs:
         print("Finishing and saving...")
         finishup_lines(c, ny, nx, axes_lines_area, f_lines_area, "Global crop area", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
@@ -871,11 +870,11 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             finishup_lines(c, ny, nx, axes_lines_yield_dt_shiftL, f_lines_yield_dt_shiftL, "Global crop yield (detrended) shiftL", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
             finishup_lines(c, ny, nx, axes_lines_yield_dt_shiftR, f_lines_yield_dt_shiftR, "Global crop yield (detrended) shiftR", outDir_figs, mxmat_limited, fig_caselist, min_viable_hui_list=min_viable_hui_list)
         if include_scatter:
-            finishup_scatter(c, ny, nx, axes_scatter_yield_dt, f_scatter_yield_dt, "Global crop yield (detrended)", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
+            finishup_scatter(c, ny, nx, axes_scatter_yield_dt, f_scatter_yield_dt, f"Global crop yield ({scatter_title_paren})", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
             if include_shiftsens:
-                finishup_scatter(c, ny, nx, axes_scatter_yield_dt_orig, f_scatter_yield_dt_orig, "Global crop yield (detrended) no-shift", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
-                finishup_scatter(c, ny, nx, axes_scatter_yield_dt_shiftL, f_scatter_yield_dt_shiftL, "Global crop yield (detrended) shiftL", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
-                finishup_scatter(c, ny, nx, axes_scatter_yield_dt_shiftR, f_scatter_yield_dt_shiftR, "Global crop yield (detrended) shiftR", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
+                finishup_scatter(c, ny, nx, axes_scatter_yield_dt_orig, f_scatter_yield_dt_orig, f"Global crop yield ({scatter_title_paren}) no-shift", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
+                finishup_scatter(c, ny, nx, axes_scatter_yield_dt_shiftL, f_scatter_yield_dt_shiftL, f"Global crop yield ({scatter_title_paren}) shiftL", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
+                finishup_scatter(c, ny, nx, axes_scatter_yield_dt_shiftR, f_scatter_yield_dt_shiftR, f"Global crop yield ({scatter_title_paren}) shiftR", outDir_figs, mxmat_limited, fig_caselist, inds_sim)
 
     print("Done.")
     return cases
