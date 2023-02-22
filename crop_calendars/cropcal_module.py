@@ -2463,7 +2463,7 @@ def weighted_pearsons_r(x, y, w):
     n = len(x)
     df = n - 2
     t = r * np.sqrt(df) / np.sqrt(1 - r**2)
-    p = 1 - stats.t(df).cdf(t)
+    p = 2*stats.t(df).cdf(-np.abs(t))
     
     return r, p
 
