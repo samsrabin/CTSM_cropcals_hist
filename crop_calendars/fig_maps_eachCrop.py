@@ -125,10 +125,16 @@ def get_colorbar_chunks(im, ax, this_var, cmap_name, is_diff):
     return vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange
 
 
-def get_cases_with_var(cases, this_var, lu_ds, min_viable_hui, mxmats_tmp, ref_casename):
+def get_cases_with_var(cases, this_var, var_info, lu_ds, min_viable_hui, mxmats_tmp, ref_casename):
     ny = 0
     fig_caselist = []
     for i, (casename, case) in enumerate(cases.items()):
+        
+        if 'skip_cases' in var_info and var_info['skip_cases'] is not None:
+            if not isinstance(var_info['skip_cases'], list):
+                var_info['skip_cases'] = [var_info['skip_cases']]
+            if casename in var_info['skip_cases']:
+                continue
         
         if this_var in ["YIELD_ANN", "PROD_ANN"]:
             case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp, lu_ds=lu_ds)
@@ -552,7 +558,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, 
             diff_cmap = "PiYG_r"
 
         # First, determine how many cases have this variable
-        fig_caselist, ny = get_cases_with_var(cases, this_var, lu_ds, min_viable_hui, mxmats_tmp, ref_casename)
+        fig_caselist, ny = get_cases_with_var(cases, this_var, var_info, lu_ds, min_viable_hui, mxmats_tmp, ref_casename)
         if ny == 0:
             print(f"No cases contain {this_var}; skipping.")
             continue

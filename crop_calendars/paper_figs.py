@@ -653,6 +653,11 @@ overwrite = True
 plot_y1 = 1980
 plot_yN = 2010
 
+if ref_casename=="rx":
+    skip_SDATES = ['Prescribed Calendars']
+else:
+    skip_SDATES = None
+
 varList = {
     'GDDHARV': {
         'suptitle':   'Mean harvest requirement',
@@ -696,7 +701,8 @@ varList = {
         'time_dim':   'gs',
         'units':      'day of year',
         'multiplier': 1,
-        'chunk_colorbar': True},
+        'chunk_colorbar': True,
+        'skip_cases': skip_SDATES},
     'MATURE': {
         'suptitle':   'Mature harvests',
         'time_dim':   'gs',
