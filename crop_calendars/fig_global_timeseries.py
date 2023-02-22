@@ -156,7 +156,7 @@ def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
                     fontsize=fontsize['legend'])
 
 
-def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabel, ylabel, equalize_scatter_axes, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None, ny=2):
+def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabel, ylabel, equalize_scatter_axes, bottommiddle_plot, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None, ny=2):
     
     for i, casename in enumerate(caselist):
         if "CLM Default" in casename:
@@ -176,7 +176,7 @@ def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabe
         plt.sca(ax_this)
         plt.scatter(xdata, ydata_this[i,:], color=color, s=100, alpha=0.8, facecolors=facecolors)
         m, b = np.polyfit(xdata, ydata_this[i,:], 1)
-        plt.plot(xdata, m*xdata+b, color=color)
+        plt.plot(xdata, m*xdata+b, color=color, linewidth=3)
     
     if subplot_label is not None:
         ypos = 0.93 # From before, with ny=4
@@ -221,8 +221,17 @@ def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabe
     ax_this.title.set_text(thisTitle)
     ax_this.title.set_size(fontsize['title'])
     ax_this.tick_params(axis='both', which='major', labelsize=fontsize['tick_label'], length=ticklength_minor)
-    ax_this.set_xlabel(xlabel, fontsize=fontsize['axis_label'])
-    ax_this.set_ylabel(ylabel, fontsize=fontsize['axis_label'])
+    
+    if bottommiddle_plot:
+        ax_this.set_xlabel(xlabel, fontsize=fontsize['suptitle'])
+        ax_this.xaxis.set_label_coords(0.5, -0.25)
+    else:
+        ax_this.set_xlabel(xlabel, fontsize=fontsize['axis_label'])
+    
+    ax_this.set_ylabel(ylabel, fontsize=fontsize['suptitle'])
+    if ylabel is not None:
+        ax_this.yaxis.set_label_coords(-0.25, 0.5)
+    
     reduce_yticks(ax_this)
     if ax_this.get_legend():
         ax_this.get_legend().remove()
@@ -266,7 +275,11 @@ def finishup_lines(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, mxmat_li
 
 def finishup_scatter(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, mxmat_limited, fig_caselist, inds_sim):
     # Delete unused axes, if any
+    legend_in_empty_spot = False
     for a in np.arange(c+1, ny*nx):
+        if a == ny*nx-1:
+            legend_in_empty_spot = True
+            break
         f_this.delaxes(axes_this[a])
     
     if ny==3 and nx==3:
@@ -275,18 +288,38 @@ def finishup_scatter(c, ny, nx, axes_this, f_this, suptitle, outDir_figs, mxmat_
     if mxmat_limited:
         suptitle += " (limited season length)"
         
+    # Are we putting the legend in an empty spot?
+    if legend_in_empty_spot:
+        legend_ncol = 1
+        legend_loc = "center"
+        legend_owner_handle = axes_this[a]
+        legend_bbox_to_anchor = None
+        legend_bbox_transform = None
+        suptitle_y = 0.96
+    else:
+        legend_ncol = int(np.ceil(len(fig_caselist)/2))
+        legend_loc = "upper center"
+        legend_owner_handle = f_this
+        legend_bbox_to_anchor = (0.5, 0.972)
+        legend_bbox_transform = f_this.transFigure
+        suptitle_y = 1
+        
     f_this.suptitle(suptitle,
-                    x = 0.5, y=0.05, horizontalalignment = 'center',
-                    fontsize=fontsize['suptitle'])
+                    x = 0.5, y=suptitle_y, horizontalalignment = 'center',
+                    fontsize=fontsize['suptitle'], fontweight='bold')
     
     # Get the handles of just the points (i.e., not including regression lines)    
     legend_handles = [x for x in axes_this[0].get_children() if isinstance(x, mplcollections.PathCollection)]
     
-    f_this.legend(handles = legend_handles,
+    legend_owner_handle.legend(handles = legend_handles,
                   labels = [fig_caselist[x] for x in inds_sim],
-                  loc = "upper center",
-                  ncol = int(np.ceil(len(fig_caselist)/2)),
+                  loc = legend_loc,
+                  bbox_to_anchor = legend_bbox_to_anchor,
+                  bbox_transform = legend_bbox_transform,
+                  ncol = legend_ncol,
                   fontsize=fontsize['legend'])
+    if legend_in_empty_spot:
+        legend_owner_handle.axis('off')
 
     f_this.savefig(outDir_figs + "Scatter " + suptitle + " by crop.pdf",
                    bbox_inches='tight')
@@ -838,13 +871,15 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                 ylabel_yield_scatter = None
                 if ylabel_yield is not None and not (ny==3 and c!=3):
                     ylabel_yield_scatter = "Simulated " + ylabel_yield.lower()
-                if xlabel is not None:
+                even_nx = nx%2==0
+                bottommiddle_plot = not even_nx and c - (ny-1)*nx == 1
+                if xlabel is not None and (even_nx or bottommiddle_plot):
                     xlabel_yield_scatter = "Observed " + label_yield.lower()
-                make_1plot_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref_touse, stats_round=corrcoef_round, shift_symbols=shift_symbols, subplot_label=subplot_str, ny=ny)
+                make_1plot_scatter(ax_scatter_yield_dt, ydata_yield_dt_touse[o,:], ydata_yield_dt_touse[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, bottommiddle_plot, stats2=corrcoef_ref_touse, stats_round=corrcoef_round, shift_symbols=shift_symbols, subplot_label=subplot_str, ny=ny)
                 if include_shiftsens:
-                    make_1plot_scatter(ax_scatter_yield_dt_orig, ydata_yield_dt[o,:], ydata_yield_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoef_ref, stats_round=corrcoef_round, shift_symbols=noshift_symbols, subplot_label=subplot_str, ny=ny)
-                    make_1plot_scatter(ax_scatter_yield_dt_shiftL, ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm,xlabel_yield_scatter,  ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffL, stats_round=corrcoef_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str, ny=ny)
-                    make_1plot_scatter(ax_scatter_yield_dt_shiftR, ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, stats2=corrcoeffR, stats_round=corrcoef_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str, ny=ny)
+                    make_1plot_scatter(ax_scatter_yield_dt_orig, ydata_yield_dt[o,:], ydata_yield_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, bottommiddle_plot, stats2=corrcoef_ref, stats_round=corrcoef_round, shift_symbols=noshift_symbols, subplot_label=subplot_str, ny=ny)
+                    make_1plot_scatter(ax_scatter_yield_dt_shiftL, ydata_yield_shiftL_dt[o,:], ydata_yield_shiftL_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm,xlabel_yield_scatter,  ylabel_yield_scatter, equalize_scatter_axes, bottommiddle_plot, stats2=corrcoeffL, stats_round=corrcoef_round, shift_symbols=shiftL_symbols, subplot_label=subplot_str, ny=ny)
+                    make_1plot_scatter(ax_scatter_yield_dt_shiftR, ydata_yield_shiftR_dt[o,:], ydata_yield_shiftR_dt[inds_sim,:], [fig_caselist[x] for x in inds_sim], thisCrop_clm, xlabel_yield_scatter, ylabel_yield_scatter, equalize_scatter_axes, bottommiddle_plot, stats2=corrcoeffR, stats_round=corrcoef_round, shift_symbols=shiftR_symbols, subplot_label=subplot_str, ny=ny)
             
     # Finish up and save
     scatter_title_paren = "detrended"

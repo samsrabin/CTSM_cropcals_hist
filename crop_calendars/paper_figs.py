@@ -588,7 +588,7 @@ mxmat_limited = False
 # mxmat_limited = True
 
 # Equalize axes of scatter plots?
-equalize_scatter_axes = False
+equalize_scatter_axes = True
 
 # Remove bias from scatter plots?
 remove_scatter_bias = True
