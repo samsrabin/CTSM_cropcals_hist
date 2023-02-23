@@ -18,11 +18,10 @@ import utils
 
 fontsize = {}
 fontsize['titles'] = 18
-fontsize['axislabels'] = 16
-fontsize['ticklabels'] = 16
-fontsize['suptitle'] = 20
+fontsize['axislabels'] = 14
+fontsize['ticklabels'] = 14
+fontsize['suptitle'] = 22
 
-figsize = (10, 7)
 dpi = 150
 
 
@@ -63,7 +62,22 @@ def get_plot_years(cases, plot_y1, plot_yN, timedim):
     return plot_y1, plot_yN, figname_y1, figname_yN
 
 
-def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=None):
+def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=None, nx=1, custom_figname=None):
+    
+    cbar_labelpad = 13
+    subplot_str = None
+    if nx == 1:
+        figsize = (14, 16)
+    elif nx == 2:
+        figsize = (14, 8)
+    else:
+        raise RuntimeError(f"figsize unknown for nx={nx}")
+    
+    if nx > 1:
+        if custom_figname is None:
+            raise RuntimeError("You must provide a custom figname when nx > 1")
+        elif len(varList) != nx:
+            raise RuntimeError(f"nx {nx} does not match number of variables to plot {len(varList)}")
     
     # Get derived variables
     caselist = [x for x in cases.keys()]
@@ -72,7 +86,10 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
     orig_vars = [[v for v in case['ds']] for _, case in cases.items()]
     
     # Make figures
+    subplot_num = -1
     for (this_var, var_info) in varList.items():
+        print(this_var)
+        
         ds0 = None
         cmap = None
         vrange = None
@@ -101,20 +118,22 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
             added_vars.append(this_var2add)
             
         # Difference plots
-        
         if "DIFF" in this_var:
             if "IRRIG_WITHDRAWAL_FRAC_SUPPLY" in this_var:
                 # vrange = [-max(vrange), max(vrange)]
                 vrange = None
                 extend = "both"
-                bounds = np.arange(-0.9, 1, 0.2)
+                bounds = np.arange(-0.9, 1, 0.2) * var_info['multiplier']
                 cmap_to_use = cm.get_cmap("PiYG", len(bounds)+1)
-                cbar_units = "Change in fraction"
+                if var_info['units'] is None:
+                    cbar_units = "Change in fraction"
+                else:
+                    cbar_units = var_info['units']
             this_var = this_var.replace("_DIFF", "")
             case0 = caselist[0]
             case1 = caselist[1]
-            ds0 = cases[case0]['ds']
-            ds1 = cases[case1]['ds']
+            ds0 = cases[case0]['ds'].copy()
+            ds1 = cases[case1]['ds'].copy()
             da0 = ds0[this_var]
             da1 = ds1[this_var]
             if "time_mth" in da0.dims:
@@ -122,7 +141,8 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
             elif "time" in da0.dims:
                 raise RuntimeError("Code this")
             da = da1 - da0
-            if var_info['units'] == "months":
+            da *= var_info['multiplier']
+            if var_info['units'].lower() == "months":
                 
                 # Difference is modulo 6 months
                 da_vals = da.copy().values
@@ -138,7 +158,10 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
                 cmap_to_use = cm.get_cmap(cmap)
                 extend = "neither"
                 ticklabels_to_use = np.arange(-6,7,1)
-                cbar_units=f"{case1} minus {case0} ({var_info['units']})"
+                if "suppress_difftext" in var_info and var_info['suppress_difftext']:
+                    cbar_units = var_info['units']
+                else:
+                    cbar_units = f"{case1} minus {case0} ({var_info['units']})"
             
             if "time_mth" in da.dims:
                 raise RuntimeError(f"Can't handle dim time_mth")
@@ -160,9 +183,13 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
             ds0['tmp'] = da
             this_map = utils.grid_one_variable(ds0, 'tmp')
             
-            f = plt.figure(figsize=figsize, facecolor="white")
-            ax = f.add_axes([0,0,1,1], projection=ccrs.PlateCarree())
-            im, cb = ccf.make_map(ax, this_map, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=True, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, cbar_max=cbar_max)
+            subplot_num += 1
+            if (subplot_num) % nx == 0:
+                f = plt.figure(figsize=figsize, facecolor="white")
+            if nx > 1:
+                subplot_str = chr(ord('`') + subplot_num+1) # or ord('@') for capital
+            ax = f.add_subplot(1, nx, subplot_num%nx + 1, projection=ccrs.PlateCarree())
+            im, cb = ccf.make_map(ax, this_map, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, show_cbar=True, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, cbar_max=cbar_max, subplot_label=subplot_str, cbar_labelpad=cbar_labelpad)
             
             if ds0 is not None and "tmp" in ds0:
                 ds0 = ds0.drop_vars("tmp")
@@ -170,14 +197,23 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
             if "_PKMTH" in this_var:
                 cb.ax.tick_params(length=0)
             
-            this_title = f"{var_info['suptitle']}: {case1} minus {case0}"
-            ax.set_title(this_title.replace(": ", "\n"), fontsize=20)
+            minus = f": {case1} minus {case0}"
+            file_basename = f"{var_info['suptitle']}{minus}"
+            this_title = file_basename
+            if "suppress_difftext" in var_info and var_info['suppress_difftext']:
+                this_title = this_title.replace(minus, "")
+            ax.set_title(this_title.replace(": ", "\n"), fontsize=fontsize['titles'])
             
             if outDir_figs is not None:
-                fig_outfile = os.path.join(outDir_figs, this_title.replace(": ", "—") + ".png")
-                f.savefig(fig_outfile,
-                        bbox_inches='tight', facecolor='white', dpi=dpi)
-                plt.close()
+                if (subplot_num%nx - 1) == 0:
+                    if custom_figname is not None:
+                        file_basename = custom_figname
+                    else:
+                        file_basename = file_basename.replace(": ", "—").replace("\n", "")
+                    fig_outfile = os.path.join(outDir_figs, file_basename + ".png")
+                    f.savefig(fig_outfile,
+                            bbox_inches='tight', facecolor='white', dpi=dpi)
+                    plt.close()
             else:
                 plt.show()
         
@@ -199,27 +235,34 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
             plot_yN = None
             for i, (casename, case) in enumerate(cases.items()):
                 
-                if "time_mth" in case['ds'][this_var].dims:
+                ds = case['ds'].copy()
+                
+                if "time_mth" in ds[this_var].dims:
                     raise RuntimeError(f"Can't handle dim time_mth")
-                elif "time" in case['ds'][this_var].dims:
+                elif "time" in ds[this_var].dims:
                     plot_y1, plot_yN, figname_y1, figname_yN = get_plot_years(cases, y1, yN, "time")
                     timeslice = slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")
-                    case['ds']['tmp'] = case['ds'][this_var].sel(time=timeslice).mean(dim="time")
-                elif "year" in case['ds'][this_var].dims:
+                    ds['tmp'] = ds[this_var].sel(time=timeslice).mean(dim="time")
+                elif "year" in ds[this_var].dims:
                     plot_y1, plot_yN, figname_y1, figname_yN = get_plot_years(cases, y1, yN, "year")
                     timeslice = slice(plot_y1, plot_yN)
-                    case['ds']['tmp'] = case['ds'][this_var].sel(year=timeslice).mean(dim="year")
+                    ds['tmp'] = ds[this_var].sel(year=timeslice).mean(dim="year")
                 else:
-                    case['ds']['tmp'] = case['ds'][this_var]
+                    ds['tmp'] = ds[this_var]
                 
-                if any(d != "gridcell" for d in case['ds']['tmp'].dims):
-                    raise RuntimeError(f"Expected one dimension ('gridcell'); got {case['ds']['tmp'].dims}")
+                if any(d != "gridcell" for d in ds['tmp'].dims):
+                    raise RuntimeError(f"Expected one dimension ('gridcell'); got {ds['tmp'].dims}")
                 
-                this_map = utils.grid_one_variable(case['ds'], 'tmp')
+                this_map = utils.grid_one_variable(ds, 'tmp')
+                this_map *= var_info['multiplier']
                 
-                f = plt.figure(figsize=figsize, facecolor="white")
-                ax = f.add_axes([0,0,1,1], projection=ccrs.PlateCarree())
-                im, cb = ccf.make_map(ax, this_map, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, linewidth=0.5, show_cbar=True, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, cbar_max=cbar_max)
+                subplot_num += 1
+                if subplot_num % nx == 0:
+                    f = plt.figure(figsize=figsize, facecolor="white")
+                if nx > 1:
+                    subplot_str = chr(ord('`') + subplot_num+1) # or ord('@') for capital
+                ax = f.add_subplot(1, nx, subplot_num%nx + 1, projection=ccrs.PlateCarree())
+                im, cb = ccf.make_map(ax, this_map, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, show_cbar=True, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, cbar_max=cbar_max, subplot_label=subplot_str, cbar_labelpad=cbar_labelpad)
                 
                 if "_PKMTH" in this_var:
                     cb.set_ticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
@@ -235,16 +278,18 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
                 this_title = f"{var_info['suptitle']}: {casename}"
                 if plot_y1 is not None:
                     this_title += f", {figname_y1}-{figname_yN}"
-                ax.set_title(this_title.replace(": ", "\n"), fontsize=20)
+                ax.set_title(this_title.replace(": ", "\n"), fontsize=fontsize['titles'])
                 
                 if outDir_figs is not None:
-                    fig_outfile = os.path.join(outDir_figs, this_title.replace(": ", "—").replace(",", "") + ".png")
-                    f.savefig(fig_outfile,
-                              bbox_inches='tight', facecolor='white', dpi=dpi)
-                    plt.close()
+                    if nx==1 or (subplot_num%nx - 1) == 0:
+                        print("saving")
+                        if custom_figname is not None:
+                            file_basename = custom_figname
+                        else:
+                            file_basename = this_title.replace(": ", "—").replace(",", "").replace("\n", " ")
+                        fig_outfile = os.path.join(outDir_figs, file_basename + ".png")
+                        f.savefig(fig_outfile,
+                                bbox_inches='tight', facecolor='white', dpi=dpi)
+                        plt.close()
                 else:
                     plt.show()
-        
-    # Drop any variables we added while making figures
-    for c, (_, case) in enumerate(cases.items()):
-        case['ds'] = case['ds'][orig_vars[c]]

@@ -740,6 +740,8 @@ importlib.reload(cc)
 importlib.reload(sys.modules['cropcal_figs_module'])
 from cropcal_figs_module import *
 
+nx = 1
+custom_figname = None
 varList = {
     'IRRIG_FROM_SURFACE_GRID_ANN': {
         'suptitle':   'Irrigation from surface water',
@@ -763,10 +765,25 @@ varList = {
         'multiplier': 1},
 }
 
+# nx = 2
+# custom_figname = "Irrigation pk month diffs"
+# varList = {
+#     'QIRRIG_FROM_SURFACE_GRID_PKMTH_DIFF': {
+#         'suptitle':   'Difference in mean peak month of irrigation',
+#         'units':      'Months',
+#         'multiplier': 1,
+#         'suppress_difftext': True},
+#     'IRRIG_WITHDRAWAL_FRAC_SUPPLY_VALPKMTHWITHDRAWAL_ANN_DIFF': {
+#         'suptitle':   'Difference in mean irrigation use as\nfrac. supply in annual peak month',
+#         'units':      "Percentage points",
+#         'multiplier': 100,
+#         'suppress_difftext': True},
+# }
+
 plot_y1 = 1980
 plot_yN = 2010
 
-maps_gridlevel_vars(cases, varList, outDir_figs=outDir_figs, y1=plot_y1, yN=plot_yN)
+maps_gridlevel_vars(cases, varList, outDir_figs=outDir_figs, y1=plot_y1, yN=plot_yN, nx=nx, custom_figname=custom_figname)
 
 
 # %% Make maps of harvest reasons
