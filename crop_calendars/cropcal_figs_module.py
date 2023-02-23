@@ -68,7 +68,7 @@ def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_typ
     return this_map, croparea_ever_positive, time_dim
 
 
-def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_max=None, cbar_spacing='uniform', cmap=colormaps['seq_other'], extend_bounds='both', extend_nonbounds='both', linewidth=1.0, lonlat_bin_width=None, show_cbar=False, subplot_label=None, this_title=None, ticklabels=None, underlay=None, underlay_color=[0.75, 0.75, 0.75, 1], units=None, vmax=None, vmin=None, vrange=None):
+def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_labelpad=4.0, cbar_max=None, cbar_spacing='uniform', cmap=colormaps['seq_other'], extend_bounds='both', extend_nonbounds='both', linewidth=1.0, lonlat_bin_width=None, show_cbar=False, subplot_label=None, this_title=None, ticklabels=None, underlay=None, underlay_color=[0.75, 0.75, 0.75, 1], units=None, vmax=None, vmin=None, vrange=None):
     
     if underlay is not None:
         underlay_cmap = mcolors.ListedColormap(np.array([underlay_color, [1, 1, 1, 1]]))
@@ -127,7 +127,7 @@ def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_max=None, cbar
             ticklabels = [str(int(x)) for x in ticklabels]
             cbar.ax.set_xticks(ticks) # Calling this before set_xticklabels() avoids "UserWarning: FixedFormatter should only be used together with FixedLocator" (https://stackoverflow.com/questions/63723514/userwarning-fixedformatter-should-only-be-used-together-with-fixedlocator)
             cbar.ax.set_xticklabels(ticklabels)
-        cbar.set_label(label=units, fontsize=fontsize['axislabels'], verticalalignment="center")
+        cbar.set_label(label=units, fontsize=fontsize['axislabels'], verticalalignment="center", labelpad=cbar_labelpad)
         cbar.ax.tick_params(labelsize=fontsize['ticklabels'])
         if units is not None and "month" in units.lower():
             cbar.ax.tick_params(length=0)
