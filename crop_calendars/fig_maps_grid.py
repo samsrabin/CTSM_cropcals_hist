@@ -85,6 +85,7 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
     
     cbar_labelpad = 13
     subplot_str = None
+    title_y = 1.1
     if nx == 1:
         figsize = (14, 16)
     elif nx == 2:
@@ -226,7 +227,7 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
             this_title = file_basename
             if "suppress_difftext" in var_info and var_info['suppress_difftext']:
                 this_title = this_title.replace(minus, "")
-            ax.set_title(this_title.replace(": ", "\n"), fontsize=fontsize['titles'])
+            ax.set_title(this_title.replace(": ", "\n"), fontsize=fontsize['titles'], y=title_y)
             
             if outDir_figs is not None:
                 if (subplot_num%nx - 1) == 0:
@@ -302,7 +303,7 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
                 this_title = f"{var_info['suptitle']}: {casename}"
                 if plot_y1 is not None:
                     this_title += f", {figname_y1}-{figname_yN}"
-                ax.set_title(this_title.replace(": ", "\n"), fontsize=fontsize['titles'])
+                ax.set_title(this_title.replace(": ", "\n"), fontsize=fontsize['titles'], y=title_y)
                 
                 if outDir_figs is not None:
                     if nx==1 or (subplot_num%nx - 1) == 0:
