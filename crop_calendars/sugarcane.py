@@ -3,17 +3,23 @@
 import numpy as np
 
 water_frac = (0.73 + 0.76)/2
-solids_frac = (0.10 + 0.16)/2
-solids_frac_of_dry = solids_frac / (1 - water_frac)
+soluble_solids_frac = (0.10 + 0.16)/2
+soluble_solids_frac_of_dry = soluble_solids_frac / (1 - water_frac)
+fiber_frac = (0.11 + 0.16) / 2
+fiber_frac_of_dry = fiber_frac / (1 - water_frac)
 # Sugar types: sucrose, glucose, fructose
-sugars_frac_of_solids = np.array([(0.70 + 0.88), (0.02 + 0.04), (0.02 + 0.04)])/2
+sugars_frac_of_soluble_solids = np.array([(0.70 + 0.88), (0.02 + 0.04), (0.02 + 0.04)])/2
 
 # What fraction of the total is sugar?
-total_sugar_frac_of_solids = np.sum(sugars_frac_of_solids)
-total_sugar_frac_of_total = total_sugar_frac_of_solids * solids_frac
-total_sugar_frac_of_dry = total_sugar_frac_of_solids * solids_frac_of_dry
+total_sugar_frac_of_soluble_solids = np.sum(sugars_frac_of_soluble_solids)
+# total_sugar_frac_of_solids = 0.01*(75+92)/2
+total_sugar_frac_of_total = total_sugar_frac_of_soluble_solids * soluble_solids_frac
+total_sugar_frac_of_dry = total_sugar_frac_of_soluble_solids * soluble_solids_frac_of_dry
 print(f'{total_sugar_frac_of_total*100}% of millable cane is sugar (mostly sucrose, some glucose and fructose).')
 print(f'That\'s {np.round(total_sugar_frac_of_dry*100, 2)}% of the dry portion of millable cane.')
+
+# What fraction of the total is sugar + other soluble solids?
+print(f'All soluble solids together are {np.round(soluble_solids_frac_of_dry*100, 2)}% of the dry portion of millable cane.')
 
 def get_c_frac(c, h, o):
    c = np.array(c)
@@ -26,6 +32,6 @@ def get_c_frac(c, h, o):
 
 sugars_cfrac = get_c_frac([12, 6, 6], [22, 12, 12], [11, 6, 6])
 
-mean_sugar_cfrac = np.sum(sugars_cfrac * sugars_frac_of_solids / np.sum(sugars_frac_of_solids))
+mean_sugar_cfrac = np.sum(sugars_cfrac * sugars_frac_of_soluble_solids / np.sum(sugars_frac_of_soluble_solids))
 print(f'Sugar in cane is {int(np.round(100*mean_sugar_cfrac))}% C.')
 
