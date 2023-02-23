@@ -81,7 +81,8 @@ all_pft_params = list(np.sort(np.unique(all_pft_params)))
 # %% Print info about a PFT
 
 # pftname = 'rice'
-pftname = 'irrigated_rice'
+# pftname = 'irrigated_rice'
+pftname = 'tropical_corn'
 
 param_values_lists = [[] for v in paramfile_versions]
 param_names = []
@@ -92,7 +93,13 @@ for param_name in all_pft_params:
     for v in paramfile_versions:
         if param_name in params[v]:
             pftnum = list(params[v]["pftname2"].values).index(pftname)
-            param_values.append(params[v][param_name].isel(pft=pftnum).values)
+            param_value = params[v][param_name].isel(pft=pftnum).values
+            if isinstance(param_value, np.ndarray):
+                if param_value.ndim==0:
+                    param_value = float(param_value)
+                elif param_value.ndim==1 and len(param_value)==1:
+                    param_value = param_value[0]
+            param_values.append(param_value)
             if long_name=="" and 'long_name' in params[v][param_name].attrs:
                 long_name = params[v][param_name].attrs['long_name']
         else:
@@ -100,7 +107,7 @@ for param_name in all_pft_params:
     if len(np.unique(param_values)) > 1:
         param_names.append(param_name)
         long_names.append(long_name)
-        # print(f"{param_name}{long_name}: {param_values}")
+        print(f"{param_name} ({long_name}): {param_values}")
         for i in np.arange(len(paramfile_versions)):
             param_values_lists[i].append(param_values[i])
 
@@ -115,3 +122,40 @@ for v in paramfile_versions:
     outFile_suffix += "_" + v
 outFile = os.path.join(outDir, f"compare_params_{my_clm_subver}" + outFile_suffix + f"_{pftname}.csv")
 df.to_csv(outFile)
+
+
+# %% Print info about a variable
+
+param_name = "grnfill"
+
+cropList = ['cotton', 'rice', 'sugarcane', 'spring_wheat', 'temperate_corn', 'temperate_soybean', 'tropical_corn', 'tropical_soybean']
+
+for pftname in cropList:
+    irr_pftname = "irrigated_" + pftname
+    param_values = []
+    for v in paramfile_versions:
+        if param_name in params[v]:
+            
+            # Get value
+            pftnum = list(params[v]["pftname2"].values).index(pftname)
+            param_value = params[v][param_name].isel(pft=pftnum).values
+            
+            # Make sure irrigated value is the same
+            irr_pftnum = list(params[v]["pftname2"].values).index(irr_pftname)
+            irr_param_value = params[v][param_name].isel(pft=irr_pftnum).values
+            if not np.array_equal(param_value, irr_param_value):
+                raise RuntimeError("Irrigated and rainfed parameter values differ")
+            
+            # Save value
+            if isinstance(param_value, np.ndarray):
+                if param_value.ndim==0:
+                    param_value = float(param_value)
+                elif param_value.ndim==1 and len(param_value)==1:
+                    param_value = param_value[0]
+            param_values.append(param_value)
+        else:
+            param_values.append("n/a")
+    if param_values[0] != param_values[1]:
+        print(f"∆ {pftname}: {param_values[0]} → {param_values[1]}")
+    else:
+        print(f"  {pftname}: {param_values[0]}")
