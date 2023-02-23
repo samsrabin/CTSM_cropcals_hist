@@ -119,17 +119,16 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
         cbar_units = None
         cmap_to_use = None
         bounds = None
-        spacing = 'uniform'
         added_vars = []
         if "_PKMTH" in this_var:
-            cmap = "twilight_shifted"
+            cmap = ccf.colormaps['seq_timeofyear']
             this_var2add = this_var.replace("_DIFF", "")
             added_vars.append(this_var2add)
             cases = cc.get_peakmonth(cases, this_var2add, y1=y1, yN=yN)
         if "IRRIG_WITHDRAWAL_FRAC_SUPPLY" in this_var:
             # vrange = [0, 0.9]
             bounds = [0, 0.01] + list(np.arange(0.1, 0.95, 0.1))
-            cmap = truncate_colormap(cm.get_cmap("CMRmap_r"), minval=0.05, maxval=1.0, n=11)
+            cmap = truncate_colormap(cm.get_cmap(ccf.colormaps['seq_other']), minval=0.05, maxval=1.0, n=11)
             cmap_to_use = cm.get_cmap(cmap, len(bounds))
             extend = "max"
             cbar_units = "Fraction"
@@ -146,7 +145,7 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
                 bounds = np.arange(-0.9, 1, 0.2) * var_info['multiplier']
                 
                 # Get colormap, setting custom color for zero-centered bin
-                cmap_to_use = set_custom_middle_color("PiYG", bounds)
+                cmap_to_use = set_custom_middle_color(ccf.colormaps['div_yieldirr'], bounds)
                 
                 if var_info['units'] is None:
                     cbar_units = "Change in fraction"
@@ -248,7 +247,7 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
         else:
             if "_PKMTH" in this_var:
                 bounds = np.arange(0.5, 13.5, 1)
-                cmap_to_use = cm.get_cmap('twilight_shifted')
+                cmap_to_use = cm.get_cmap(ccf.colormaps['seq_timeofyear'])
                 extend = "neither"
                 ticklabels_to_use = np.arange(1,13,1)
                 cbar_units = "Month"

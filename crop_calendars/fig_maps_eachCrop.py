@@ -12,7 +12,6 @@ sys.path.insert(0, parentdir)
 import cropcal_module as cc
 from cropcal_figs_module import *
 
-abs_cmap_default = 'rainbow'
 gslen_colorbar_max = 364
 
 fontsize = {}
@@ -121,7 +120,7 @@ def get_colorbar_chunks(im, ax, this_var, cmap_name, is_diff):
     if cmap_name:
         this_cmap = cm.get_cmap(cmap_name, Ncolors)
     else:
-        this_cmap = cm.get_cmap("viridis", Ncolors)
+        this_cmap = cm.get_cmap(colormaps('seq_other'), Ncolors)
     return vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange
 
 
@@ -296,7 +295,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_i
         c += 1
             
         # Get mean, set colormap
-        diverging_map = "PiYG_r"
+        diverging_map = colormaps['div_other_nonnorm']
         units = var_info['units']
         bounds = None
         vrange = None
@@ -338,7 +337,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_i
                 if abs_cmap:
                     cmap = abs_cmap
                 else:
-                    cmap = 'twilight_shifted'
+                    cmap = colormaps['seq_timeofyear']
                 
                 units = "Day of year"
                 if chunk_colorbar:
@@ -371,7 +370,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_i
             else:
                 manual_colors = True
                 bounds = np.arange(0.5, 13.5, 1)
-                cmap_to_use = cm.get_cmap('twilight_shifted')
+                cmap_to_use = cm.get_cmap(colormaps['seq_timeofyear'])
                 extend = "neither"
                 ticklabels_to_use = np.arange(1,13,1)
                 units = "Month"
@@ -395,7 +394,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_i
                 if abs_cmap:
                     cmap = abs_cmap
                 else:
-                    cmap = 'viridis'
+                    cmap = colormaps['seq_other']
                 vrange = None
             
         if casename == ref_casename:
@@ -548,15 +547,12 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, 
         print(f'Mapping {this_var}...')
         
         # Get colormap
-        abs_cmap = abs_cmap_default
+        abs_cmap = colormaps['seq_other']
+        diff_cmap = colormaps['div_other_nonnorm']
         if "DATE" in this_var or "_PKMTH" in this_var:
-            abs_cmap = "twilight_shifted"
-        elif "IRRIG" in this_var:
-            abs_cmap = "plasma_r"
-        if ("YIELD" in this_var or "PROD" in this_var) and ref_casename:
-            diff_cmap = "BrBG"
-        else:
-            diff_cmap = "PiYG_r"
+            abs_cmap = colormaps['seq_timeofyear']
+        if ("YIELD" in this_var or "PROD" in this_var or "IRRIG" in this_var):
+            diff_cmap = colormaps['div_yieldirr']
 
         # First, determine how many cases have this variable
         fig_caselist, ny = get_cases_with_var(cases, this_var, var_info, lu_ds, min_viable_hui, mxmats_tmp, ref_casename)

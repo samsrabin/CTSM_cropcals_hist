@@ -14,6 +14,19 @@ my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myf
 sys.path.append(my_ctsm_python_gallery)
 import utils
 
+import importlib
+importlib.reload(sys.modules['cropcal_figs_module'])
+from cropcal_figs_module import *
+
+colormaps = {
+    'seq_timeofyear': 'twilight_shifted',
+    'seq_other': 'plasma_r', # magma_r? CMRmap_r?
+    'div_yieldirr': 'BrBG',
+    'div_timeofyear': 'twilight_shifted',
+    'div_other_nonnorm': 'PuOr',
+    'div_other_norm': 'RdBu_r'
+}
+
 def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_types, plot_y1, plot_yN, ref_casename):
     time_dim = var_info['time_dim']
     case = cases[casename]
@@ -55,7 +68,7 @@ def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_typ
     return this_map, croparea_ever_positive, time_dim
 
 
-def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_max=None, cbar_spacing='uniform', cmap='viridis', extend_bounds='both', extend_nonbounds='both', linewidth=1.0, lonlat_bin_width=None, show_cbar=False, subplot_label=None, this_title=None, ticklabels=None, underlay=None, underlay_color=[0.75, 0.75, 0.75, 1], units=None, vmax=None, vmin=None, vrange=None):
+def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_max=None, cbar_spacing='uniform', cmap=colormaps['seq_other'], extend_bounds='both', extend_nonbounds='both', linewidth=1.0, lonlat_bin_width=None, show_cbar=False, subplot_label=None, this_title=None, ticklabels=None, underlay=None, underlay_color=[0.75, 0.75, 0.75, 1], units=None, vmax=None, vmin=None, vrange=None):
     
     if underlay is not None:
         underlay_cmap = mcolors.ListedColormap(np.array([underlay_color, [1, 1, 1, 1]]))

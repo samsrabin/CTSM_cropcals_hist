@@ -1430,10 +1430,11 @@ for thisVar_orig in varList:
     filename_prefix = "seas_length_compGGCMI" + filename_prefix
     if diffExpected:
         units = "Season length minus expected"
-        cmap = plt.cm.RdBu
+        cmap = colormaps['div_other_norm']
     else:
         units = "Days"
-        cmap = plt.cm.viridis
+        cmap = colormaps['seq_other']
+    cmap = plt.get_cmap(cmap)
     vmin = None
     
     figsize = (16, 8)

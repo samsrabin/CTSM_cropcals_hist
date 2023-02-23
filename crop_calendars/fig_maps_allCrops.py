@@ -63,11 +63,11 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
     
     if is_diff:
         if is_diffdiff:
-            cmap = "RdBu_r"
+            cmap = colormaps['div_other_norm']
         else:
-            cmap = "BrBG"
+            cmap = colormaps['div_yieldirr']
     else:
-        cmap = "viridis"
+        cmap = colormaps['seq_other']
     
     if posNeg:
         if Nvars > 1:

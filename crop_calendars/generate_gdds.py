@@ -23,6 +23,7 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
 import cropcal_module as cc
+from cropcal_figs_module import *
 
 # Import everything else
 import os
@@ -364,7 +365,7 @@ def main(argv):
                 Ncolors = vmax/gdd_spacing
                 if Ncolors % 2 == 0: Ncolors += 1
                 if not cmap:
-                    cmap = cm.get_cmap("RdYlBu_r", Ncolors)
+                    cmap = cm.get_cmap(colormaps['div_other_nonnorm'], Ncolors)
                 
                 if np.any(this_map.values > vmax) and np.any(this_map.values < vmin):
                     extend = 'both'
@@ -380,7 +381,7 @@ def main(argv):
                 vmax = np.floor(vmax/500)*500
                 Ncolors = vmax/500
                 if not cmap:
-                    cmap=cm.get_cmap("jet", Ncolors)
+                    cmap=cm.get_cmap(colormaps['seq_other'], Ncolors)
                 extend = 'max'
                 
             im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
@@ -573,7 +574,7 @@ def main(argv):
                     gdd_spacing = 250
                     vmax, bounds, Ncolors = get_bounds_ncolors(gdd_spacing, diff_map_yx)
                 
-                cmap = cm.get_cmap("RdBu_r", Ncolors)
+                cmap = cm.get_cmap(colormaps['div_other_norm'], Ncolors)
                 cbar_ticks = []
                 include_0bin_ticks = Ncolors <= 13
                 if vmax <= 3000:
