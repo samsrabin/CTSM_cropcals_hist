@@ -62,6 +62,25 @@ def get_plot_years(cases, plot_y1, plot_yN, timedim):
     return plot_y1, plot_yN, figname_y1, figname_yN
 
 
+def set_custom_middle_color(cmap, bounds):
+    cmap_to_use = cm.get_cmap(cmap, len(bounds)+1)
+    
+    # Set custom color for zero-centered bin
+    Nbins = len(bounds) - 1
+    if Nbins % 2 == 0:
+        raise RuntimeError(f"Expected odd Nbins, not {Nbins}")
+    if isinstance(cmap_to_use, mcolors.LinearSegmentedColormap):
+        color_list = [cmap_to_use(x) for x in np.arange(0, 1+1e-9, 1/Nbins)]
+        cmap_to_use = mcolors.ListedColormap(color_list)
+    new_colors = np.concatenate((cmap_to_use.colors[:int(Nbins/2)+1],
+                                 np.array([[0.75, 0.75, 0.75, 1]]),
+                                 cmap_to_use.colors[int(Nbins/2)+1:]),
+                                axis=0)
+    cmap_to_use = mcolors.ListedColormap(new_colors)
+    
+    return cmap_to_use
+
+
 def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=None, nx=1, custom_figname=None):
     
     cbar_labelpad = 13
@@ -124,7 +143,10 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
                 vrange = None
                 extend = "both"
                 bounds = np.arange(-0.9, 1, 0.2) * var_info['multiplier']
-                cmap_to_use = cm.get_cmap("PiYG", len(bounds)+1)
+                
+                # Get colormap, setting custom color for zero-centered bin
+                cmap_to_use = set_custom_middle_color("PiYG", bounds)
+                
                 if var_info['units'] is None:
                     cbar_units = "Change in fraction"
                 else:
@@ -155,13 +177,15 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
                 
                 # Get plot info
                 bounds = np.arange(-6.5, 7.5, 1)
-                cmap_to_use = cm.get_cmap(cmap)
                 extend = "neither"
                 ticklabels_to_use = np.arange(-6,7,1)
                 if "suppress_difftext" in var_info and var_info['suppress_difftext']:
                     cbar_units = var_info['units']
                 else:
                     cbar_units = f"{case1} minus {case0} ({var_info['units']})"
+                    
+                 # Get colormap, setting custom color for zero-centered bin
+                cmap_to_use = set_custom_middle_color(cmap, bounds) 
             
             if "time_mth" in da.dims:
                 raise RuntimeError(f"Can't handle dim time_mth")
