@@ -1250,12 +1250,15 @@ def get_peakmonth(cases, this_var, y1=None, yN=None):
         if np.any((pkmth <= 0) & (~np.isnan(thismax))):
             raise RuntimeError("Error filling pkmth")
         
-        # Save as DataArray"
+        # Save as DataArray
         ds[this_var] = xr.DataArray(data=pkmth,
                                     coords=ds[shapevar].coords,
                                     attrs={'units': 'peak month',
                                            'y1': y1,
                                            'yN': yN})
+        
+        # Mask where always 0
+        ds[this_var] = ds[this_var].where(ds[v].max(dim='time_mth') != 0)
         
     return cases
 
