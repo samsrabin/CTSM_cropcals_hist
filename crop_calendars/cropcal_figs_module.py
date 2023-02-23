@@ -109,8 +109,8 @@ def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_labelpad=4.0, 
             cbar.remove()
         
         if bounds is not None:
-            cbar = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), orientation='horizontal', fraction=0.1, pad=0.02, spacing=cbar_spacing)
-        else:    
+            cbar = plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, orientation='horizontal', fraction=0.1, pad=0.02, spacing=cbar_spacing)
+        else:
             cbar = plt.colorbar(im, ax=ax, orientation="horizontal", fraction=0.1, pad=0.02, extend=extend_nonbounds, spacing=cbar_spacing)
         
         if ticklabels is not None:
