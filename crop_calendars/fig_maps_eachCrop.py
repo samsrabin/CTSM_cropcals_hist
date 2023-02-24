@@ -51,11 +51,13 @@ def add_rowcol_labels(axes, fig_caselist, nx, ny, rx_row_label):
                             y=1.1)
 
 
-def get_colorbar_chunks(im, ax, this_var, cmap_name, is_diff):
+def get_colorbar_chunks(im, this_var, cmap_name, is_diff):
     force_diffmap_within_vrange = False
-    cb2 = plt.colorbar(mappable=im, ax=ax, location='bottom')
+    tmp_cb_ax = plt.axes()
+    cb2 = plt.colorbar(mappable=im, ax=tmp_cb_ax)
     ticks_orig = cb2.get_ticks()
     cb2.remove()
+    tmp_cb_ax.remove()
     plt.draw()
     Ncolors = len(ticks_orig)-1
     if Ncolors <= 5:
@@ -648,9 +650,9 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, 
                 if chunk_colorbar_thisVar:
                     if not ("DATE" in this_var or this_var=="GSLEN"):
                         raise RuntimeError(f"Do not chunk colorbar for {this_var}")
-                    vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[0], axes[0], this_var, abs_cmap, False)
+                    vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[0], this_var, abs_cmap, False)
                     if ref_casename:
-                        diff_vmin, diff_vmax, diff_Ncolors, diff_this_cmap, diff_cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[-1], axes[-1], this_var, diff_cmap, True)
+                        diff_vmin, diff_vmax, diff_Ncolors, diff_this_cmap, diff_cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[-1], this_var, diff_cmap, True)
                         while diff_eq_vrange[1] <= diff_cbar_ticklabels[-2]:
                             diff_cbar_ticklabels = diff_cbar_ticklabels[1:-1]
                             diff_vmin = diff_cbar_ticklabels[0]
