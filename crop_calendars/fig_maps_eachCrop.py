@@ -121,6 +121,10 @@ def get_colorbar_chunks(im, ax, this_var, cmap_name, is_diff):
         this_cmap = cm.get_cmap(cmap_name, Ncolors)
     else:
         this_cmap = cm.get_cmap(colormaps('seq_other'), Ncolors)
+    
+    if cbar_ticklabels is None:
+        cbar_ticklabels = ticks_orig
+    
     return vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange
 
 
@@ -244,7 +248,7 @@ def get_figure_info(ny, nx, ref_casename):
     return cbar_pos, figsize, hspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos, cbar_labelpad
 
 
-def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False, save_netcdfs=False, cbar_labelpad=4.0):
+def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False, save_netcdfs=False, cbar_labelpad=4.0, cbar_ticklabels=None):
     
     if this_var == "GSLEN":
         cbar_max = gslen_colorbar_max
@@ -271,7 +275,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_i
             Ncolors_to_use = Ncolors
             if not new_axes:
                 cmap_to_use = abs_cmap
-            ticklabels_to_use = None
+            ticklabels_to_use = cbar_ticklabels
             
         if casename == "rx":
             # Get map
@@ -668,7 +672,8 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, 
                         diff_Ncolors = None
                         diff_this_cmap = None
                         diff_cbar_ticklabels = None
-                    units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar_thisVar, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange, cbar_labelpad=cbar_labelpad)
+                    
+                    units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar_thisVar, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange, cbar_labelpad=cbar_labelpad, cbar_ticklabels=cbar_ticklabels)
                 
                 # Redraw all-subplot colorbar 
                 if not ref_casename:
