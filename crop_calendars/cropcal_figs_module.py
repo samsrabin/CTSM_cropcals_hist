@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import matplotlib.colors as mcolors
 from matplotlib import cm
+import matplotlib.collections as mplcol
 import cartopy.feature as cfeature
 import xarray as xr
 import cftime
@@ -113,20 +114,7 @@ def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_labelpad=4.0, 
         else:
             cbar = plt.colorbar(im, ax=ax, orientation="horizontal", fraction=0.1, pad=0.02, extend=extend_nonbounds, spacing=cbar_spacing)
         
-        if ticklabels is not None:
-            cbar.set_ticks(ticklabels)
-            if units is not None and units.lower() == "month":
-                cbar.set_ticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
-                units == "Month"
-        if cbar_max is not None and im.get_clim()[1] > cbar_max:
-            ticks = cbar.get_ticks()
-            if ticks[-2] > cbar_max:
-                raise RuntimeError(f"Specified cbar_max is {cbar_max} but highest bin BEGINS at {ticks[-2]}")
-            ticklabels = ticks.copy()
-            ticklabels[-1] = cbar_max
-            ticklabels = [str(int(x)) for x in ticklabels]
-            cbar.ax.set_xticks(ticks) # Calling this before set_xticklabels() avoids "UserWarning: FixedFormatter should only be used together with FixedLocator" (https://stackoverflow.com/questions/63723514/userwarning-fixedformatter-should-only-be-used-together-with-fixedlocator)
-            cbar.ax.set_xticklabels(ticklabels)
+        deal_with_ticklabels(cbar, cbar_max, ticklabels, units, im)
         cbar.set_label(label=units, fontsize=fontsize['axislabels'], verticalalignment="center", labelpad=cbar_labelpad)
         cbar.ax.tick_params(labelsize=fontsize['ticklabels'])
         if units is not None and "month" in units.lower():
@@ -147,6 +135,28 @@ def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_labelpad=4.0, 
         return im, cbar
     else:
         return im, None
+
+def deal_with_ticklabels(cbar, cbar_max, ticklabels, units, im):
+    if ticklabels is not None:
+        cbar.set_ticks(ticklabels)
+        if units is not None and units.lower() == "month":
+            cbar.set_ticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
+            units == "Month"
+    if isinstance(im, mplcol.QuadMesh):
+        clim_max = im.get_clim()[1]
+    else:
+        clim_max = im
+    if cbar_max is not None and clim_max > cbar_max:
+        ticks = cbar.get_ticks()
+        if ticks[-2] > cbar_max:
+            raise RuntimeError(f"Specified cbar_max is {cbar_max} but highest bin BEGINS at {ticks[-2]}")
+        ticklabels = ticks.copy()
+        ticklabels[-1] = cbar_max
+        for i, x in enumerate(ticklabels):
+            if x == int(x):
+                ticklabels[i] = str(int(x))
+        cbar.set_ticks(ticks) # Calling this before set_xticklabels() avoids "UserWarning: FixedFormatter should only be used together with FixedLocator" (https://stackoverflow.com/questions/63723514/userwarning-fixedformatter-should-only-be-used-together-with-fixedlocator)
+        cbar.set_ticklabels(ticklabels)
 
 
 def set_ticks(lonlat_bin_width, fontsize, x_or_y):

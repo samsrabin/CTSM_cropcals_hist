@@ -687,7 +687,11 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, 
                     cb.set_label(units, fontsize=fontsize['titles'], labelpad=cbar_labelpad)
                     if cbar_ticklabels is not None:
                         cb.set_ticks(cb.get_ticks()) # Does nothing except to avoid "FixedFormatter should only be used together with FixedLocator" warning in call of cb.set_ticklabels() below
-                        cb.set_ticklabels(cbar_ticklabels)
+                        if "GSLEN" in this_var:
+                            cbar_max = gslen_colorbar_max
+                        else:
+                            cbar_max = np.inf
+                        deal_with_ticklabels(cb, cbar_max, cbar_ticklabels, units, cbar_ticklabels[-1])
             
             if hspace is not None:
                 plt.subplots_adjust(hspace=hspace)
