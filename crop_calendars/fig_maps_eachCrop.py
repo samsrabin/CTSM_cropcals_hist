@@ -60,6 +60,7 @@ def get_colorbar_chunks(im, this_var, cmap_name, is_diff):
     tmp_cb_ax.remove()
     plt.draw()
     Ncolors = len(ticks_orig)-1
+    extend = None
     if Ncolors <= 5:
         Ncolors *= 2
     if is_diff and Ncolors % 2 == 0:
@@ -71,6 +72,7 @@ def get_colorbar_chunks(im, this_var, cmap_name, is_diff):
             Ncolors = 11
             cbar_ticklabels = np.arange(vmin, vmax+1, 30)
             force_diffmap_within_vrange = True
+            extend = "both"
         elif this_var == "HUIFRAC" or this_var == "MATURE":
             vmin = -1.1
             vmax = 1.1
@@ -113,6 +115,13 @@ def get_colorbar_chunks(im, this_var, cmap_name, is_diff):
         vmin = 0
         vmax = 400
         cbar_ticklabels = [1, 50, 100, 150, 200, 250, 300, 350, 365]
+    elif "GSLEN" in this_var:
+        clim = im.get_clim()
+        bin_width = 30
+        vmin, vmax, cbar_ticklabels, Ncolors, extend = get_gslen_color_bins(clim, bin_width)
+        if Ncolors < 4:
+            bin_width = 15
+            vmin, vmax, cbar_ticklabels, Ncolors, extend = get_gslen_color_bins(clim, bin_width)
     else:
         vmin = min(ticks_orig)
         vmax = max(ticks_orig)
@@ -127,7 +136,20 @@ def get_colorbar_chunks(im, this_var, cmap_name, is_diff):
     if cbar_ticklabels is None:
         cbar_ticklabels = ticks_orig
     
-    return vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange
+    return vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange, extend
+
+def get_gslen_color_bins(clim, bin_width):
+    extend = None
+    vmin = np.floor(clim[0] / bin_width)*bin_width
+    vmax = np.ceil(clim[1] / bin_width)*bin_width
+    if vmax > gslen_colorbar_max:
+        vmax -= bin_width
+        extend = "max"
+        if vmax > gslen_colorbar_max:
+            raise RuntimeError("How is vmax still > gslen_colorbar_max?")
+    cbar_ticklabels = np.arange(vmin, vmax+1, bin_width)
+    Ncolors = len(cbar_ticklabels) - 1
+    return vmin, vmax, cbar_ticklabels, Ncolors, extend
 
 
 def get_cases_with_var(cases, this_var, var_info, lu_ds, min_viable_hui, mxmats_tmp, ref_casename):
@@ -250,7 +272,7 @@ def get_figure_info(ny, nx, ref_casename):
     return cbar_pos, figsize, hspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos, cbar_labelpad
 
 
-def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False, save_netcdfs=False, cbar_labelpad=4.0, cbar_ticklabels=None):
+def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False, save_netcdfs=False, cbar_labelpad=4.0, cbar_ticklabels=None, extend_abs=None, extend_diff=None):
     
     if this_var == "GSLEN":
         cbar_max = gslen_colorbar_max
@@ -430,11 +452,21 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_i
             else:
                 ax = axes[i*2]
                 cb = cbs[i*2]
+            if cb is not None:
+                cb.remove()
+                plt.draw()
+                cb = None
             thisCrop = thisCrop_main
             this_map_sel = this_map.copy().sel(ivt_str=thisCrop)
             
             # Mask where there was never actually any area of this crop. (Might be NaN because there was area of some OTHER kind of crop that got MAPPED to this crop.)
             this_map_sel = this_map_sel.where(croparea_ever_positive.sel(ivt_str=thisCrop))
+            
+            if extend is None:
+                if plotting_diffs:
+                    extend = extend_diff
+                else:
+                    extend = extend_abs
             
             if plotting_diffs and not new_axes and force_diffmap_within_vrange:
                 this_map_sel_vals = this_map_sel.copy().values
@@ -617,7 +649,6 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, 
             axes = []
             cbs = []
             units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar_thisVar, abs_cmap=abs_cmap, diff_cmap=diff_cmap, save_netcdfs=save_netcdfs, cbar_labelpad=cbar_labelpad)
-
             fig.suptitle(this_suptitle,
                             x = suptitle_xpos,
                             y = suptitle_ypos,
@@ -650,9 +681,13 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, 
                 if chunk_colorbar_thisVar:
                     if not ("DATE" in this_var or this_var=="GSLEN"):
                         raise RuntimeError(f"Do not chunk colorbar for {this_var}")
-                    vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[0], this_var, abs_cmap, False)
+                    vmin, vmax, Ncolors, this_cmap, cbar_ticklabels, force_diffmap_within_vrange, extend2 = get_colorbar_chunks(ims[0], this_var, abs_cmap, False)
+                    if extend2 is not None:
+                        extend = extend2
                     if ref_casename:
-                        diff_vmin, diff_vmax, diff_Ncolors, diff_this_cmap, diff_cbar_ticklabels, force_diffmap_within_vrange = get_colorbar_chunks(ims[-1], this_var, diff_cmap, True)
+                        diff_vmin, diff_vmax, diff_Ncolors, diff_this_cmap, diff_cbar_ticklabels, force_diffmap_within_vrange, diff_extend = get_colorbar_chunks(ims[-1], this_var, diff_cmap, True)
+                        if diff_extend is not None:
+                            raise RuntimeError("Handling of diff_extend not coded")
                         while diff_eq_vrange[1] <= diff_cbar_ticklabels[-2]:
                             diff_cbar_ticklabels = diff_cbar_ticklabels[1:-1]
                             diff_vmin = diff_cbar_ticklabels[0]
@@ -675,7 +710,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, 
                         diff_this_cmap = None
                         diff_cbar_ticklabels = None
                     
-                    units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar_thisVar, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange, cbar_labelpad=cbar_labelpad, cbar_ticklabels=cbar_ticklabels)
+                    units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar_thisVar, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange, cbar_labelpad=cbar_labelpad, cbar_ticklabels=cbar_ticklabels, extend_abs=extend)
                 
                 # Redraw all-subplot colorbar 
                 if not ref_casename:
@@ -686,7 +721,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, 
                     cb.ax.tick_params(labelsize=fontsize['ticklabels'])
                     cb.set_label(units, fontsize=fontsize['titles'], labelpad=cbar_labelpad)
                     if cbar_ticklabels is not None:
-                        cb.set_ticks(cb.get_ticks()) # Does nothing except to avoid "FixedFormatter should only be used together with FixedLocator" warning in call of cb.set_ticklabels() below
+                        cb.set_ticks(cbar_ticklabels)
                         if "GSLEN" in this_var:
                             cbar_max = gslen_colorbar_max
                         else:
