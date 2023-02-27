@@ -7,6 +7,7 @@ import cropcal_figs_module as ccf
 import cartopy.crs as ccrs
 import os
 import cropcal_module as cc
+from cropcal_figs_module import colormaps
 
 # Import general CTSM Python utilities
 import sys
@@ -73,7 +74,7 @@ def set_custom_middle_color(cmap, bounds):
         color_list = [cmap_to_use(x) for x in np.arange(0, 1+1e-9, 1/Nbins)]
         cmap_to_use = mcolors.ListedColormap(color_list)
     new_colors = np.concatenate((cmap_to_use.colors[:int(Nbins/2)+1],
-                                 np.array([[0.75, 0.75, 0.75, 1]]),
+                                 np.array([colormaps['underlay']]),
                                  cmap_to_use.colors[int(Nbins/2)+1:]),
                                 axis=0)
     cmap_to_use = mcolors.ListedColormap(new_colors)

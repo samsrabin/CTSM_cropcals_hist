@@ -150,7 +150,6 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
         
         # Set up for masking
         underlay = None
-        underlay_color = [0.75, 0.75, 0.75, 1]
         any_masked = False
         sumdiff_beforemask = np.nansum(np.abs(this_map_timemean.values))
         max_absdiff_beforemask = np.max(np.abs(this_map_timemean))
@@ -324,17 +323,17 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
                     if posNeg:
                         if crop == "Crops decreasing":
                             new_colors = np.concatenate((this_cmap.colors[:int(Nbins/2)],
-                                                         np.array([underlay_color])),
+                                                         np.array([colormaps['underlay']])),
                                                         axis=0)
                         elif crop == "Crops increasing":
-                            new_colors = np.concatenate((np.array([underlay_color]),
+                            new_colors = np.concatenate((np.array([colormaps['underlay']]),
                                                          this_cmap.colors[int(Nbins/2)+1:]),
                                                         axis=0)
                         else:
                             raise RuntimeError(f"posNeg: Crop {crop} not recognized for color bar (2)")
                     else:
                         new_colors = np.concatenate((this_cmap.colors[:int(Nbins/2)],
-                                                     np.array([underlay_color]),
+                                                     np.array([colormaps['underlay']]),
                                                      this_cmap.colors[int(Nbins/2)+1:]),
                                                     axis=0)
                     
@@ -352,7 +351,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
         
         # Plot map
         subplot_str = chr(ord('`') + thisPlot) # or ord('@') for capital
-        im, cb = make_map(ax, this_map_timemean, fontsize, show_cbar=True, vmin=vmin, vmax=vmax, cmap=this_cmap, extend_nonbounds=None, underlay=underlay, underlay_color=underlay_color, bounds=bounds, extend_bounds="neither", ticklabels=ticks_orig, cbar_spacing=cbar_spacing, subplot_label=subplot_str)
+        im, cb = make_map(ax, this_map_timemean, fontsize, show_cbar=True, vmin=vmin, vmax=vmax, cmap=this_cmap, extend_nonbounds=None, underlay=underlay, underlay_color=colormaps['underlay'], bounds=bounds, extend_bounds="neither", ticklabels=ticks_orig, cbar_spacing=cbar_spacing, subplot_label=subplot_str)
         
         show_cbar_label = True
         cbar_label = varInfo['units'][v]

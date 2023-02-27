@@ -25,7 +25,8 @@ colormaps = {
     'div_yieldirr': 'BrBG',
     'div_timeofyear': 'twilight_shifted',
     'div_other_nonnorm': 'PuOr_r',
-    'div_other_norm': 'RdBu_r'
+    'div_other_norm': 'RdBu_r',
+    'underlay': [0.75, 0.75, 0.75, 1],
 }
 
 def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_types, plot_y1, plot_yN, ref_casename):
@@ -69,9 +70,12 @@ def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_typ
     return this_map, croparea_ever_positive, time_dim
 
 
-def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_labelpad=4.0, cbar_max=None, cbar_spacing='uniform', cmap=colormaps['seq_other'], extend_bounds='both', extend_nonbounds='both', linewidth=1.0, lonlat_bin_width=None, show_cbar=False, subplot_label=None, this_title=None, ticklabels=None, underlay=None, underlay_color=[0.75, 0.75, 0.75, 1], units=None, vmax=None, vmin=None, vrange=None):
+def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_labelpad=4.0, cbar_max=None, cbar_spacing='uniform', cmap=colormaps['seq_other'], extend_bounds='both', extend_nonbounds='both', linewidth=1.0, lonlat_bin_width=None, show_cbar=False, subplot_label=None, this_title=None, ticklabels=None, underlay=None, underlay_color=None, units=None, vmax=None, vmin=None, vrange=None):
+    
     
     if underlay is not None:
+        if underlay_color is None:
+            underlay_color = colormaps['underlay']
         underlay_cmap = mcolors.ListedColormap(np.array([underlay_color, [1, 1, 1, 1]]))
         ax.pcolormesh(underlay.lon.values, underlay.lat.values,
                       underlay, cmap=underlay_cmap)
