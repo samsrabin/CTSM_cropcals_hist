@@ -26,10 +26,11 @@ if not os.path.exists(outdir_figs):
 
 if res == '1deg':
     file50 = "/Users/Shared/CESM_work/CropEvalData_ssr/ctsm_inputs_1deg/landuse.timeseries_0.9x1.25_hist_78pfts_CMIP6_simyr1850-2015_c170824.subset.nc"
-    file52 = "/Users/Shared/CESM_work/CropEvalData_ssr/ctsm_inputs_1deg/landuse_timeseries_globalctsm52histLUH2_0.9x1.25_hist_simyr1850-2015_c221017.subset.nc"
+    # file52 = "/Users/Shared/CESM_work/CropEvalData_ssr/ctsm_inputs_1deg/landuse_timeseries_globalctsm52histLUH2_0.9x1.25_hist_simyr1850-2015_c221017.subset.nc"
 elif res == '2deg':
     file50 = '/Users/Shared/CESM_work/CropEvalData_ssr/landuse.timeseries_1.9x2.5_hist_78pfts_CMIP6_simyr1850-2015_c170824.nc4'
-    file52 = '/Users/Shared/CESM_work/CropEvalData_ssr/landuse.timeseries_1.9x2.5_hist_78_CMIP6_1850-2015_c230127.nlevurb5.nc'
+    # file52 = '/Users/Shared/CESM_work/CropEvalData_ssr/landuse.timeseries_1.9x2.5_hist_78_CMIP6_1850-2015_c230127.nlevurb5.nc'
+    file52 = '/Users/Shared/CESM_work/CropEvalData_ssr/landuse.timeseries_1.9x2.5_SSP5-8.5_78_CMIP6_1850-2015_c230227.nc'
 lu50 = utils.import_ds(file50, rename_lsmlatlon=True, timeSlice=slice(y1, yN))
 lu52 = utils.import_ds(file52, rename_lsmlatlon=True, timeSlice=slice(y1, yN))
 
