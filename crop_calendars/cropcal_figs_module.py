@@ -21,10 +21,10 @@ from cropcal_figs_module import *
 
 colormaps = {
     'seq_timeofyear': 'twilight_shifted',
-    'seq_other': 'plasma_r', # magma_r? CMRmap_r?
+    'seq_other': 'plasma', # magma_r? CMRmap_r?
     'div_yieldirr': 'BrBG',
     'div_timeofyear': 'twilight_shifted',
-    'div_other_nonnorm': 'PuOr',
+    'div_other_nonnorm': 'PuOr_r',
     'div_other_norm': 'RdBu_r'
 }
 
