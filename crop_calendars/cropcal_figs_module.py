@@ -30,7 +30,7 @@ colormaps = {
 }
 
 
-def chunk_colorbar(this_map, cbar_spacing, cmap, crop, fontsize, nearzero_thresh, pct_absdiffs_masked_before, sumdiff_beforemask, varInfo, vmin, vmax, posNeg=False, underlay=None, v=0):
+def chunk_colorbar(this_map, cbar_spacing, cmap, crop, fontsize, pct_absdiffs_masked_before, sumdiff_beforemask, varInfo, vmin, vmax, posNeg=False, underlay=None, v=0):
     # Make a temporary plot with the same color axis and colorbar settings we would use in make_map().
     plt.pcolormesh(this_map, vmin=vmin, vmax=vmax)
     cb0 = plt.colorbar(location="bottom")
@@ -80,14 +80,34 @@ def chunk_colorbar(this_map, cbar_spacing, cmap, crop, fontsize, nearzero_thresh
         raise RuntimeError(f"Expected even number of color bins; got {Nbins}")
     
     # Special color for small-masked cells
-    if 'mask_lowest' in varInfo and varInfo['mask_lowest'][v]:
+    if 'maskcolorbar_near0' in varInfo and varInfo['maskcolorbar_near0'][v] is not None:
+        
+        # Get near-zero threshold
+        nearzero_thresh = varInfo['maskcolorbar_near0'][v]
+        if isinstance(nearzero_thresh, str):
+            nearzero_parts = nearzero_thresh.split("|")
+            if nearzero_parts[0] != "percentile":
+                raise RuntimeError(f"Unable to parse maskcolorbar_near0 value {nearzero_thresh}")
+            
+            # The input value should be a percentile, 0-100
+            nearzero_val_in = np.float(nearzero_parts[1])
+            
+            if len(nearzero_parts) > 2:
+                if nearzero_parts[2] != "cumulative":
+                    raise RuntimeError(f"Unable to parse maskcolorbar_near0 value {nearzero_thresh}")
+                frac_to_include = 1 - nearzero_val_in/100
+                nearzero_thresh = get_threshold_lowestpercentile_cumulative(this_map, frac_to_include)
+            else:
+                nearzero_thresh = np.nanpercentile(np.abs(this_map), nearzero_val_in)
+        else:
+            raise RuntimeError("Can only parse string values of maskcolorbar_near0")
         
         # Add near-zero bin
-        bounds, cbar_spacing, pct_absdiffs_masked_before, ticks_orig, vmax, vmin = maskcolorbar_lowest(binwidth, bounds, cbar_spacing, crop, nearzero_thresh, pct_absdiffs_masked_before, posNeg, sumdiff_beforemask, this_map, ticks_orig, vmax, vmin)
+        bounds, cbar_spacing, pct_absdiffs_masked_before, ticks_orig, vmax, vmin = maskcolorbar_near0(binwidth, bounds, cbar_spacing, crop, nearzero_thresh, pct_absdiffs_masked_before, posNeg, sumdiff_beforemask, this_map, ticks_orig, vmax, vmin)
         
         # Add color for that bin
         if underlay is not None:
-            raise RuntimeError("You need a different color to distinguish mask_lowest cells from other-masked cells")
+            raise RuntimeError("You need a different color to distinguish maskcolorbar_near0 cells from other-masked cells")
         if isinstance(this_cmap, mcolors.LinearSegmentedColormap):
             this_cmap = cm.get_cmap(cmap)
             color_list = [this_cmap(x) for x in np.arange(0, 1, 1/Nbins)]
@@ -136,6 +156,20 @@ def get_amount_masked(crop, this_map_timemean, sumdiff_beforemask, pct_absdiffs_
     print(f"   Masked {crop} ({reason}): {round(pct_absdiffs_masked_here, 1)}%")
     pct_absdiffs_masked_before = pct_absdiffs_masked
     return pct_absdiffs_masked_before
+
+
+def get_threshold_lowestpercentile_cumulative(this_map_timemean, frac_to_include):
+    flattened = np.abs(this_map_timemean.values).flatten()
+    flattened_is_ok = np.where(~np.isnan(flattened))
+    okflattened = flattened[flattened_is_ok]
+    oksorted = np.flip(np.sort(okflattened))
+    okcumsum = np.cumsum(oksorted)
+    okcumprop = okcumsum / np.sum(oksorted)
+    for i, x in enumerate(okcumprop):
+        if x >= frac_to_include:
+            break
+    lowest_threshold = oksorted[i]
+    return lowest_threshold
 
 
 def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_types, plot_y1, plot_yN, ref_casename):
@@ -251,7 +285,7 @@ def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_labelpad=4.0, 
 
 
 # Note that we're not actually masking here; we're just setting a special color for a particular part of the colorbar
-def maskcolorbar_lowest(binwidth, bounds, cbar_spacing, crop, nearzero_thresh, pct_absdiffs_masked_before, posNeg, sumdiff_beforemask, this_map_timemean, ticks_orig, vmax, vmin):
+def maskcolorbar_near0(binwidth, bounds, cbar_spacing, crop, nearzero_thresh, pct_absdiffs_masked_before, posNeg, sumdiff_beforemask, this_map_timemean, ticks_orig, vmax, vmin):
             
     # Add near-zero bin
     if posNeg:

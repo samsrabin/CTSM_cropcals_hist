@@ -8,6 +8,10 @@ sys.path.insert(0, parentdir)
 import cropcal_module as cc
 from cropcal_figs_module import *
 
+import importlib
+importlib.reload(sys.modules['cropcal_figs_module'])
+from cropcal_figs_module import *
+
 # Import general CTSM Python utilities
 my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
 sys.path.append(my_ctsm_python_gallery)
@@ -24,19 +28,6 @@ fontsize['titles'] = 18
 fontsize['axislabels'] = 14
 fontsize['ticklabels'] = 14
 fontsize['suptitle'] = 22
-
-def get_lowest_threshold(this_map_timemean, frac_to_include):
-    flattened = np.abs(this_map_timemean.values).flatten()
-    flattened_is_ok = np.where(~np.isnan(flattened))
-    okflattened = flattened[flattened_is_ok]
-    oksorted = np.flip(np.sort(okflattened))
-    okcumsum = np.cumsum(oksorted)
-    okcumprop = okcumsum / np.sum(oksorted)
-    for i, x in enumerate(okcumprop):
-        if x >= frac_to_include:
-            break
-    lowest_threshold = oksorted[i]
-    return lowest_threshold
 
 
 def get_underlay(this_ds, area_map_sum):
@@ -145,7 +136,6 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
         max_absdiff_beforemask = np.max(np.abs(this_map_timemean))
         pct_absdiffs_masked_before = 0
         frac_to_include = 0.95
-        lowest_threshold = get_lowest_threshold(this_map_timemean, frac_to_include)
         
         # If doing so, mask out cells not significantly different from zero
         if 'mask_sig_diff_from_0' in varInfo and varInfo['mask_sig_diff_from_0'][v]:
@@ -193,7 +183,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
             
         # If doing so, SET UP TO mask out all but cells comprising top 95% of absolute differences.
         # This masking actually happens later, via chunk_colorbar().
-        if 'mask_lowest' in varInfo and varInfo['mask_lowest'][v]:
+        if 'maskcolorbar_near0' in varInfo and varInfo['maskcolorbar_near0'][v]:
             any_masked = True
             
         # Get color bar info
@@ -211,7 +201,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
         cbar_spacing = "uniform"
         if any_masked:
             if is_diff:
-                bounds, cbar_spacing, pct_absdiffs_masked_before, this_cmap, ticks_orig, vmin, vmax = chunk_colorbar(this_map_timemean, cbar_spacing, cmap, crop, fontsize, lowest_threshold, pct_absdiffs_masked_before, sumdiff_beforemask, varInfo, vmin, vmax, posNeg=posNeg, underlay=underlay, v=v)
+                bounds, cbar_spacing, pct_absdiffs_masked_before, this_cmap, ticks_orig, vmin, vmax = chunk_colorbar(this_map_timemean, cbar_spacing, cmap, crop, fontsize, pct_absdiffs_masked_before, sumdiff_beforemask, varInfo, vmin, vmax, posNeg=posNeg, underlay=underlay, v=v)
             else:
                 raise RuntimeError("How do you have an underlay without a difference map")
         

@@ -1736,7 +1736,7 @@ varList = {
         'suptitle':   'Mean annual production',
         'units':      'Mt',
         'multiplier': 1e-12, # g to Mt
-        'mask_lowest': True},
+        'maskcolorbar_near0': "percentile|5|cumulative"},
     'YIELD_ANN': {
         'suptitle':   'Mean annual yield',
         'units':      't/ha',
@@ -1761,7 +1761,7 @@ varList = {
         'suptitle':   'Mean annual production bias rel. EarthStat',
         'units':      '∆ abs.\nbias (Mt)',
         'multiplier': 1e-6, # t to Mt
-        'mask_lowest': True},
+        'maskcolorbar_near0': "percentile|5|cumulative"},
     'IRRIG_DEMAND_PATCH_ANN': {
         'suptitle':   'Mean annual irrigation',
         'units':      'km$^3$ yr$^{-1}$',
@@ -1770,18 +1770,18 @@ varList = {
         'suptitle':   'Mean annual irrigation difference',
         'units':      'km$^3$ yr$^{-1}$',
         'multiplier': 1e-9, # m3 to km3
-        'mask_lowest': True},
+        'maskcolorbar_near0': "percentile|5|cumulative"},
     'IRRIG_DEMAND_PATCH_ANN_DIFFPOSNEG': {
         'suptitle':   'Components of total mean annual irrigation difference',
         'units':      'km$^3$ yr$^{-1}$',
         'multiplier': 1e-9, # m3 to km3
-        'mask_lowest': True,
+        'maskcolorbar_near0': "percentile|5|cumulative",
         'suppress_difftext': True},
     # 'PROD_ANN_DIFF.PROD_ANN_BIASEARTHSTAT_DIFF': {
     #     'suptitle':   ['Change in production', 'Change in absolute bias'],
     #     'units':      ['Mt', 'Mt'],
     #     'multiplier': [1e-12, 1e-6], # g to Mt, t to Mt
-    #     'mask_lowest': [True, True],
+    #     'maskcolorbar_near0': ["percentile|5|cumulative", "percentile|5|cumulative"],
     #     'suppress_difftext': [True, True]}
 }
 
