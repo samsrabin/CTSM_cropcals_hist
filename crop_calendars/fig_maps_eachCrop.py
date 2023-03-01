@@ -131,7 +131,7 @@ def get_colorbar_chunks(im, this_var, cmap_name, is_diff):
     if cmap_name:
         this_cmap = cm.get_cmap(cmap_name, Ncolors)
     else:
-        this_cmap = cm.get_cmap(colormaps('seq_other'), Ncolors)
+        this_cmap = cm.get_cmap(cropcal_colors('seq_other'), Ncolors)
     
     if cbar_ticklabels is None:
         cbar_ticklabels = ticks_orig
@@ -323,7 +323,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_i
         c += 1
             
         # Get mean, set colormap
-        diverging_map = colormaps['div_other_nonnorm']
+        diverging_map = cropcal_colors['div_other_nonnorm']
         units = var_info['units']
         bounds = None
         vrange = None
@@ -365,7 +365,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_i
                 if abs_cmap:
                     cmap = abs_cmap
                 else:
-                    cmap = colormaps['seq_timeofyear']
+                    cmap = cropcal_colors['seq_timeofyear']
                 
                 units = "Day of year"
                 if chunk_colorbar:
@@ -398,7 +398,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_i
             else:
                 manual_colors = True
                 bounds = np.arange(0.5, 13.5, 1)
-                cmap_to_use = cm.get_cmap(colormaps['seq_timeofyear'])
+                cmap_to_use = cm.get_cmap(cropcal_colors['seq_timeofyear'])
                 extend = "neither"
                 ticklabels_to_use = np.arange(1,13,1)
                 units = "Month"
@@ -422,7 +422,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_i
                 if abs_cmap:
                     cmap = abs_cmap
                 else:
-                    cmap = colormaps['seq_other']
+                    cmap = cropcal_colors['seq_other']
                 vrange = None
             
         if casename == ref_casename:
@@ -585,12 +585,12 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, 
         print(f'Mapping {this_var}...')
         
         # Get colormap
-        abs_cmap = colormaps['seq_other']
-        diff_cmap = colormaps['div_other_nonnorm']
+        abs_cmap = cropcal_colors['seq_other']
+        diff_cmap = cropcal_colors['div_other_nonnorm']
         if "DATE" in this_var or "_PKMTH" in this_var:
-            abs_cmap = colormaps['seq_timeofyear']
+            abs_cmap = cropcal_colors['seq_timeofyear']
         if ("YIELD" in this_var or "PROD" in this_var or "IRRIG" in this_var):
-            diff_cmap = colormaps['div_yieldirr']
+            diff_cmap = cropcal_colors['div_yieldirr']
 
         # First, determine how many cases have this variable
         fig_caselist, ny = get_cases_with_var(cases, this_var, var_info, lu_ds, min_viable_hui, mxmats_tmp, ref_casename)

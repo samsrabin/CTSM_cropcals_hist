@@ -44,11 +44,11 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
     
     if is_diff:
         if is_diffdiff:
-            cmap = colormaps['div_other_norm']
+            cmap = cropcal_colors['div_other_norm']
         else:
-            cmap = colormaps['div_yieldirr']
+            cmap = cropcal_colors['div_yieldirr']
     else:
-        cmap = colormaps['seq_other']
+        cmap = cropcal_colors['seq_other']
     
     if posNeg:
         if Nvars > 1:
@@ -211,7 +211,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
         
         # Plot map
         subplot_str = chr(ord('`') + thisPlot) # or ord('@') for capital
-        im, cb = make_map(ax, this_map_timemean, fontsize, show_cbar=True, vmin=vmin, vmax=vmax, cmap=this_cmap, extend_nonbounds=None, underlay=underlay, underlay_color=colormaps['underlay'], bounds=bounds, extend_bounds="neither", ticklabels=ticks_orig, cbar_spacing=cbar_spacing, subplot_label=subplot_str)
+        im, cb = make_map(ax, this_map_timemean, fontsize, show_cbar=True, vmin=vmin, vmax=vmax, cmap=this_cmap, extend_nonbounds=None, underlay=underlay, underlay_color=cropcal_colors['underlay'], bounds=bounds, extend_bounds="neither", ticklabels=ticks_orig, cbar_spacing=cbar_spacing, subplot_label=subplot_str)
         
         show_cbar_label = True
         cbar_label = varInfo['units'][v]

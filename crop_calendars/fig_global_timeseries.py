@@ -6,6 +6,7 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
 import cropcal_module as cc
+import cropcal_figs_module as ccf
 
 # Import general CTSM Python utilities
 my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
@@ -83,14 +84,8 @@ def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
     grays = [dark_gray, light_gray]
     
     for i, casename in enumerate(caselist):
-        if "CLM Default" in casename:
-            color = [x/255 for x in [92, 219, 219]]
-        elif "Prescribed Calendars" in casename:
-            color = [x/255 for x in [250, 102, 240]]
-        elif "Prescribed Sowing" in casename:
-            color = [x/255 for x in [133, 92, 255]]
-        elif "Prescribed Maturity" in casename:
-            color = [x/255 for x in [128,0,0]]
+        if casename.lower() in ccf.cropcal_colors:
+            color = ccf.cropcal_colors[casename.lower()]
         elif i <= 1:
             color = grays[i]
         else:
@@ -160,14 +155,8 @@ def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabe
     
     p_symbols = []
     for i, casename in enumerate(caselist):
-        if "CLM Default" in casename:
-            color = [x/255 for x in [92, 219, 219]]
-        elif "Prescribed Calendars"  in casename:
-            color = [x/255 for x in [250, 102, 240]]
-        elif "Prescribed Sowing"  in casename:
-            color = [x/255 for x in [133, 92, 255]]
-        elif "Prescribed Maturity"  in casename:
-            color = [x/255 for x in [128,0,0]]
+        if casename.lower() in ccf.cropcal_colors:
+            color = ccf.cropcal_colors[casename.lower()]
         else:
             color = cm.Dark2(i)
         if casename in ["Prescribed Sowing", "Prescribed Maturity"]:

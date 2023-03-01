@@ -365,7 +365,7 @@ def main(argv):
                 Ncolors = vmax/gdd_spacing
                 if Ncolors % 2 == 0: Ncolors += 1
                 if not cmap:
-                    cmap = cm.get_cmap(colormaps['div_other_nonnorm'], Ncolors)
+                    cmap = cm.get_cmap(cropcal_colors['div_other_nonnorm'], Ncolors)
                 
                 if np.any(this_map.values > vmax) and np.any(this_map.values < vmin):
                     extend = 'both'
@@ -379,10 +379,13 @@ def main(argv):
             else:
                 vmin = 0
                 vmax = np.floor(vmax/500)*500
-                Ncolors = vmax/500
+                Ncolors = int(vmax/500)
                 if not cmap:
-                    cmap=cm.get_cmap(colormaps['seq_other'], Ncolors)
+                    cmap=cm.get_cmap(cropcal_colors['seq_other'], Ncolors+1)
                 extend = 'max'
+                extend_color = cmap.colors[-1]
+                cmap = mcolors.ListedColormap(cmap.colors[:Ncolors])
+                cmap.set_over(extend_color)
                 
             im1 = ax.pcolormesh(this_map.lon.values, this_map.lat.values, 
                     this_map, shading="auto",
@@ -480,8 +483,14 @@ def main(argv):
             upper = lat_bin_edges[b+1]
             bin_names.append(f"{lower}–{upper}")
             
-        color_old = '#beaed4'
-        color_new = '#7fc97f'
+        if args.run1_name.lower() in cropcal_colors:
+            color_old = cropcal_colors[args.run1_name.lower()]
+        else:
+            color_old = '#beaed4'
+        if args.run2_name.lower() in cropcal_colors:
+            color_new = cropcal_colors[args.run2_name.lower()]
+        else:
+            color_new = '#7fc97f'
         gdd_units = 'GDD (°C • day)'
     
         # Maps
@@ -574,7 +583,7 @@ def main(argv):
                     gdd_spacing = 250
                     vmax, bounds, Ncolors = get_bounds_ncolors(gdd_spacing, diff_map_yx)
                 
-                cmap = cm.get_cmap(colormaps['div_other_norm'], Ncolors)
+                cmap = cm.get_cmap(cropcal_colors['div_other_nonnorm'], Ncolors)
                 cbar_ticks = []
                 include_0bin_ticks = Ncolors <= 13
                 if vmax <= 3000:
@@ -645,7 +654,7 @@ def main(argv):
             ax.spines['right'].set_visible(False)
             ax.spines['top'].set_visible(False)
             
-            plt.xlabel("latitude zone (absolute value)", fontsize=fontsize_axislabels)
+            plt.xlabel("Latitude zone (absolute value)", fontsize=fontsize_axislabels)
             plt.ylabel(gdd_units, fontsize=fontsize_axislabels)
             ax.yaxis.set_label_coords(-0.11, 0.5)
             plt.title(f"Zonal changes", fontsize=fontsize_titles, fontweight="bold")

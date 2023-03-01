@@ -19,7 +19,13 @@ import importlib
 importlib.reload(sys.modules['cropcal_figs_module'])
 from cropcal_figs_module import *
 
-colormaps = {
+cropcal_colors = {
+    # Cases (line and scatter plots)
+    'clm default': [x/255 for x in [92, 219, 219]],
+    'prescribed calendars': [x/255 for x in [250, 102, 240]],
+    'prescribed maturity': [x/255 for x in [128,0,0]],
+    'prescribed sowing': [x/255 for x in [133, 92, 255]],
+    # Colormaps (maps)
     'seq_timeofyear': 'twilight_shifted',
     'seq_other': 'plasma', # magma_r? CMRmap_r?
     'div_yieldirr': 'BrBG',
@@ -126,17 +132,17 @@ def chunk_colorbar(this_map, cbar_spacing, cmap, crop, fontsize, pct_absdiffs_ma
         if posNeg:
             if crop == "Crops decreasing":
                 new_colors = np.concatenate((this_cmap.colors[:int(Nbins/2)],
-                                                np.array([colormaps['underlay']])),
+                                                np.array([cropcal_colors['underlay']])),
                                             axis=0)
             elif crop == "Crops increasing":
-                new_colors = np.concatenate((np.array([colormaps['underlay']]),
+                new_colors = np.concatenate((np.array([cropcal_colors['underlay']]),
                                                 this_cmap.colors[int(Nbins/2)+1:]),
                                             axis=0)
             else:
                 raise RuntimeError(f"posNeg: Crop {crop} not recognized for color bar (2)")
         else:
             new_colors = np.concatenate((this_cmap.colors[:int(Nbins/2)],
-                                            np.array([colormaps['underlay']]),
+                                            np.array([cropcal_colors['underlay']]),
                                             this_cmap.colors[int(Nbins/2)+1:]),
                                         axis=0)
         
@@ -213,12 +219,12 @@ def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_typ
     return this_map, croparea_ever_positive, time_dim
 
 
-def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_labelpad=4.0, cbar_max=None, cbar_spacing='uniform', cmap=colormaps['seq_other'], extend_bounds='both', extend_nonbounds='both', linewidth=1.0, lonlat_bin_width=None, show_cbar=False, subplot_label=None, this_title=None, ticklabels=None, underlay=None, underlay_color=None, units=None, vmax=None, vmin=None, vrange=None):
+def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_labelpad=4.0, cbar_max=None, cbar_spacing='uniform', cmap=cropcal_colors['seq_other'], extend_bounds='both', extend_nonbounds='both', linewidth=1.0, lonlat_bin_width=None, show_cbar=False, subplot_label=None, this_title=None, ticklabels=None, underlay=None, underlay_color=None, units=None, vmax=None, vmin=None, vrange=None):
     
     
     if underlay is not None:
         if underlay_color is None:
-            underlay_color = colormaps['underlay']
+            underlay_color = cropcal_colors['underlay']
         underlay_cmap = mcolors.ListedColormap(np.array([underlay_color, [1, 1, 1, 1]]))
         ax.pcolormesh(underlay.lon.values, underlay.lat.values,
                       underlay, cmap=underlay_cmap)
