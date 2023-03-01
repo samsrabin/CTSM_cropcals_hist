@@ -347,7 +347,7 @@ def main(argv):
         Ncolors = len(bounds) + 1
         return vmax, bounds, Ncolors
     
-    def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles, bounds=None, extend='both', cmap=None, cbar_ticks=None):
+    def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles, bounds=None, extend='both', cmap=None, cbar_ticks=None, vmin=None):
         
         if bounds:
             if not cmap:
@@ -361,6 +361,8 @@ def main(argv):
             if np.any(this_map.values < 0):
                 gdd_spacing = 500
                 vmax = np.floor(np.nanmax(this_map.values)/gdd_spacing)*gdd_spacing
+                if vmin is not None:
+                    raise RuntimeError("Do not specify vmin in this call of make_map()")
                 vmin = -vmax
                 Ncolors = vmax/gdd_spacing
                 if Ncolors % 2 == 0: Ncolors += 1
@@ -377,7 +379,10 @@ def main(argv):
                     extend = 'neither'
                 
             else:
-                vmin = 0
+                if vmin is None:
+                    vmin = 0
+                else:
+                    vmin = np.floor(vmin/500)*500
                 vmax = np.floor(vmax/500)*500
                 Ncolors = int(vmax/500)
                 if not cmap:
@@ -530,6 +535,7 @@ def main(argv):
             gdd_map_yx.attrs['units'] = gdd_units
             gddharv_map_yx.attrs['units'] = gdd_units
                     
+            vmin = min(np.min(gdd_map_yx), np.min(gddharv_map_yx)).values
             vmax = max(np.max(gdd_map_yx), np.max(gddharv_map_yx)).values
             
             # Set up figure and first subplot
@@ -554,7 +560,7 @@ def main(argv):
             thisMax = int(np.round(np.nanmax(gddharv_map_yx)))
             thisTitle = f"{args.run1_name} (range {thisMin}–{thisMax})"
             make_map(ax, gddharv_map_yx, thisTitle, vmax, bin_width,
-                     fontsize_ticklabels, fontsize_titles)
+                     fontsize_ticklabels, fontsize_titles, vmin=vmin)
             
             if layout == "3x1":
                 ax = fig.add_subplot(ny,nx,2,projection=ccrs.PlateCarree())
@@ -566,7 +572,7 @@ def main(argv):
             thisMax = int(np.round(np.nanmax(gdd_map_yx)))
             thisTitle = f"{args.run2_name} (range {thisMin}–{thisMax})"
             make_map(ax, gdd_map_yx, thisTitle, vmax, bin_width,
-                     fontsize_ticklabels, fontsize_titles)
+                     fontsize_ticklabels, fontsize_titles, vmin=vmin)
             
             # Difference
             if layout == "3x2":
