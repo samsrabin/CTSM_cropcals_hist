@@ -54,6 +54,66 @@ warnings.filterwarnings("ignore", message="__len__ for multi-part geometries is 
 warnings.filterwarnings("ignore", message="Iteration over multi-part geometries is deprecated and will be removed in Shapely 2.0. Use the `geoms` property to access the constituent parts of a multi-part geometry.")
 
 
+def get_multicrop_maps(ds, theseVars, crop_areas_yx, dummy_fill):
+    crop_area_yx = crop_areas_yx.sum(dim="cft")
+    weights_yx = crop_areas_yx / crop_area_yx
+    print(f"min weight sum {np.min(weights_yx.sum(dim='cft').values)}")
+    print(f"max weight sum {np.max(weights_yx.sum(dim='cft').values)}")
+    assert(np.isclose(np.min(weights_yx.sum(dim="cft").values), 1.0) or np.isclose(np.min(weights_yx.sum(dim="cft").values), 0.0))
+    assert(np.isclose(np.max(weights_yx.sum(dim="cft").values), 1.0))
+    
+    # da_eachCFT = xr.concat((ds[x] for i, x in enumerate(theseVars)),
+    #                        dim="cft")
+    da_eachCFT = xr.concat((ds[x].where(crop_areas_yx.isel(cft=i) > 0) for i, x in enumerate(theseVars)),
+                            dim="cft")
+    da_eachCFT['cft'] = weights_yx['cft']
+    if "time" in ds.dims:
+        da_eachCFT = da_eachCFT.isel(time=0, drop=True)
+    da_eachCFT = da_eachCFT.where(da_eachCFT != dummy_fill)
+    
+    Nbad = np.nansum((da_eachCFT == 0))
+    print(f"     {Nbad} bad cells 0")
+    
+    minSeen = np.inf
+    for x in da_eachCFT['cft'].values:
+        thisMin = np.nanmin(da_eachCFT.sel(cft=x).values)
+        minSeen = min(minSeen, thisMin)
+        print(f"CFT {x} minimum {thisMin}")
+        Nbad = np.nansum((da_eachCFT.sel(cft=x) == 0))
+        print(f"     {Nbad} bad cells")
+        # da_eachCFT.sel(cft=x).plot()
+        # plt.show()
+        
+    if not np.array_equal(da_eachCFT['lon'].values, weights_yx['lon'].values):
+        raise RuntimeError("lon mismatch")
+    if not np.array_equal(da_eachCFT['lat'].values, weights_yx['lat'].values):
+        raise RuntimeError("lat mismatch")
+    
+    da = (da_eachCFT * weights_yx).sum(dim="cft")
+    da.attrs['units'] = ds[theseVars[0]].attrs['units']
+    da = da.where(crop_area_yx > 0)
+    
+    print(f"Combined minimum {np.nanmin(da.values)}")
+    Nbad = np.nansum((da == 0))
+    print(f"     {Nbad} bad cells A")
+    Nbad = np.nansum(((da == 0) & (da_eachCFT.max(dim="cft") > 0)))
+    print(f"     {Nbad} bad cells B")
+    Nbad = np.nansum(da < minSeen)
+    print(f"     {Nbad} bad cells C")
+    
+    whereBad = da < da_eachCFT.min(dim="cft")
+    if np.any(whereBad):
+        Nbad = np.nansum(whereBad)
+        print(f"     {Nbad} bad cells D")
+        whereBad.plot()
+        plt.show()
+    
+    if np.any(da == 0):
+        raise RuntimeError("Unexpected combined GDD reqt 0")
+    
+    return da
+
+
 def main(argv):
 
     ###############################
@@ -345,7 +405,7 @@ def main(argv):
             bounds[bounds.index(-gdd_spacing)] /= 2
             bounds[bounds.index(gdd_spacing)] /= 2
         Ncolors = len(bounds) + 1
-        return vmax, bounds, Ncolors
+        return vmax, bounds, Ncolors    
     
     def make_map(ax, this_map, this_title, vmax, bin_width, fontsize_ticklabels, fontsize_titles, bounds=None, extend='both', cmap=None, cbar_ticks=None, vmin=None):
         
@@ -503,37 +563,65 @@ def main(argv):
         nx = 1
         gddfn.log(logger, "Making before/after maps...")
         for v, vegtype_str in enumerate(incl_vegtypes_str):
-            vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
-            thisVar = f"gdd1_{vegtype_int}"
-            gddfn.log(logger, f"   {vegtype_str} ({vegtype_int})...")
+        # for v, vegtype_str in enumerate(["Corn", "Cotton", "Rice", "Soybean", "Sugarcane", "Wheat"]):
+        # for v, vegtype_str in enumerate(["Corn"]):
             
-            vegtype_str_title = vegtype_str.replace("_", " ")
-            if "irrigated" not in vegtype_str:
-                vegtype_str_title = "rainfed " + vegtype_str_title
-            vegtype_str_title = vegtype_str_title.capitalize()
+            # Get component types
+            if vegtype_str in incl_vegtypes_str:
+                vegtypes_str = [vegtype_str]
+            else:
+                vegtypes_str = [x for x in incl_vegtypes_str if vegtype_str.lower() in x]
             
-            # Crop area map (for masking)
-            if lu_ds:
-                crop_area_yx = (lu_ds.AREA * lu_ds.LANDFRAC_PFT * lu_ds.PCT_CROP * lu_ds.PCT_CFT.sel(cft=vegtype_int)).sum(dim="time")
-                if np.nansum(crop_area_yx.values) == 0:
-                    print(f"   No area of {vegtype_str}; skipping.")
-                    continue
-            
-            # Maps #####################
-            
-            gdd_map = gdd_maps_ds[thisVar].isel(time=0, drop=True)
-            gdd_map_yx = gdd_map.where(gdd_map != dummy_fill)
-            gddharv_map = gddharv_maps_ds[thisVar]
-            if "time" in gddharv_map.dims:
-                gddharv_map = gddharv_map.isel(time=0, drop=True)
-            gddharv_map_yx = gddharv_map.where(gddharv_map != dummy_fill)
-            
-            if lu_ds:
-                gdd_map_yx = gdd_map_yx.where(crop_area_yx > 0)
-                gddharv_map_yx = gddharv_map_yx.where(crop_area_yx > 0)
-            
-            gdd_map_yx.attrs['units'] = gdd_units
-            gddharv_map_yx.attrs['units'] = gdd_units
+            # Get map
+            if len(vegtypes_str) > 1:
+                print(vegtypes_str)
+                if not lu_ds:
+                    raise RuntimeError(f"If mapping {vegtype_str}, you must provide land use dataset")
+                vegtypes_int = [utils.vegtype_str2int(x)[0] for x in vegtypes_str]
+                crop_areas_yx = (lu_ds.AREA * lu_ds.LANDFRAC_PFT * lu_ds.PCT_CROP * lu_ds.PCT_CFT.sel(cft=vegtypes_int)).sum(dim="time")
+                
+                theseVars = [f"gdd1_{x}" for x in vegtypes_int]
+                gddharv_map_yx = get_multicrop_maps(gddharv_maps_ds, theseVars, crop_areas_yx, dummy_fill)
+                gdd_map_yx = get_multicrop_maps(gdd_maps_ds, theseVars, crop_areas_yx, dummy_fill)
+                                
+                vegtype_str_title = vegtype_str
+                
+            else:
+                vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
+                thisVar = f"gdd1_{vegtype_int}"
+                gddfn.log(logger, f"   {vegtype_str} ({vegtype_int})...")
+                
+                # Crop area map (for masking)
+                if lu_ds:
+                    crop_area_yx = (lu_ds.AREA * lu_ds.LANDFRAC_PFT * lu_ds.PCT_CROP * lu_ds.PCT_CFT.sel(cft=vegtype_int)).sum(dim="time")
+                    if np.nansum(crop_area_yx.values) == 0:
+                        print(f"   No area of {vegtype_str}; skipping.")
+                        continue
+                
+                # Maps #####################
+                
+                gdd_map = gdd_maps_ds[thisVar].isel(time=0, drop=True)
+                gdd_map_yx = gdd_map.where(gdd_map != dummy_fill)
+                # if np.any(np.isnan(gdd_map_yx) & (crop_area_yx > 0)):
+                #     print("Missing area 3b?")
+                gddharv_map = gddharv_maps_ds[thisVar]
+                if "time" in gddharv_map.dims:
+                    gddharv_map = gddharv_map.isel(time=0, drop=True)
+                gddharv_map_yx = gddharv_map.where(gddharv_map != dummy_fill)
+                # if np.any(np.isnan(gddharv_map_yx) & (crop_area_yx > 0)):
+                #     print("Missing area 4b?")
+                
+                if lu_ds:
+                    gdd_map_yx = gdd_map_yx.where(crop_area_yx > 0)
+                    gddharv_map_yx = gddharv_map_yx.where(crop_area_yx > 0)
+                
+                gdd_map_yx.attrs['units'] = gdd_units
+                gddharv_map_yx.attrs['units'] = gdd_units
+                
+                vegtype_str_title = vegtype_str.replace("_", " ")
+                if "irrigated" not in vegtype_str:
+                    vegtype_str_title = "rainfed " + vegtype_str_title
+                vegtype_str_title = vegtype_str_title.capitalize()
                     
             vmin = min(np.min(gdd_map_yx), np.min(gddharv_map_yx)).values
             vmax = max(np.max(gdd_map_yx), np.max(gddharv_map_yx)).values
@@ -615,7 +703,7 @@ def main(argv):
             gdd_vector = get_non_nans(gdd_map_yx, dummy_fill)
             gddharv_vector = get_non_nans(gddharv_map_yx, dummy_fill)
             
-            lat_abs = np.abs(gdd_map.lat.values)
+            lat_abs = np.abs(gdd_map_yx.lat.values)
             gdd_bybin_old = [gddharv_vector]
             gdd_bybin_new = [gdd_vector]
             for b in np.arange(Nbins):
@@ -670,7 +758,10 @@ def main(argv):
                          fontweight="bold",
                          y=0.95)
             
-            outfile = os.path.join(outdir_figs, f"{thisVar}_{vegtype_str}_gs{y1}-{yN}{lu_years_file}.png")
+            if vegtype_str in incl_vegtypes_str:
+                outfile = os.path.join(outdir_figs, f"{thisVar}_{vegtype_str}_gs{y1}-{yN}{lu_years_file}.png")
+            else:
+                outfile = os.path.join(outdir_figs, f"{vegtype_str}_gs{y1}-{yN}{lu_years_file}.png")
             plt.savefig(outfile, dpi=300, transparent=False, facecolor='white',
                         bbox_inches='tight')
             plt.close()
