@@ -10,10 +10,15 @@ import cftime
 import sys
 from scipy import stats
 
-# Import general CTSM Python utilities
-my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
-sys.path.append(my_ctsm_python_gallery)
-import utils
+# Import the CTSM Python utilities
+import socket
+hostname = socket.gethostname()
+if hostname == "Sams-2021-MacBook-Pro.local":
+    sys.path.append("/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/")
+    import utils
+else:
+    # Only possible because I have export PYTHONPATH=$HOME in my .bash_profile
+    from ctsm_python_gallery_myfork.ctsm_py import utils
 
 import importlib
 importlib.reload(sys.modules['cropcal_figs_module'])
