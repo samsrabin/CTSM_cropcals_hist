@@ -281,7 +281,7 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
                                                     coords = dates_incl_ds['HDATES'].coords,
                                                     attrs = dates_incl_ds['HDATES'].attrs)
         else:
-            error(logger, f"{len(skip_patches_for_isel_hdatelt1)} patches have HDATE < 1. Unique affected sdates: {unique_sdates}")
+            error(logger, f"{len(skip_patches_for_isel_hdatelt1)} patches have HDATE < 1. (Did you forget to use flanduse_timeseries from make_lu_for_gddgen.py?) Unique affected sdates: {unique_sdates}")
     
     # Make sure there was only one harvest per year
     N_extra_harv = np.sum(np.nanmax(dates_incl_ds.HDATES.isel(mxharvests=slice(1,mxharvests)).values, axis=mxharvests_dim) >= 1)
