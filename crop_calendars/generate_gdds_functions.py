@@ -158,7 +158,8 @@ def yp_list_to_ds(yp_list, daily_ds, incl_vegtypes_str, dates_rx, longname_prefi
 
 
 
-def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, indir, incl_vegtypes_str_in, h1_ds_file, mxmats, get_gs_len_da, logger):
+def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, indir, incl_vegtypes_str_in, h1_ds_file, mxmats, get_gs_len_da, logger):
+    save_figs = True
     log(logger, f'netCDF year {thisYear}...')
     log(logger, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     
@@ -352,11 +353,11 @@ def import_and_process_1yr(y1, yN, y, thisYear, sdates_rx, hdates_rx, gddaccum_y
     log(logger, f"   Importing accumulated GDDs...")
     clm_gdd_var = "GDDACCUM"
     myVars = [clm_gdd_var]
-    if save_figs and not gddharv_in_h3:
+    if not gddharv_in_h3:
         myVars.append("GDDHARV")
     pattern = os.path.join(indir, f"*h1.{thisYear-1}-01-01*")
     h1_ds = utils.import_ds(glob.glob(pattern), myVars=myVars, myVegtypes=utils.define_mgdcrop_list(), myVars_missing_ok=['GDDHARV'])
-    if save_figs and 'GDDHARV' not in h1_ds:
+    if 'GDDHARV' not in h1_ds:
         if not gddharv_in_h3:
             log(logger, 'Trying to get GDDHARV from h3 file(s) instead.')
         try:

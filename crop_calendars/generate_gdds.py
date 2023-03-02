@@ -143,7 +143,7 @@ def main(argv):
                         required=True)
     figsgroup = parser.add_mutually_exclusive_group()
     figsgroup.add_argument("--dont-save-figs", 
-                           help="Do not save figures or files needed to create them",
+                           help="Do not save figures",
                            action="store_true", default=False)
     figsgroup.add_argument("--only-make-figs", 
                            help="Use preprocessed files to make figures only",
@@ -240,7 +240,7 @@ def main(argv):
             if thisYear <= pickle_year:
                 continue
             
-            h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = gddfn.import_and_process_1yr(args.first_season, args.last_season, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, save_figs, args.run_dir, incl_vegtypes_str, h1_ds_file, mxmats, cc.get_gs_len_da, logger)
+            h1_ds, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, incl_vegtypes_str, incl_patches1d_itype_veg, mxsowings = gddfn.import_and_process_1yr(args.first_season, args.last_season, y, thisYear, sdates_rx, hdates_rx, gddaccum_yp_list, gddharv_yp_list, skip_patches_for_isel_nan_lastyear, lastYear_active_patch_indices_list, incorrectly_daily, gddharv_in_h3, args.run_dir, incl_vegtypes_str, h1_ds_file, mxmats, cc.get_gs_len_da, logger)
             
             gddfn.log(logger, f'   Saving pickle file ({pickle_file})...')
             with open(pickle_file, 'wb') as f:
@@ -380,7 +380,7 @@ def main(argv):
                                     'y1': args.first_season,
                                     'yN': args.last_season})
     
-    if save_figs and not args.only_make_figs:
+    if not args.only_make_figs:
         if not os.path.exists(outdir_figs):
             os.makedirs(outdir_figs)
 
