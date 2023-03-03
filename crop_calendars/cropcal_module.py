@@ -2235,8 +2235,8 @@ def remove_outliers(gridded_da):
     pctle25 = np.nanpercentile(gridded_da, q=25, axis=gs_axis)
     pctle75 = np.nanpercentile(gridded_da, q=75, axis=gs_axis)
     iqr = pctle75 - pctle25
-    outlier_thresh_lo = pctle25 - iqr
-    outlier_thresh_up = pctle75 - iqr
+    outlier_thresh_lo = pctle25 - 1.5*iqr
+    outlier_thresh_up = pctle75 + 1.5*iqr
     not_outlier = np.bitwise_and(gridded_da > outlier_thresh_lo, gridded_da < outlier_thresh_up)
     gridded_da = gridded_da.where(not_outlier)
     return gridded_da
