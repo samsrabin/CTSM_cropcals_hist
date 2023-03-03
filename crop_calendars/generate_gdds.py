@@ -54,22 +54,26 @@ warnings.filterwarnings("ignore", message="__len__ for multi-part geometries is 
 warnings.filterwarnings("ignore", message="Iteration over multi-part geometries is deprecated and will be removed in Shapely 2.0. Use the `geoms` property to access the constituent parts of a multi-part geometry.")
 
 
-def get_multicrop_maps(ds, theseVars, crop_areas_yx, dummy_fill):
+def get_multicrop_maps(ds, theseVars, crop_areas_yx, dummy_fill, gdd_units):
     
     # Get GDDs for these crops
     da_eachCFT = xr.concat((ds[x] for i, x in enumerate(theseVars)),
                             dim="cft")
-    da_eachCFT['cft'] = crop_areas_yx['cft']
     if "time" in ds.dims:
         da_eachCFT = da_eachCFT.isel(time=0, drop=True)
     da_eachCFT = da_eachCFT.where(da_eachCFT != dummy_fill)
+    da_eachCFT.attrs['units'] = gdd_units
+    
+    if crop_areas_yx is None:
+        return da_eachCFT.isel(cft=0, drop=True)
     
     # Warn if GDD is NaN anywhere that there is area
+    da_eachCFT['cft'] = crop_areas_yx['cft']
     gddNaN_areaPos = np.isnan(da_eachCFT) & (crop_areas_yx > 0)
     if np.any(gddNaN_areaPos):
         total_bad_croparea = np.nansum(crop_areas_yx.where(gddNaN_areaPos).values)
         total_croparea = np.nansum(crop_areas_yx.values)
-        print(f"GDD reqt NaN but area positive ({np.round(total_bad_croparea/total_croparea*100, 1)}% of this crop's area)")
+        print(f"   GDD reqt NaN but area positive ({np.round(total_bad_croparea/total_croparea*100, 1)}% of this crop's area)")
     
     # Get areas and weights, masking cell-crops with NaN GDDs
     crop_areas_yx = crop_areas_yx.where(~np.isnan(da_eachCFT))
@@ -81,6 +85,8 @@ def get_multicrop_maps(ds, theseVars, crop_areas_yx, dummy_fill):
     
     # Mask GDDs and weights where there is no area
     da_eachCFT = da_eachCFT.where(crop_areas_yx > 0)
+    if len(theseVars)==1:
+        return da_eachCFT.isel(cft=0, drop=True)
     weights_yx = weights_yx.where(crop_areas_yx > 0)
     weights_sum = weights_yx.sum(dim='cft').where(crop_area_yx > 0)
     assert(np.isclose(np.nanmin(weights_sum.values), 1.0))
@@ -94,7 +100,7 @@ def get_multicrop_maps(ds, theseVars, crop_areas_yx, dummy_fill):
     
     # Get area-weighted mean GDD requirements for all crops
     da = (da_eachCFT * weights_yx).sum(dim="cft")
-    da.attrs['units'] = ds[theseVars[0]].attrs['units']
+    da.attrs['units'] = gdd_units
     da = da.where(crop_area_yx > 0)
     
     # Ensure that weighted mean is between each cell's min and max
@@ -562,56 +568,35 @@ def main(argv):
         gddfn.log(logger, "Making before/after maps...")
         # for v, vegtype_str in enumerate(incl_vegtypes_str):
         for v, vegtype_str in enumerate(["Corn", "Cotton", "Rice", "Soybean", "Sugarcane", "Wheat"]):
+            print(f"{vegtype_str}...")
             
             # Get component types
             if vegtype_str in incl_vegtypes_str:
                 vegtypes_str = [vegtype_str]
+            elif not lu_ds:
+                raise RuntimeError(f"If mapping {vegtype_str}, you must provide land use dataset")
             else:
                 vegtypes_str = [x for x in incl_vegtypes_str if vegtype_str.lower() in x]
+            vegtypes_int = [utils.vegtype_str2int(x)[0] for x in vegtypes_str]
             
-            # Get map
-            if len(vegtypes_str) > 1:
-                print(vegtypes_str)
-                if not lu_ds:
-                    raise RuntimeError(f"If mapping {vegtype_str}, you must provide land use dataset")
-                vegtypes_int = [utils.vegtype_str2int(x)[0] for x in vegtypes_str]
+            # Crop area map (for masking and weighting)
+            if lu_ds:
                 crop_areas_yx = (lu_ds.AREA * lu_ds.LANDFRAC_PFT * lu_ds.PCT_CROP * lu_ds.PCT_CFT.sel(cft=vegtypes_int)).sum(dim="time")
                 crop_areas_yx.attrs['units'] = lu_ds.AREA.attrs['units']
-                
-                theseVars = [f"gdd1_{x}" for x in vegtypes_int]
-                gddharv_map_yx = get_multicrop_maps(gddharv_maps_ds, theseVars, crop_areas_yx, dummy_fill)
-                gdd_map_yx = get_multicrop_maps(gdd_maps_ds, theseVars, crop_areas_yx, dummy_fill)
-                                
-                vegtype_str_title = vegtype_str
-                
+                if np.sum(crop_areas_yx) == 0:
+                    print(f"Skipping {vegtype_str} (no area)")
+                    continue
             else:
-                vegtype_int = utils.vegtype_str2int(vegtype_str)[0]
-                thisVar = f"gdd1_{vegtype_int}"
-                gddfn.log(logger, f"   {vegtype_str} ({vegtype_int})...")
-                
-                # Crop area map (for masking)
-                if lu_ds:
-                    crop_area_yx = (lu_ds.AREA * lu_ds.LANDFRAC_PFT * lu_ds.PCT_CROP * lu_ds.PCT_CFT.sel(cft=vegtype_int)).sum(dim="time")
-                    if np.nansum(crop_area_yx.values) == 0:
-                        print(f"   No area of {vegtype_str}; skipping.")
-                        continue
-                
-                # Maps #####################
-                
-                gdd_map = gdd_maps_ds[thisVar].isel(time=0, drop=True)
-                gdd_map_yx = gdd_map.where(gdd_map != dummy_fill)
-                gddharv_map = gddharv_maps_ds[thisVar]
-                if "time" in gddharv_map.dims:
-                    gddharv_map = gddharv_map.isel(time=0, drop=True)
-                gddharv_map_yx = gddharv_map.where(gddharv_map != dummy_fill)
-                
-                if lu_ds:
-                    gdd_map_yx = gdd_map_yx.where(crop_area_yx > 0)
-                    gddharv_map_yx = gddharv_map_yx.where(crop_area_yx > 0)
-                
-                gdd_map_yx.attrs['units'] = gdd_units
-                gddharv_map_yx.attrs['units'] = gdd_units
-                
+                crop_areas_yx = None
+
+            theseVars = [f"gdd1_{x}" for x in vegtypes_int]
+            gddharv_map_yx = get_multicrop_maps(gddharv_maps_ds, theseVars, crop_areas_yx, dummy_fill, gdd_units)
+            gdd_map_yx = get_multicrop_maps(gdd_maps_ds, theseVars, crop_areas_yx, dummy_fill, gdd_units)
+            
+            # Get figure title
+            if len(vegtypes_str) > 1:
+                vegtype_str_title = vegtype_str
+            else:                
                 vegtype_str_title = vegtype_str.replace("_", " ")
                 if "irrigated" not in vegtype_str:
                     vegtype_str_title = "rainfed " + vegtype_str_title
@@ -753,7 +738,7 @@ def main(argv):
                          y=0.95)
             
             if vegtype_str in incl_vegtypes_str:
-                outfile = os.path.join(outdir_figs, f"{thisVar}_{vegtype_str}_gs{y1}-{yN}{lu_years_file}.png")
+                outfile = os.path.join(outdir_figs, f"{theseVars[0]}_{vegtype_str}_gs{y1}-{yN}{lu_years_file}.png")
             else:
                 outfile = os.path.join(outdir_figs, f"{vegtype_str}_gs{y1}-{yN}{lu_years_file}.png")
             plt.savefig(outfile, dpi=300, transparent=False, facecolor='white',
