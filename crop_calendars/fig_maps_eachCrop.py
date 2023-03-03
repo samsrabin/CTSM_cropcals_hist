@@ -260,12 +260,19 @@ def get_figure_info(ny, nx, ref_casename):
             hspace = -0.6
         cbar_labelpad = 13
     elif ny == 4:
-        figsize = (22, 16)	 # width, height
-        suptitle_xpos = 0.55
-        suptitle_ypos = 1
-        cbar_pos = [0.2, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
+        figsize = (14, 20)	 # width, height
+        suptitle_xpos = 0.5
+        if ref_casename:
+            suptitle_ypos = 0.8
+            cbar_pos = [0.2, 0.05, 0.725, 0.025]  # left edge, bottom edge, width, height
+            hspace = -0.4
+        else:
+            suptitle_ypos = 0.84
+            cbar_pos = [0.15, 0.16, 0.725, 0.015]  # left edge, bottom edge, width, height
+            hspace = -0.7
         new_sp_bottom = 0.11 # default: 0.1
         new_sp_left = 0.125
+        cbar_labelpad = 13
     else:
         raise ValueError(f"Set up for ny = {ny}")
     
