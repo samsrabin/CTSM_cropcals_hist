@@ -64,6 +64,12 @@ def get_multicrop_maps(ds, theseVars, crop_areas_yx, dummy_fill, gdd_units):
     da_eachCFT = da_eachCFT.where(da_eachCFT != dummy_fill)
     da_eachCFT.attrs['units'] = gdd_units
     
+    # What are the maximum differences seen between different crop types?
+    if len(theseVars) > 1:
+        maxDiff = np.nanmax(da_eachCFT.max(dim="cft") - da_eachCFT.min(dim="cft"))
+        if maxDiff > 0:
+            print(f"   Max difference among crop types: {np.round(maxDiff)}")
+    
     if crop_areas_yx is None:
         return da_eachCFT.isel(cft=0, drop=True)
     
