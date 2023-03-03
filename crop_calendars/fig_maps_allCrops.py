@@ -42,6 +42,10 @@ def get_underlay(this_ds, area_map_sum):
 
 def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats, posNeg):
     
+    time_dim = "time"
+    if "time_dim" in varInfo:
+        time_dim = varInfo['time_dim']
+    
     if is_diff:
         if is_diffdiff:
             cmap = cropcal_colors['div_other_norm']
@@ -109,7 +113,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
             this_map_weighted = this_map
         
         # Get mean over time
-        this_map_timemean = this_map_weighted.mean(dim="time")
+        this_map_timemean = this_map_weighted.mean(dim=time_dim)
         
         # If doing just positive-negative, select and sum the matching cells
         if posNeg:
@@ -148,9 +152,9 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
                 underlay = get_underlay(this_ds, area_map_sum)
             
             # Get p-values for one-sample t-test
-            ttest = stats.ttest_1samp(a=this_map.values, popmean=0, axis=list(this_map.dims).index("time"))
+            ttest = stats.ttest_1samp(a=this_map.values, popmean=0, axis=list(this_map.dims).index(time_dim))
             pvalues = xr.DataArray(data=ttest.pvalue,
-                                   coords=this_map.isel(time=0).coords)
+                                   coords=this_map.isel({time_dim: 0}).coords)
             
             # Get critical p-value (alpha)
             alpha = 0.05
@@ -301,6 +305,13 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             if len(these_cases) != 2:
                 raise RuntimeError(f"You must provide exactly 2 cases in these_cases for DIFF variables")
         is_diffdiff = is_diff and thisVar.replace("BIAS", "DIFF").count("DIFF") == 2
+        time_dim = "time"
+        if "time_dim" in varInfo:
+            time_dim = varInfo['time_dim']
+            if isinstance(time_dim, list):
+                if len(time_dim) > 1:
+                    raise RuntimeError("Handle time_dim list with multiple members")
+                time_dim = time_dim[0]
         
         # Special setup for posNeg
         if posNeg:
@@ -332,7 +343,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             if "BIAS" in thisVar:
                 if earthstats is None:
                     raise RuntimeError("Pass earthstats to maps_allCrops() if you want to calculate bias.")
-                earthstats_ds = earthstats[case0['res']].sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+                earthstats_ds = earthstats[case0['res']].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
             else:
                 earthstats_ds = None
 
@@ -357,7 +368,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                     thisVar_base = thisVar.replace("_DIFF", "")
                 this_ds[thisVar] = ds1[thisVar_base] - ds0[thisVar_base]
             this_ds = this_ds\
-                    .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+                    .sel({time_dim : slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
             
             make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg)
         
@@ -369,7 +380,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 this_ds = case['ds']
                 this_ds = cc.get_yield_ann(this_ds, min_viable_hui=min_viable_hui, mxmats=None, lu_ds=lu_ds)
                 this_ds = this_ds.copy()\
-                    .sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+                    .sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
                     
                 this_suptitle = f"{varInfo['suptitle'][v]}: {this_case}"
                 if not multiCol:
@@ -379,7 +390,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 if "BIAS" in thisVar:
                     if earthstats is None:
                         raise RuntimeError("Pass earthstats to maps_allCrops() if you want to calculate bias.")
-                    earthstats_ds = earthstats[this_case['res']].sel(time=slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31"))
+                    earthstats_ds = earthstats[this_case['res']].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
                 else:
                     earthstats_ds = None
                 
