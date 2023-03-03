@@ -269,8 +269,6 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
 
 def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cropList_combined_clm_nototal, figsize, crop_subset=None, croptitle_side="top", dpi=150, earthstats=None, low_area_threshold_m2=1e4, min_viable_hui="ggcmi3", mxmats=None, ny=2, nx=3, plot_y1=1980, plot_yN=2009):
     
-    fig = plt.figure(figsize=figsize)
-    
     if crop_subset==cropList_combined_clm_nototal:
         crop_subset = None
     filename_suffix = ""
@@ -317,10 +315,10 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
         if posNeg:
             ny = 1
             nx = 2
-            plt.close(fig)
-            fig = plt.figure(figsize=(14, 3.75))
+            figsize = (14, 3.75)
 
         if is_diff:
+            fig = plt.figure(figsize=figsize)
             this_suptitle = f"{varInfo['suptitle'][v]}"
             minus = f": {these_cases[1]} minus {these_cases[0]}"
             this_suptitle += minus
@@ -371,10 +369,15 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                     .sel({time_dim : slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
             
             make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg)
+            
+            # plt.show()
+            fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)
+            plt.close()
         
         
         else:
             for this_case in these_cases:
+                fig = plt.figure(figsize=figsize)
                 case = cases[this_case]
                 lu_ds = reses[case['res']]['ds']
                 this_ds = case['ds']
@@ -395,9 +398,10 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                     earthstats_ds = None
                 
                 make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "DIFF" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg)
+                
+                # plt.show()
+                fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)
+                plt.close()
     
-    # plt.show()
-    fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)
-    plt.close()
     
     return cases
