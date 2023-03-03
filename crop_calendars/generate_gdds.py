@@ -55,61 +55,59 @@ warnings.filterwarnings("ignore", message="Iteration over multi-part geometries 
 
 
 def get_multicrop_maps(ds, theseVars, crop_areas_yx, dummy_fill):
-    crop_area_yx = crop_areas_yx.sum(dim="cft")
-    weights_yx = crop_areas_yx / crop_area_yx
-    print(f"min weight sum {np.min(weights_yx.sum(dim='cft').values)}")
-    print(f"max weight sum {np.max(weights_yx.sum(dim='cft').values)}")
-    assert(np.isclose(np.min(weights_yx.sum(dim="cft").values), 1.0) or np.isclose(np.min(weights_yx.sum(dim="cft").values), 0.0))
-    assert(np.isclose(np.max(weights_yx.sum(dim="cft").values), 1.0))
     
-    # da_eachCFT = xr.concat((ds[x] for i, x in enumerate(theseVars)),
-    #                        dim="cft")
-    da_eachCFT = xr.concat((ds[x].where(crop_areas_yx.isel(cft=i) > 0) for i, x in enumerate(theseVars)),
+    # Get GDDs for these crops
+    da_eachCFT = xr.concat((ds[x] for i, x in enumerate(theseVars)),
                             dim="cft")
-    da_eachCFT['cft'] = weights_yx['cft']
+    da_eachCFT['cft'] = crop_areas_yx['cft']
     if "time" in ds.dims:
         da_eachCFT = da_eachCFT.isel(time=0, drop=True)
     da_eachCFT = da_eachCFT.where(da_eachCFT != dummy_fill)
     
-    Nbad = np.nansum((da_eachCFT == 0))
-    print(f"     {Nbad} bad cells 0")
+    # Warn if GDD is NaN anywhere that there is area
+    gddNaN_areaPos = np.isnan(da_eachCFT) & (crop_areas_yx > 0)
+    if np.any(gddNaN_areaPos):
+        total_bad_croparea = np.nansum(crop_areas_yx.where(gddNaN_areaPos).values)
+        total_croparea = np.nansum(crop_areas_yx.values)
+        print(f"GDD reqt NaN but area positive ({np.round(total_bad_croparea/total_croparea*100, 1)}% of this crop's area)")
     
-    minSeen = np.inf
-    for x in da_eachCFT['cft'].values:
-        thisMin = np.nanmin(da_eachCFT.sel(cft=x).values)
-        minSeen = min(minSeen, thisMin)
-        print(f"CFT {x} minimum {thisMin}")
-        Nbad = np.nansum((da_eachCFT.sel(cft=x) == 0))
-        print(f"     {Nbad} bad cells")
-        # da_eachCFT.sel(cft=x).plot()
-        # plt.show()
-        
+    # Get areas and weights, masking cell-crops with NaN GDDs
+    crop_areas_yx = crop_areas_yx.where(~np.isnan(da_eachCFT))
+    crop_area_yx = crop_areas_yx.sum(dim="cft")
+    weights_yx = crop_areas_yx / crop_area_yx
+    weights_sum_gt0 = weights_yx.sum(dim='cft').where(weights_yx > 0)
+    assert(np.isclose(np.nanmin(weights_sum_gt0.values), 1.0))
+    assert(np.isclose(np.nanmax(weights_sum_gt0.values), 1.0))
+    
+    # Mask GDDs and weights where there is no area
+    da_eachCFT = da_eachCFT.where(crop_areas_yx > 0)
+    weights_yx = weights_yx.where(crop_areas_yx > 0)
+    weights_sum = weights_yx.sum(dim='cft').where(crop_area_yx > 0)
+    assert(np.isclose(np.nanmin(weights_sum.values), 1.0))
+    assert(np.isclose(np.nanmax(weights_sum.values), 1.0))
+    
+    # Ensure grid match between GDDs and weights
     if not np.array_equal(da_eachCFT['lon'].values, weights_yx['lon'].values):
         raise RuntimeError("lon mismatch")
     if not np.array_equal(da_eachCFT['lat'].values, weights_yx['lat'].values):
         raise RuntimeError("lat mismatch")
     
+    # Get area-weighted mean GDD requirements for all crops
     da = (da_eachCFT * weights_yx).sum(dim="cft")
     da.attrs['units'] = ds[theseVars[0]].attrs['units']
     da = da.where(crop_area_yx > 0)
     
-    print(f"Combined minimum {np.nanmin(da.values)}")
-    Nbad = np.nansum((da == 0))
-    print(f"     {Nbad} bad cells A")
-    Nbad = np.nansum(((da == 0) & (da_eachCFT.max(dim="cft") > 0)))
-    print(f"     {Nbad} bad cells B")
-    Nbad = np.nansum(da < minSeen)
-    print(f"     {Nbad} bad cells C")
-    
-    whereBad = da < da_eachCFT.min(dim="cft")
+    # Ensure that weighted mean is between each cell's min and max
+    whereBad = (da < da_eachCFT.min(dim="cft")) | (da > da_eachCFT.max(dim="cft"))
     if np.any(whereBad):
-        Nbad = np.nansum(whereBad)
-        print(f"     {Nbad} bad cells D")
-        whereBad.plot()
-        plt.show()
-    
-    if np.any(da == 0):
-        raise RuntimeError("Unexpected combined GDD reqt 0")
+        where_belowMin = da.where(da < da_eachCFT.min(dim="cft"))
+        worst_belowMin = np.min((da_eachCFT.min(dim='cft') - where_belowMin).values)
+        where_aboveMax = da.where(da > da_eachCFT.max(dim="cft"))
+        worst_aboveMax = np.max((where_aboveMax - da_eachCFT.max(dim='cft')).values)
+        worst = max(worst_belowMin, worst_aboveMax)
+        tol = 1e-12
+        if worst > 1e-12:
+            raise RuntimeError(f"Some value is outside expected range by {worst} (exceeds tolerance {tol})")
     
     return da
 
@@ -562,9 +560,8 @@ def main(argv):
         ny = 3
         nx = 1
         gddfn.log(logger, "Making before/after maps...")
-        for v, vegtype_str in enumerate(incl_vegtypes_str):
-        # for v, vegtype_str in enumerate(["Corn", "Cotton", "Rice", "Soybean", "Sugarcane", "Wheat"]):
-        # for v, vegtype_str in enumerate(["Corn"]):
+        # for v, vegtype_str in enumerate(incl_vegtypes_str):
+        for v, vegtype_str in enumerate(["Corn", "Cotton", "Rice", "Soybean", "Sugarcane", "Wheat"]):
             
             # Get component types
             if vegtype_str in incl_vegtypes_str:
@@ -579,6 +576,7 @@ def main(argv):
                     raise RuntimeError(f"If mapping {vegtype_str}, you must provide land use dataset")
                 vegtypes_int = [utils.vegtype_str2int(x)[0] for x in vegtypes_str]
                 crop_areas_yx = (lu_ds.AREA * lu_ds.LANDFRAC_PFT * lu_ds.PCT_CROP * lu_ds.PCT_CFT.sel(cft=vegtypes_int)).sum(dim="time")
+                crop_areas_yx.attrs['units'] = lu_ds.AREA.attrs['units']
                 
                 theseVars = [f"gdd1_{x}" for x in vegtypes_int]
                 gddharv_map_yx = get_multicrop_maps(gddharv_maps_ds, theseVars, crop_areas_yx, dummy_fill)
@@ -602,14 +600,10 @@ def main(argv):
                 
                 gdd_map = gdd_maps_ds[thisVar].isel(time=0, drop=True)
                 gdd_map_yx = gdd_map.where(gdd_map != dummy_fill)
-                # if np.any(np.isnan(gdd_map_yx) & (crop_area_yx > 0)):
-                #     print("Missing area 3b?")
                 gddharv_map = gddharv_maps_ds[thisVar]
                 if "time" in gddharv_map.dims:
                     gddharv_map = gddharv_map.isel(time=0, drop=True)
                 gddharv_map_yx = gddharv_map.where(gddharv_map != dummy_fill)
-                # if np.any(np.isnan(gddharv_map_yx) & (crop_area_yx > 0)):
-                #     print("Missing area 4b?")
                 
                 if lu_ds:
                     gdd_map_yx = gdd_map_yx.where(crop_area_yx > 0)
