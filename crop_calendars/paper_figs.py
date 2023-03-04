@@ -1715,7 +1715,7 @@ for thisVar_orig in varList:
 print("Done.")
 
 
-# %% Make maps of average production and/or yield for all crops
+# %% Make maps for all 6 crops
 importlib.reload(sys.modules['cropcal_figs_module'])
 from cropcal_figs_module import *
 importlib.reload(sys.modules['fig_maps_allCrops'])
@@ -1724,8 +1724,6 @@ from fig_maps_allCrops import *
 these_cases = ['CLM Default', 'Prescribed Calendars']
 
 crop_subset = None; ny = 3; nx = 2; figsize = (14,16); croptitle_side="top"
-# crop_subset = ['Cotton', 'Rice', 'Sugarcane']; ny = 3; nx = 1; figsize = (14,16); croptitle_side="left"
-# crop_subset = ['Corn', 'Soybean', 'Wheat']; ny = 3; nx = 1; figsize = (14,16); croptitle_side="left"
 
 varList = {
     'PROD_ANN': {
@@ -1787,12 +1785,6 @@ varList = {
         'time_dim':   'gs',
         'units':      'days',
         'multiplier': 1},
-    # 'PROD_ANN_DIFF.PROD_ANN_BIASEARTHSTAT_DIFF': {
-    #     'suptitle':   ['Change in production', 'Change in absolute bias'],
-    #     'units':      ['Mt', 'Mt'],
-    #     'multiplier': [1e-12, 1e-6], # g to Mt, t to Mt
-    #     'maskcolorbar_near0': ["percentile|5|cumulative", "percentile|5|cumulative"],
-    #     'suppress_difftext': [True, True]}
 }
 
 # Yield settings
@@ -1803,6 +1795,41 @@ for (this_var, var_info) in varList.items():
     cases = maps_allCrops(cases, these_cases, reses, this_var, var_info, outDir_figs, cropList_combined_clm_nototal, figsize, earthstats=earthstats_gd, min_viable_hui=min_viable_hui, ny=ny, nx=nx, croptitle_side=croptitle_side, crop_subset=crop_subset)
 
 print("Done.")
+
+
+# %% Make maps for 3 crops (rows) and 2 variables (columns)
+importlib.reload(sys.modules['cropcal_figs_module'])
+from cropcal_figs_module import *
+importlib.reload(sys.modules['fig_maps_allCrops'])
+from fig_maps_allCrops import *
+
+crop_subset = ['Cotton', 'Rice', 'Sugarcane']
+# crop_subset = ['Corn', 'Soybean', 'Wheat']; 
+
+these_cases = ['CLM Default', 'Prescribed Calendars']
+ny = 3
+nx = 1
+figsize = (14,16)
+croptitle_side="left"
+
+varList = {
+    'PROD_ANN_DIFF.PROD_ANN_BIASEARTHSTAT_DIFF': {
+        'suptitle':   ['Change in production', 'Change in absolute bias'],
+        'units':      ['Mt', 'Mt'],
+        'multiplier': [1e-12, 1e-6], # g to Mt, t to Mt
+        'maskcolorbar_near0': ["percentile|5|cumulative", "percentile|5|cumulative"],
+        'suppress_difftext': [True, True]}
+}
+
+# Yield settings
+min_viable_hui = "ggcmi3"
+
+
+for (this_var, var_info) in varList.items():
+    cases = maps_allCrops(cases, these_cases, reses, this_var, var_info, outDir_figs, cropList_combined_clm_nototal, figsize, earthstats=earthstats_gd, min_viable_hui=min_viable_hui, ny=ny, nx=nx, croptitle_side=croptitle_side, crop_subset=crop_subset)
+
+print("Done.")
+
 
 
 # %% 
