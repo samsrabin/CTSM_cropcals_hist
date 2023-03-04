@@ -40,7 +40,7 @@ def get_underlay(this_ds, area_map_sum):
     return underlay
 
 
-def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats, posNeg):
+def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats, posNeg, take_subcrop_sum, take_subcrop_wtdmean):
     
     time_dim = "time"
     if "time_dim" in varInfo:
@@ -49,8 +49,10 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
     if is_diff:
         if is_diffdiff:
             cmap = cropcal_colors['div_other_norm']
-        else:
+        elif np.any([x in thisVar for x in ["PROD", "YIELD", "IRRIG"]]):
             cmap = cropcal_colors['div_yieldirr']
+        else:
+            cmap = cropcal_colors['div_other_nonnorm']
     else:
         cmap = cropcal_colors['seq_other']
     
@@ -88,14 +90,19 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
             area_map_sum = area_map.sum(dim="ivt_str")
             weights_map = area_map / area_map_sum
 
-        # Grid data for those CFTs, getting their sum
+        # Grid data for those CFTs, getting their sum or weighted mean
         this_map = utils.grid_one_variable(this_ds, thisVar, vegtype=list(theseCrops))
         if "YIELD" in thisVar:
             if posNeg:
                 raise RuntimeError("Area weighting not set up for posNeg because weights_map not yet generated")
             this_map = this_map * weights_map
         if not posNeg:
-            this_map = this_map.sum(dim="ivt_str")
+            if take_subcrop_sum:
+                this_map = this_map.sum(dim="ivt_str")
+            elif take_subcrop_wtdmean:
+                this_map = this_map.weighted(area_map.fillna(0)).mean(dim="ivt_str")
+            else:
+                raise RuntimeError("Neither take_subcrop_sum nor take_subcrop_wtdmean???")
         this_map *= varInfo['multiplier'][v]
         
         # Weight based on EarthStats data, if needed
@@ -311,6 +318,22 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                     raise RuntimeError("Handle time_dim list with multiple members")
                 time_dim = time_dim[0]
         
+        # Does this variable get summed across subcrops, or weighted-meaned?
+        take_subcrop_sum = False
+        for units in ["Mt", "km$^3$"]:
+            if units in varInfo['units']:
+                take_subcrop_sum = True
+                break
+        take_subcrop_wtdmean = False
+        for units in ["t/ha", "days"]:
+            if units in varInfo['units']:
+                take_subcrop_wtdmean = True
+                break
+        if take_subcrop_sum and take_subcrop_wtdmean:
+            raise RuntimeError(f"Units '{varInfo['units']}' have both take_subcrop_sum and take_subcrop_wtdmean specified somehow")
+        if not (take_subcrop_sum or take_subcrop_wtdmean):
+            raise RuntimeError(f"Define across-subcrop operation for units '{varInfo['units']}'")
+        
         # Special setup for posNeg
         if posNeg:
             ny = 1
@@ -368,7 +391,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             this_ds = this_ds\
                     .sel({time_dim : slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
             
-            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg)
+            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg, take_subcrop_sum, take_subcrop_wtdmean)
             
             # plt.show()
             fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)
@@ -397,7 +420,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 else:
                     earthstats_ds = None
                 
-                make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "DIFF" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg)
+                make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "DIFF" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg, take_subcrop_sum, take_subcrop_wtdmean)
                 
                 # plt.show()
                 fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)

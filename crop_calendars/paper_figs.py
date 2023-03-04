@@ -1777,6 +1777,16 @@ varList = {
         'multiplier': 1e-9, # m3 to km3
         'maskcolorbar_near0': "percentile|5|cumulative",
         'suppress_difftext': True},
+    'GSLEN': {
+        'suptitle':   'Mean growing season length',
+        'time_dim':   'gs',
+        'units':      'days',
+        'multiplier': 1},
+    'GSLEN_DIFF': {
+        'suptitle':   'Mean growing season length difference',
+        'time_dim':   'gs',
+        'units':      'days',
+        'multiplier': 1},
     # 'PROD_ANN_DIFF.PROD_ANN_BIASEARTHSTAT_DIFF': {
     #     'suptitle':   ['Change in production', 'Change in absolute bias'],
     #     'units':      ['Mt', 'Mt'],
