@@ -572,8 +572,7 @@ def main(argv):
         ny = 3
         nx = 1
         gddfn.log(logger, "Making before/after maps...")
-        # for v, vegtype_str in enumerate(incl_vegtypes_str):
-        for v, vegtype_str in enumerate(["Corn", "Cotton", "Rice", "Soybean", "Sugarcane", "Wheat"]):
+        for v, vegtype_str in enumerate(incl_vegtypes_str + ["Corn", "Cotton", "Rice", "Soybean", "Sugarcane", "Wheat"]):
             print(f"{vegtype_str}...")
             
             # Get component types
