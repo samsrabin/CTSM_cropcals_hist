@@ -280,7 +280,7 @@ def main(argv):
         
         gddfn.log(logger, 'Getting and gridding mean GDDs...')
         gdd_maps_ds = gddfn.yp_list_to_ds(gddaccum_yp_list, h1_ds, incl_vegtypes_str, sdates_rx, longname_prefix, logger)
-        if save_figs: gddharv_maps_ds = gddfn.yp_list_to_ds(gddharv_yp_list, h1_ds, incl_vegtypes_str, sdates_rx, longname_prefix, logger)
+        gddharv_maps_ds = gddfn.yp_list_to_ds(gddharv_yp_list, h1_ds, incl_vegtypes_str, sdates_rx, longname_prefix, logger)
         
         # Fill NAs with dummy values
         dummy_fill = -1
@@ -333,7 +333,7 @@ def main(argv):
             return ds
         gdd_maps_ds = add_lonlat_attrs(gdd_maps_ds)
         gdd_fill0_maps_ds = add_lonlat_attrs(gdd_fill0_maps_ds)
-        if save_figs: gddharv_maps_ds = add_lonlat_attrs(gddharv_maps_ds)
+        gddharv_maps_ds = add_lonlat_attrs(gddharv_maps_ds)
         
         gddfn.log(logger, "Done.")
     
