@@ -2039,9 +2039,11 @@ def open_lu_ds(filename, y1, yN, existing_ds, ungrid=True):
     dsg = dsg.swap_dims({"lsmlon": "lon",
                          "lsmlat": "lat"})
     
-    dsg['AREA_CFT'] = dsg.AREA*1e6 * dsg.LANDFRAC_PFT * dsg.PCT_CROP/100 * dsg.PCT_CFT/100
-    dsg['AREA_CFT'].attrs = {'units': 'm2'}
-    dsg['AREA_CFT'].load()
+    if "AREA" in dsg:
+        print("Warning: AREA missing from Dataset, so AREA_CFT will not be created")
+        dsg['AREA_CFT'] = dsg.AREA*1e6 * dsg.LANDFRAC_PFT * dsg.PCT_CROP/100 * dsg.PCT_CFT/100
+        dsg['AREA_CFT'].attrs = {'units': 'm2'}
+        dsg['AREA_CFT'].load()
     
     if not ungrid:
         return dsg
@@ -2053,6 +2055,8 @@ def open_lu_ds(filename, y1, yN, existing_ds, ungrid=True):
     
     ds = xr.Dataset(attrs=dsg.attrs)
     for v in ["AREA", "LANDFRAC_PFT", "PCT_CFT", "PCT_CROP", "AREA_CFT"]:
+        if v not in dsg:
+            continue
         if 'time' in dsg[v].dims:
             new_coords = existing_ds['GRAINC_TO_FOOD_ANN'].coords
         else:

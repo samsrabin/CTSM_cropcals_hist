@@ -54,7 +54,7 @@ warnings.filterwarnings("ignore", message="__len__ for multi-part geometries is 
 warnings.filterwarnings("ignore", message="Iteration over multi-part geometries is deprecated and will be removed in Shapely 2.0. Use the `geoms` property to access the constituent parts of a multi-part geometry.")
 
 
-def get_multicrop_maps(ds, theseVars, crop_areas_yx, dummy_fill, gdd_units):
+def get_multicrop_maps(ds, theseVars, crop_fracs_yx, dummy_fill, gdd_units):
     
     # Get GDDs for these crops
     da_eachCFT = xr.concat((ds[x] for i, x in enumerate(theseVars)),
@@ -70,30 +70,30 @@ def get_multicrop_maps(ds, theseVars, crop_areas_yx, dummy_fill, gdd_units):
         if maxDiff > 0:
             print(f"   Max difference among crop types: {np.round(maxDiff)}")
     
-    if crop_areas_yx is None:
+    if crop_fracs_yx is None:
         return da_eachCFT.isel(cft=0, drop=True)
     
     # Warn if GDD is NaN anywhere that there is area
-    da_eachCFT['cft'] = crop_areas_yx['cft']
-    gddNaN_areaPos = np.isnan(da_eachCFT) & (crop_areas_yx > 0)
+    da_eachCFT['cft'] = crop_fracs_yx['cft']
+    gddNaN_areaPos = np.isnan(da_eachCFT) & (crop_fracs_yx > 0)
     if np.any(gddNaN_areaPos):
-        total_bad_croparea = np.nansum(crop_areas_yx.where(gddNaN_areaPos).values)
-        total_croparea = np.nansum(crop_areas_yx.values)
+        total_bad_croparea = np.nansum(crop_fracs_yx.where(gddNaN_areaPos).values)
+        total_croparea = np.nansum(crop_fracs_yx.values)
         print(f"   GDD reqt NaN but area positive ({np.round(total_bad_croparea/total_croparea*100, 1)}% of this crop's area)")
     
     # Get areas and weights, masking cell-crops with NaN GDDs
-    crop_areas_yx = crop_areas_yx.where(~np.isnan(da_eachCFT))
-    crop_area_yx = crop_areas_yx.sum(dim="cft")
-    weights_yx = crop_areas_yx / crop_area_yx
+    crop_fracs_yx = crop_fracs_yx.where(~np.isnan(da_eachCFT))
+    crop_area_yx = crop_fracs_yx.sum(dim="cft")
+    weights_yx = crop_fracs_yx / crop_area_yx
     weights_sum_gt0 = weights_yx.sum(dim='cft').where(weights_yx > 0)
     assert(np.isclose(np.nanmin(weights_sum_gt0.values), 1.0))
     assert(np.isclose(np.nanmax(weights_sum_gt0.values), 1.0))
     
     # Mask GDDs and weights where there is no area
-    da_eachCFT = da_eachCFT.where(crop_areas_yx > 0)
+    da_eachCFT = da_eachCFT.where(crop_fracs_yx > 0)
     if len(theseVars)==1:
         return da_eachCFT.isel(cft=0, drop=True)
-    weights_yx = weights_yx.where(crop_areas_yx > 0)
+    weights_yx = weights_yx.where(crop_fracs_yx > 0)
     weights_sum = weights_yx.sum(dim='cft').where(crop_area_yx > 0)
     assert(np.isclose(np.nanmin(weights_sum.values), 1.0))
     assert(np.isclose(np.nanmax(weights_sum.values), 1.0))
@@ -584,19 +584,18 @@ def main(argv):
                 vegtypes_str = [x for x in incl_vegtypes_str if vegtype_str.lower() in x]
             vegtypes_int = [utils.vegtype_str2int(x)[0] for x in vegtypes_str]
             
-            # Crop area map (for masking and weighting)
+            # Crop fraction map (for masking and weighting)
             if lu_ds:
-                crop_areas_yx = (lu_ds.AREA * lu_ds.LANDFRAC_PFT * lu_ds.PCT_CROP * lu_ds.PCT_CFT.sel(cft=vegtypes_int)).sum(dim="time")
-                crop_areas_yx.attrs['units'] = lu_ds.AREA.attrs['units']
-                if np.sum(crop_areas_yx) == 0:
+                crop_fracs_yx = (lu_ds.LANDFRAC_PFT * lu_ds.PCT_CROP * lu_ds.PCT_CFT.sel(cft=vegtypes_int)).sum(dim="time")
+                if np.sum(crop_fracs_yx) == 0:
                     print(f"Skipping {vegtype_str} (no area)")
                     continue
             else:
-                crop_areas_yx = None
+                crop_fracs_yx = None
 
             theseVars = [f"gdd1_{x}" for x in vegtypes_int]
-            gddharv_map_yx = get_multicrop_maps(gddharv_maps_ds, theseVars, crop_areas_yx, dummy_fill, gdd_units)
-            gdd_map_yx = get_multicrop_maps(gdd_maps_ds, theseVars, crop_areas_yx, dummy_fill, gdd_units)
+            gddharv_map_yx = get_multicrop_maps(gddharv_maps_ds, theseVars, crop_fracs_yx, dummy_fill, gdd_units)
+            gdd_map_yx = get_multicrop_maps(gdd_maps_ds, theseVars, crop_fracs_yx, dummy_fill, gdd_units)
             
             # Get figure title
             if len(vegtypes_str) > 1:
