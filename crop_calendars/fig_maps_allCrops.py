@@ -366,8 +366,8 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 if earthstats is None:
                     raise RuntimeError("Pass earthstats to maps_allCrops() if you want to calculate bias.")
                 earthstats_ds = earthstats[case0['res']].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
-                ds0 = cc.get_diff_earthstat(ds0, case0, earthstats, reses)
-                ds1 = cc.get_diff_earthstat(ds1, case1, earthstats, reses)
+                ds0 = cc.get_diff_earthstat(ds0, case0, earthstats_ds, reses)
+                ds1 = cc.get_diff_earthstat(ds1, case1, earthstats_ds, reses)
             else:
                 earthstats_ds = None
 
@@ -407,7 +407,8 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 case = cases[this_case]
                 lu_ds = reses[case['res']]['ds']
                 this_ds = case['ds']
-                this_ds = cc.get_yield_ann(this_ds, min_viable_hui=min_viable_hui, mxmats=None, lu_ds=lu_ds)
+                if "PROD" in thisVar or "YIELD" in thisVar:
+                    this_ds = cc.get_yield_ann(this_ds, min_viable_hui=min_viable_hui, mxmats=None, lu_ds=lu_ds)
                 this_ds = this_ds.copy()\
                     .sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
                     
@@ -419,11 +420,13 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 if "BIAS" in thisVar:
                     if earthstats is None:
                         raise RuntimeError("Pass earthstats to maps_allCrops() if you want to calculate bias.")
-                    earthstats_ds = earthstats[this_case['res']].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
+                    earthstats_ds = earthstats[case['res']].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
+                    this_ds = cc.get_diff_earthstat(this_ds, case, earthstats_ds, reses)
+                    this_ds[thisVar] = this_ds[thisVar.replace("_BIAS", "_DIFF")]
                 else:
                     earthstats_ds = None
                 
-                make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "DIFF" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg, take_subcrop_sum, take_subcrop_wtdmean)
+                make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "BIAS" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg, take_subcrop_sum, take_subcrop_wtdmean)
                 
                 # plt.show()
                 fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)

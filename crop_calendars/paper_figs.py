@@ -1740,11 +1740,11 @@ varList = {
         'suptitle':   'Mean annual yield',
         'units':      't/ha',
         'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
-    'YIELD_ANN_DIFFEARTHSTAT': {
+    'YIELD_ANN_BIASEARTHSTAT': {
         'suptitle':   'Mean annual yield difference rel. EarthStat',
         'units':      't/ha',
         'multiplier': 1},
-    'YIELD_ANN_DIFFEARTHSTAT_DIFF': {
+    'YIELD_ANN_BIASEARTHSTAT_DIFF': {
         'suptitle':   'Mean annual yield difference rel. EarthStat',
         'units':      'Change in abs. bias (t/ha)',
         'multiplier': 1},
