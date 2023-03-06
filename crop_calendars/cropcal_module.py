@@ -2040,10 +2040,11 @@ def open_lu_ds(filename, y1, yN, existing_ds, ungrid=True):
                          "lsmlat": "lat"})
     
     if "AREA" in dsg:
-        print("Warning: AREA missing from Dataset, so AREA_CFT will not be created")
         dsg['AREA_CFT'] = dsg.AREA*1e6 * dsg.LANDFRAC_PFT * dsg.PCT_CROP/100 * dsg.PCT_CFT/100
         dsg['AREA_CFT'].attrs = {'units': 'm2'}
         dsg['AREA_CFT'].load()
+    else:
+        print("Warning: AREA missing from Dataset, so AREA_CFT will not be created")
     
     if not ungrid:
         return dsg
