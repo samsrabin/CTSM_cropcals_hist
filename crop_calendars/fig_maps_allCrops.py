@@ -352,8 +352,9 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 this_suptitle = this_suptitle.replace(minus, "")
             
             case0 = cases[these_cases[0]]
-            ds0 = cases[these_cases[0]]['ds']
-            ds1 = cases[these_cases[1]]['ds']
+            case1 = cases[these_cases[1]]
+            ds0 = case0['ds']
+            ds1 = case1['ds']
             lu_ds = reses[case0['res']]['ds']
             
             # Get mean production over period of interest
@@ -365,6 +366,8 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 if earthstats is None:
                     raise RuntimeError("Pass earthstats to maps_allCrops() if you want to calculate bias.")
                 earthstats_ds = earthstats[case0['res']].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
+                ds0 = cc.get_diff_earthstat(ds0, case0, earthstats, reses)
+                ds1 = cc.get_diff_earthstat(ds1, case1, earthstats, reses)
             else:
                 earthstats_ds = None
 

@@ -500,11 +500,8 @@ mxmats_tmp = None
 
 # Get yields
 for i, (casename, case) in enumerate(cases.items()):
-    case['ds'] = cc.get_yield_ann(case['ds'], min_viable_hui=min_viable_hui, mxmats=mxmats_tmp, lu_ds=lu_ds)
-    case['ds']['YIELD_ANN_DIFFEARTHSTAT'] = (case['ds']['YIELD_ANN']*1e-6*1e4) - earthstats[case['res']]['Yield'].where(earthstats[case['res']]['PhysicalArea'] > 0)
-    case['ds']['YIELD_ANN_DIFFEARTHSTAT'].attrs['units'] = 'tons / ha'
-    case['ds']['PROD_ANN_DIFFEARTHSTAT'] = case['ds']['YIELD_ANN_DIFFEARTHSTAT'] * reses[case['res']]['ds']['AREA_CFT']*1e-4
-    case['ds']['PROD_ANN_DIFFEARTHSTAT'].attrs['units'] = 'tons'
+    case['ds'] = cc.get_yield_ann(case['ds'], case, min_viable_hui=min_viable_hui, mxmats=mxmats_tmp, lu_ds=lu_ds)
+    case = cc.get_diff_earthstat(case, earthstats, reses)
 
 print("Done.")
 
