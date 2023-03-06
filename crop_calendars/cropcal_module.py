@@ -961,15 +961,24 @@ def get_caselist(which_cases):
          'res': 'f19_g17_ctsm5.2',
          'verbosename': 'CLM Default 20230128, ctsm5.2 LU: my cropcal code, no Rx',
          'gdd_min': 1.0}
+    clm_default_20230227_ctsm52 = \
+        {'filepath': '/Users/Shared/CESM_runs/cropcals_20230128/clm52/20230227_clm52_clmdefault/20230227_clm52_clmdefault.clm2.h1.1958-01-01-00000.nc',
+         'constantVars': None,
+         'constantGSs': None,
+         'res': 'f19_g17_ctsm5.2',
+         'verbosename': 'CLM Default 20230227, ctsm5.2 LU: my cropcal code, no Rx',
+         'gdd_min': 1.0}
     
     if which_cases == "ctsm_lu_5.0_vs_5.2":
         cases['5.0 LU'] = clm_default_20230128_ctsm50
-        cases['5.2 LU'] = clm_default_20230128_ctsm52
+        cases['5.2 LU'] = clm_default_20230227_ctsm52
         return cases
         
     
     if ".2022" in which_cases:
         cases['CLM Default 22'] = clm_default_22
+    elif ".52" in which_cases:
+        cases['CLM Default'] = clm_default_20230227_ctsm52
     else:
         cases['CLM Default'] = clm_default_20230128_ctsm50
     
@@ -986,6 +995,17 @@ def get_caselist(which_cases):
             'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds.mxmat.2022-10-26-171107/gdds_20221026_180012.nc",
             'verbosename': 'Prescribed Calendars v4: Rx sdates+GDDs, lim-gs sim and GDDgen',
             'gdd_min': 50}
+    elif ".52" in which_cases:
+        cases['Prescribed Calendars'] = \
+            {'filepath': '/Users/Shared/CESM_runs/cropcals_20230128/clm52/20230227_clm52_rxboth/20230227_clm52_rxboth.clm2.h1.1958-01-01-00000.nc',
+            'constantVars': ["SDATES", "GDDHARV"],
+            'constantGSs': None, # 'None' with constantVars specified means all should be constant
+            'res': 'f19_g17_ctsm5.2',
+            'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates_mostrice/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20230102_175625.nc",
+            'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates_mostrice/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20230102_175625.nc",
+            'rx_gdds_file': "/Users/Shared/CESM_runs/20230227_clm52_gengdds/generate_gdds.mxmat.2023-03-05-113258/gdds_20230305_151946.nc",
+            'verbosename': 'Prescribed Calendars v5: Rx sdates+GDDs, lim-gs sim and GDDgen',
+            'gdd_min': 1.0}
     else:
         cases['Prescribed Calendars'] = \
             {'filepath': '/Users/Shared/CESM_runs/cropcals_20230128/clm50/20230128_clm50_rxboth/20230128_clm50_rxboth.clm2.h1.1958-01-01-00000.nc',
@@ -1023,6 +1043,29 @@ def get_caselist(which_cases):
                 'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates/cropcals3.f19-g17.rx_crop_calendars2.IHistClm50BgcCrop.ggcmi.1977-2014.gddgen/generate_gdds/gdds_20220927_174954.nc",
                 'verbosename': 'Prescribed maturity reqts.: unlim-gs sim and GDDs',
                 'gdd_min': 50}
+        elif ".52" in which_cases:
+            # My run with rx_crop_calendars2 code and GGCMI sowing dates but CLM maturity reqts
+            cases['Prescribed Sowing'] = \
+                {'filepath': '/Users/Shared/CESM_runs/cropcals_20230128/clm52/20230227_clm52_rxsdates/20230227_clm52_rxsdates.clm2.h1.1958-01-01-00000.nc',
+                'constantVars': ["SDATES"],
+                'constantGSs': None, # 'None' with constantVars specified means all should be constant
+                'res': 'f19_g17_ctsm5.2',
+                'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates_mostrice/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17.2000-2000.20230102_175625.nc",
+                'rx_hdates_file': None,
+                'rx_gdds_file': None,
+                'verbosename': 'Prescribed sowing: unlim-gs sim',
+                'gdd_min': 1.0}
+            # My run with rx_crop_calendars2 code and CLM sowing dates but GGCMI maturity reqts
+            cases['Prescribed Maturity'] = \
+                {'filepath': '/Users/Shared/CESM_runs/cropcals_20230128/clm52/20230227_clm52_rxgdds/20230227_clm52_rxgdds.clm2.h1.1958-01-01-00000.nc',
+                'constantVars': ["GDDHARV"],
+                'constantGSs': None, # 'None' with constantVars specified means all should be constant
+                'res': 'f19_g17_ctsm5.2',
+                'rx_sdates_file': None,
+                'rx_hdates_file': None,
+                'rx_gdds_file': "/Users/Shared/CESM_runs/20230227_clm52_gengdds/generate_gdds.mxmat.2023-03-05-113258/gdds_20230305_151946.nc",
+                'verbosename': 'Prescribed maturity reqts.: unlim-gs sim and GDDs',
+                'gdd_min': 1.0}
         else:
             # My run with rx_crop_calendars2 code and GGCMI sowing dates but CLM maturity reqts
             cases['Prescribed Sowing'] = \

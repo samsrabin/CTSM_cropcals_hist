@@ -199,7 +199,7 @@ reses["f09_g17"] = {"lu_path": "/Users/Shared/CESM_work/CropEvalData_ssr/landuse
 # f19_g17 ("""2-degree"""; i.e., 2.5 lon x 1.9 lat), ctsm5.0
 reses["f19_g17"] = {"lu_path": "/Users/Shared/CESM_work/CropEvalData_ssr/landuse.timeseries_1.9x2.5_hist_78pfts_CMIP6_simyr1850-2015_c170824.nc4"}
 # f19_g17 ("""2-degree"""; i.e., 2.5 lon x 1.9 lat), ctsm5.2
-reses["f19_g17_ctsm5.2"] = {"lu_path": "/Users/Shared/CESM_work/CropEvalData_ssr/landuse.timeseries_1.9x2.5_hist_78_CMIP6_1850-2015_c230127.nlevurb5.AREA.nc"}
+reses["f19_g17_ctsm5.2"] = {"lu_path": "/Users/Shared/CESM_work/CropEvalData_ssr/landuse.timeseries_1.9x2.5_SSP5-8.5_78_CMIP6_1850-2015_c230227.nc"}
 
 # Import land use to reses dicts
 for i, (resname, res) in enumerate(reses.items()):

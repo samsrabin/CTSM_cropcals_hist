@@ -39,6 +39,8 @@ cropcal_colors = {
     'div_other_norm': 'RdBu_r',
     'underlay': [0.75, 0.75, 0.75, 1],
 }
+cropcal_colors['5.0 lu'] = cropcal_colors['clm default']
+cropcal_colors['5.2 lu'] = cropcal_colors['prescribed calendars']
 
 
 def chunk_colorbar(this_map, cbar_spacing, cmap, crop, fontsize, pct_absdiffs_masked_before, sumdiff_beforemask, varInfo, vmin, vmax, posNeg=False, underlay=None, v=0):
