@@ -113,7 +113,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
         this_map *= varInfo['multiplier'][v]
         
         # Weight based on EarthStats data, if needed
-        if "BIAS" in thisVar and earthstats is not None:
+        if False: #"BIAS" in thisVar and earthstats is not None:
             if posNeg:
                 raise RuntimeError("EarthStats weighting not tested for posNeg")
             elif "PROD" not in thisVar:
