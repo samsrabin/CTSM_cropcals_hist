@@ -295,6 +295,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
         if "DIFF" in thisVar:
             minus = f"{these_cases[1]} minus {these_cases[0]} "
         fig_outfile = os.path.join(outDir_figs, f"{thisVar} {minus}{plot_y1}-{plot_yN}{filename_suffix}.png").replace('Mean annual ', '').replace(':', '')
+        fig = plt.figure(figsize=figsize)
     else:
         varList = [thisVar]
         for key in varInfo.keys():
@@ -341,7 +342,8 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             figsize = (14, 3.75)
 
         if is_diff:
-            fig = plt.figure(figsize=figsize)
+            if not multiCol:
+                fig = plt.figure(figsize=figsize)
             this_suptitle = f"{varInfo['suptitle'][v]}"
             minus = f": {these_cases[1]} minus {these_cases[0]}"
             this_suptitle += minus
@@ -396,14 +398,16 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             
             make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg, take_subcrop_sum, take_subcrop_wtdmean)
             
-            # plt.show()
-            fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)
-            plt.close()
+            if not multiCol:
+                # plt.show()
+                fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)
+                plt.close()
         
         
         else:
             for this_case in these_cases:
-                fig = plt.figure(figsize=figsize)
+                if not multiCol:
+                    fig = plt.figure(figsize=figsize)
                 case = cases[this_case]
                 lu_ds = reses[case['res']]['ds']
                 this_ds = case['ds']
@@ -428,9 +432,15 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 
                 make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "BIAS" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg, take_subcrop_sum, take_subcrop_wtdmean)
                 
-                # plt.show()
-                fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)
-                plt.close()
+                if not multiCol:
+                    # plt.show()
+                    fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)
+                    plt.close()
+    
+    if multiCol:
+        # plt.show()
+        fig.savefig(fig_outfile, bbox_inches='tight', facecolor='white', dpi=dpi)
+        plt.close()
     
     
     return cases
