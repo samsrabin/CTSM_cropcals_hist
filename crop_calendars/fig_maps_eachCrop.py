@@ -51,6 +51,26 @@ def add_rowcol_labels(axes, fig_caselist, nx, ny, rx_row_label):
                             y=1.1)
 
 
+def check_outer_colorbins(diff_cbar_ticklabels, diff_cmap, diff_eq_vrange, diff_Ncolors, diff_this_cmap, diff_vmax, diff_vmin):
+    while diff_eq_vrange[1] <= diff_cbar_ticklabels[-2]:
+        diff_cbar_ticklabels = diff_cbar_ticklabels[1:-1]
+        diff_vmin = diff_cbar_ticklabels[0]
+        diff_vmax = diff_cbar_ticklabels[-1]
+        diff_Ncolors -= 2
+        if diff_Ncolors <= 0:
+            raise RuntimeError("Infinite loop?")
+        diff_this_cmap = cm.get_cmap(diff_cmap, diff_Ncolors)
+    if diff_eq_vrange[1] <= diff_cbar_ticklabels[-2]:
+        print(f"diff_eq_vrange: {diff_eq_vrange}")
+        print(f"range from get_colorbar_chunks(): [{diff_vmin}, {diff_vmax}]")
+        print(f"diff_Ncolors: {diff_Ncolors}")
+        print(f"diff_cbar_ticklabels: {diff_cbar_ticklabels}")
+        print(f"diff_this_cmap: {diff_this_cmap}")
+        raise RuntimeError("Extra bin(s)!")
+    
+    return diff_cbar_ticklabels, diff_cmap, diff_eq_vrange, diff_Ncolors, diff_this_cmap, diff_vmax, diff_vmin
+
+
 def get_colorbar_chunks(im, this_var, cmap_name, is_diff):
     force_diffmap_within_vrange = False
     tmp_cb_ax = plt.axes()
@@ -662,21 +682,18 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, 
                         diff_vmin, diff_vmax, diff_Ncolors, diff_this_cmap, diff_cbar_ticklabels, force_diffmap_within_vrange, diff_extend = get_colorbar_chunks(ims[-1], this_var, diff_cmap, True)
                         if diff_extend is not None:
                             raise RuntimeError("Handling of diff_extend not coded")
-                        while diff_eq_vrange[1] <= diff_cbar_ticklabels[-2]:
-                            diff_cbar_ticklabels = diff_cbar_ticklabels[1:-1]
-                            diff_vmin = diff_cbar_ticklabels[0]
-                            diff_vmax = diff_cbar_ticklabels[-1]
-                            diff_Ncolors -= 2
-                            if diff_Ncolors <= 0:
-                                raise RuntimeError("Infinite loop?")
+                        diff_cbar_ticklabels, diff_cmap, diff_eq_vrange, diff_Ncolors, diff_this_cmap, diff_vmax, diff_vmin = check_outer_colorbins(diff_cbar_ticklabels, diff_cmap, diff_eq_vrange, diff_Ncolors, diff_this_cmap, diff_vmax, diff_vmin)
+                        
+                        if diff_Ncolors <= 5:
+                            bin_width = diff_cbar_ticklabels[1] - diff_cbar_ticklabels[0]
+                            bin_width /= 2
+                            diff_vmin = diff_cbar_ticklabels[0]-bin_width/2
+                            diff_vmax = diff_cbar_ticklabels[-1]+bin_width/2
+                            diff_cbar_ticklabels = np.arange(diff_vmin, diff_vmax+1e-6, bin_width)
+                            diff_Ncolors = len(diff_cbar_ticklabels) - 1
                             diff_this_cmap = cm.get_cmap(diff_cmap, diff_Ncolors)
-                        if diff_eq_vrange[1] <= diff_cbar_ticklabels[-2]:
-                            print(f"diff_eq_vrange: {diff_eq_vrange}")
-                            print(f"range from get_colorbar_chunks(): [{diff_vmin}, {diff_vmax}]")
-                            print(f"diff_Ncolors: {diff_Ncolors}")
-                            print(f"diff_cbar_ticklabels: {diff_cbar_ticklabels}")
-                            print(f"diff_this_cmap: {diff_this_cmap}")
-                            raise RuntimeError("Extra bin(s)!")
+                            diff_cbar_ticklabels, diff_cmap, diff_eq_vrange, diff_Ncolors, diff_this_cmap, diff_vmax, diff_vmin = check_outer_colorbins(diff_cbar_ticklabels, diff_cmap, diff_eq_vrange, diff_Ncolors, diff_this_cmap, diff_vmax, diff_vmin)
+                        
                     else:
                         diff_vmin = None
                         diff_vmax = None
