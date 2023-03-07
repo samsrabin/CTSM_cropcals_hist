@@ -330,7 +330,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
         
         # Does this variable get summed across subcrops, or weighted-meaned?
         take_subcrop_sum = False
-        for units in ["Mt", "km$^3$"]:
+        for units in ["Mt", "km$^3$", "km$^3$ yr$^{-1}$"]:
             if units in varInfo['units']:
                 take_subcrop_sum = True
                 break
