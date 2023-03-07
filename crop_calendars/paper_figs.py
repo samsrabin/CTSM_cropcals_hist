@@ -1092,9 +1092,10 @@ top_yN = 2009
 overwrite = True
 portrait = False
 
-which_to_plot = "Yield"
-# which_to_plot = "Detrended yield"
-# which_to_plot = "Yield anomaly"
+which_to_plot = "Production"
+# which_to_plot = "Yield"
+# which_to_plot = "Yield, detrended"
+# which_to_plot = "Yield, anomaly"
 
 if mxmat_limited:
     mxmats_tmp = mxmats
@@ -1136,14 +1137,22 @@ for thisCrop in fao_crops:
     Ntop_global = Ntop + 1
     
     print("    Plotting...")
-    if which_to_plot == "Yield":
-        plot_ds = topN_ds
-    elif which_to_plot == "Detrended yield":
+    if "detrended" in which_to_plot:
         plot_ds = topN_dt_ds
-    elif which_to_plot == "Yield anomaly":
-        plot_ds = topN_ya_ds
+    elif "anomaly" in which_to_plot:
+        plot_ds = topN_anom_ds
     else:
-        raise RuntimeError(f"Which dataset should be used for '{which_to_plot}'?")
+        plot_ds = topN_ds
+    thisVar = which_to_plot.split(',')[0]
+    if thisVar == "Yield":
+        units = "t/ha"
+        multiplier = 1
+    elif thisVar == "Production":
+        units = "Mt"
+        multiplier = 1e-6 # t to Mt
+    else:
+        raise RuntimeError(f"Unknown units for thisVar {thisVar}")
+    plot_ds *= multiplier
 
     f, axes = plt.subplots(ny, nx, figsize=figsize)
     axes = axes.flatten()
@@ -1157,10 +1166,10 @@ for thisCrop in fao_crops:
         r2_change_text = ""
                 
         ax = axes[c]
-        xr.plot.line(plot_ds['Yield'].sel(Country=country),
+        xr.plot.line(plot_ds[thisVar].sel(Country=country),
                      hue='Case',
                      ax=ax)
-        xr.plot.line(plot_ds['Yield (FAOSTAT)'].sel(Country=country),
+        xr.plot.line(plot_ds[f'{thisVar} (FAOSTAT)'].sel(Country=country),
                      'k--', ax=ax)
         
         for case in caselist:
@@ -1201,7 +1210,7 @@ for thisCrop in fao_crops:
     # Add row labels
     leftmost = np.arange(0, nx*ny, nx)
     for i, a in enumerate(leftmost):
-        axes[a].set_ylabel(f"{which_to_plot} (CLM)", fontsize=12, fontweight='bold')
+        axes[a].set_ylabel(f"{which_to_plot} (CLM, {units})", fontsize=12, fontweight='bold')
         axes[a].yaxis.set_label_coords(-0.15, 0.5)
 
     # Add figure title
