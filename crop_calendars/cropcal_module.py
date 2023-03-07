@@ -2522,8 +2522,9 @@ def time_units_and_trim_mth(ds, y1, yN):
     return ds.sel(time=slice(f"{y1}-01-01", f"{yN+1}-12-31"))
 
 
+# gridded_xr can be an xarray Dataset or DataArray
 # kwargs like gridded_ds_dim='ungridded_target_ds_dim'
-# e.g.: lon='patches1d_ixy', lat='patches1d_jxy'
+#     e.g.: lon='patches1d_ixy', lat='patches1d_jxy'
 def ungrid(gridded_xr, ungridded_target_ds, coords_var=None, target_dim="patch", **kwargs):
     
     # Remove any empties from ungridded_target_ds
@@ -2550,10 +2551,20 @@ def ungrid(gridded_xr, ungridded_target_ds, coords_var=None, target_dim="patch",
             values_list = list(gridded_xr[key].values)
             isel_dict[key] = xr.DataArray([values_list.index(x) for x in ungridded_target_ds[selection].values],
                                           dims = target_dim)
-    ungridded_da = gridded_xr.isel(isel_dict, drop=True)
+        
+    ungridded_xr = gridded_xr.isel(isel_dict, drop=True)
     if coords_var is not None:
-        ungridded_da = ungridded_da.assign_coords(new_coords)
-    return ungridded_da
+        ungridded_xr = ungridded_xr.assign_coords(new_coords)
+    
+    # If we're making a Dataset, save additional variables
+    if isinstance(gridded_xr, xr.Dataset):
+        ungridded_xr['lon'] = gridded_xr['lon']
+        ungridded_xr['lat'] = gridded_xr['lat']
+        # Save patch-level variables that match the variable names from the ungridded Dataset
+        for key, selection in kwargs.items():
+            ungridded_xr[selection] = ungridded_target_ds[selection]
+        
+    return ungridded_xr
 
 
 # After https://www.itl.nist.gov/div898/software/dataplot/refman2/auxillar/weigcorr.htm
