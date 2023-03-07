@@ -88,14 +88,9 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
         area_map = utils.grid_one_variable(this_ds.mean(dim="time"), "AREA_CFT", vegtype=list(theseCrops))
         if not posNeg:
             area_map_sum = area_map.sum(dim="ivt_str")
-            weights_map = area_map / area_map_sum
 
         # Grid data for those CFTs, getting their sum or weighted mean
         this_map = utils.grid_one_variable(this_ds, thisVar, vegtype=list(theseCrops))
-        if "YIELD" in thisVar:
-            if posNeg:
-                raise RuntimeError("Area weighting not set up for posNeg because weights_map not yet generated")
-            this_map = this_map * weights_map
         if not posNeg:
             if take_subcrop_sum:
                 this_map = this_map.sum(dim="ivt_str")
