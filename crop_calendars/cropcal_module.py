@@ -1113,20 +1113,22 @@ def get_faostat_country_ts(fao_all_ctry, thisCrop_fao, top_y1, top_yN, country, 
     return tmp['Value'].values
 
 
-def get_diff_earthstat(case_ds, case, earthstats, reses):
+def get_diff_earthstat(case_ds, case, earthstats_ds, reses):
     
     tgt_min_viable_hui =  case_ds['YIELD_ANN'].attrs['min_viable_hui']
     tgt_mxmat_limited =  case_ds['YIELD_ANN'].attrs['mxmat_limited']
+    if not isinstance(earthstats_ds, xr.Dataset):
+        gridspec = get_gridspec(case)
+        earthstats_ds = earthstats_ds[gridspec]
     
     if "YIELD_ANN_DIFFEARTHSTAT" not in case_ds or (case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['min_viable_hui'] != tgt_min_viable_hui or case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['mxmat_limited'] != tgt_mxmat_limited):
-        print("Getting YIELD_ANN_DIFFEARTHSTAT")
-        case_ds['YIELD_ANN_DIFFEARTHSTAT'] = (case_ds['YIELD_ANN']*1e-6*1e4) - earthstats[case['res']]['Yield'].where(earthstats[case['res']]['PhysicalArea'] > 0)
+        case_ds['YIELD_ANN_DIFFEARTHSTAT'] = (case_ds['YIELD_ANN']*1e-6*1e4 - earthstats_ds['Yield'])
+        case_ds['YIELD_ANN_DIFFEARTHSTAT'] = case_ds['YIELD_ANN_DIFFEARTHSTAT'].where(earthstats_ds['PhysicalArea'] > 0)
         case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['min_viable_hui'] = tgt_min_viable_hui
         case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['mxmat_limited'] = tgt_mxmat_limited
         case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['units'] = 'tons / ha'
     
     if "PROD_ANN_DIFFEARTHSTAT" not in case_ds or (case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['min_viable_hui'] != tgt_min_viable_hui or case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['mxmat_limited'] != tgt_mxmat_limited):
-        print("Getting PROD_ANN_DIFFEARTHSTAT")
         case_ds['PROD_ANN_DIFFEARTHSTAT'] = case_ds['YIELD_ANN_DIFFEARTHSTAT'] * reses[case['res']]['ds']['AREA_CFT']*1e-4
         case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['units'] = 'tons'
         case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['min_viable_hui'] = tgt_min_viable_hui

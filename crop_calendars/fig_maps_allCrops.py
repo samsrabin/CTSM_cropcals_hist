@@ -312,6 +312,10 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
     Nvars = len(varList)
         
     for v, thisVar in enumerate(varList):
+        rx_parent_casename = None
+        rx2_da = None
+        earthstats_ds = None
+        rx_ds = None
     
         # Process variable info
         posNeg = "POSNEG" in thisVar
@@ -432,9 +436,6 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                     fig_outfile = os.path.join(outDir_figs, f"Map {this_suptitle} {plot_y1}-{plot_yN}.png").replace('Mean annual ', '').replace(':', '')
                 print(this_suptitle)
                 
-                rx_parent_casename = None
-                rx2_da = None
-                earthstats_ds = None
                 if "BIAS" in thisVar:
                     if np.any([x in thisVar for x in ["GSLEN", "HDATE", "SDATE"]]):
                         rx_parent_casename, rx_ds, _, _ = cc.get_rx_case(cases, list(cases.keys()), ny, thisVar.replace("_BIAS", ""))
