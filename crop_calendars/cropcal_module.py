@@ -1468,14 +1468,14 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
         if len(i_thisCrop_lu) == 0:
             raise RuntimeError(f'No matches found for {thisCrop_fao} in lu_ds.patches1d_itype_veg')
       
-        # Yield...
+        # Production...
         case_ds = get_yield_ann(case_ds, min_viable_hui=min_viable_hui, mxmats=mxmats)
         tmp_ds = case_ds.isel(patch=i_thisCrop_case, time=i_theseYears_case)
-        yield_da = tmp_ds['YIELD_ANN']\
+        prod_da = tmp_ds['PROD_ANN']\
             .groupby(tmp_ds['patches1d_gi'])\
             .apply(xr.DataArray.sum, dim='patch', skipna=True)\
             .rename({'time': 'Year'})\
-            * 1e-6 * 1e4 # g/m2 to tons/ha
+            * 1e-6 # g to tons
         
         # Area...
         tmp_ds = lu_ds.isel(patch=i_thisCrop_lu, time=i_theseYears_lu)
@@ -1494,19 +1494,19 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
         for c, country in enumerate(topN_countries):			  
             if country == "World":
                 country_id = None
-                yield_thisCountry_da = yield_da
+                prod_thisCountry_da = prod_da
                 area_thisCountry_da = area_da
             else:
                 country_id = countries_key.query(f'name == "{country}"')['num'].values
                 if len(country_id) != 1:
                     raise RuntimeError(f'Expected 1 match of {country} in countries_key; got {len(country_id)}')
-                yield_thisCountry_da = yield_da.where(countries_da == country_id)
+                prod_thisCountry_da = prod_da.where(countries_da == country_id)
                 area_thisCountry_da = area_da.where(countries_da == country_id)
                 
             area_ar[i_case,:,c] = area_thisCountry_da.sum(dim='patches1d_gi').values 
             
             # Production (tons)
-            prod_ar[i_case,:,c] = (yield_thisCountry_da * area_thisCountry_da).sum(dim='patches1d_gi')
+            prod_ar[i_case,:,c] = prod_thisCountry_da.sum(dim='patches1d_gi')
                 
             # FAOSTAT production (tons) and area (ha)
             if i_case == 0:
@@ -1533,7 +1533,7 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
                                   attrs = {'units': 'tons'})
     area_da = xr.DataArray(data = area_ar,
                                   coords = new_coords,
-                                  attrs = {'units': 'tons'})
+                                  attrs = {'units': 'ha'})
     yield_da = prod_da / area_da
     yield_da = yield_da.assign_attrs({'units': 'tons/ha'})
     prod_faostat_da = xr.DataArray(data = prod_faostat_yc,
