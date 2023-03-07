@@ -1118,7 +1118,7 @@ NtopYears = len(topYears)
 legend_members = caselist + ['FAOSTAT']
 
 fao_crops = np.unique(fao_all_ctry.Crop.values)
-for c, thisCrop in enumerate(fao_crops):
+for thisCrop in fao_crops:
     print(f"{thisCrop}...")
         
     thisCrop_clm = cc.cropnames_fao2clm(thisCrop)
@@ -1127,7 +1127,7 @@ for c, thisCrop in enumerate(fao_crops):
     file_prefix = which_to_plot.replace('aly','')
     fig_outfile = outDir_figs + f"{file_prefix} timeseries top 10 " + suptitle + ".pdf"
     if os.path.exists(fig_outfile) and not overwrite:
-        print(f'    Skipping {thisCrop_out} (file exists).')
+        print(f'    Skipping {thisCrop} (file exists).')
         continue
     
     # Get yield datasets
@@ -1164,8 +1164,10 @@ for c, thisCrop in enumerate(fao_crops):
                      'k--', ax=ax)
         
         for case in caselist:
-            lr = stats.linregress(x = plot_ds['Yield (FAOSTAT)'].sel(Country=country),
-                                  y = plot_ds['Yield'].sel(Country=country, Case=case))
+            if c==0 and case==caselist[0]:
+                print("    WARNING: No shifting allowed in calculation of correlation!")
+            lr = stats.linregress(x = topN_dt_ds['Yield (FAOSTAT)'].sel(Country=country),
+                                  y = topN_dt_ds['Yield'].sel(Country=country, Case=case))
             if case == "CLM Default":
                 t = "{r1:.3g} $\\rightarrow$ "
                 r2_change_text += t.format(r1=lr.rvalue**2)
