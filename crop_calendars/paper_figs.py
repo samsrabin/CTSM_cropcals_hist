@@ -1767,6 +1767,11 @@ varList = {
         'time_dim':   'gs',
         'units':      'days',
         'multiplier': 1},
+    'GSLEN_BIAS': {
+        'suptitle':   'Mean growing season length bias',
+        'time_dim':   'gs',
+        'units':      'days',
+        'multiplier': 1},
 }
 
 # Yield settings

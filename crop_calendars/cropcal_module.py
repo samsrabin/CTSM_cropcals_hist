@@ -1348,6 +1348,39 @@ def get_reason_list_text():
         ]
 
 
+def get_rx_case(cases, fig_caselist, ny, this_var):
+    if this_var == "GDDHARV":
+        rx_ds_key = "rx_gdds_ds"
+    elif this_var == "GSLEN":
+        rx_ds_key = "rx_gslen_ds"
+    elif this_var == "HDATES":
+        rx_ds_key = "rx_hdates_ds"
+    elif this_var == "SDATES":
+        rx_ds_key = "rx_sdates_ds"
+    else:
+        raise RuntimeError(f"What rx_ds_key should I use for {this_var}?")
+    if this_var in ["GSLEN", "HDATES", "SDATES"]:
+        rx_row_label = "GGCMI3"
+    elif this_var == "GDDHARV":
+        rx_row_label = "GGCMI3-derived"
+    else:
+        raise RuntimeError(f"What row label should be used instead of 'rx' for {this_var}?")
+    rx_parent_found = False
+    for i, (casename, case) in enumerate(cases.items()):
+        # For now, we're just assuming all runs with a given prescribed variable use the same input file
+        if rx_ds_key in case:
+            rx_parent_casename = casename
+            rx_ds = case[rx_ds_key]
+            fig_caselist += ["rx"]
+            ny += 1
+            rx_parent_found = True
+            break
+    if not rx_parent_found:
+        raise RuntimeError(f"No case found with {rx_ds_key}")
+    
+    return rx_parent_casename, rx_ds, rx_row_label, ny
+
+
 def get_timeseries_bias(sim, obs, fig_caselist, weights=None):
     
     weights_provided = weights is not None

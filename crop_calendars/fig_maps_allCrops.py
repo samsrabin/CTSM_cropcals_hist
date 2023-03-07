@@ -40,7 +40,10 @@ def get_underlay(this_ds, area_map_sum):
     return underlay
 
 
-def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats, posNeg, take_subcrop_sum, take_subcrop_wtdmean):
+def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats, posNeg, take_subcrop_sum, take_subcrop_wtdmean, rx2_da, rx_parent_casename):
+    
+    if rx2_da is not None and earthstats is not None:
+        raise RuntimeError("How are both rx and earthstats Datasets specified?")
     
     time_dim = "time"
     if "time_dim" in varInfo:
@@ -72,6 +75,8 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
             where_thisCrop = np.where(ds_in['patches1d_itype_combinedCropCLM_str'] == crop)[0]
             theseCrops = np.unique(ds_in['patches1d_itype_veg_str'].isel(patch=where_thisCrop))
             this_ds = ds_in.isel(patch=where_thisCrop)
+            if rx2_da is not None:
+                this_rx2_da = rx2_da.sel(ivt_str=theseCrops)
         else:
             # Include all of the 6 explicitly-simulated crops
             if not posNeg:
@@ -90,18 +95,25 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
             area_map_sum = area_map.sum(dim="ivt_str")
 
         # Grid data for those CFTs, getting their sum or weighted mean
-        this_map = utils.grid_one_variable(this_ds, thisVar, vegtype=list(theseCrops))
+        if rx2_da is None:
+            this_map = utils.grid_one_variable(this_ds, thisVar, vegtype=list(theseCrops))
+        else:
+            this_map = utils.grid_one_variable(this_ds, thisVar.replace("_BIAS", ""), vegtype=list(theseCrops))
         if not posNeg:
             if take_subcrop_sum:
                 this_map = this_map.sum(dim="ivt_str")
+                if rx2_da is not None:
+                    this_map -= this_rx2_da.sum(dim="ivt_str")
             elif take_subcrop_wtdmean:
                 this_map = this_map.weighted(area_map.fillna(0)).mean(dim="ivt_str")
+                if rx2_da is not None:
+                    this_map -= this_rx2_da.weighted(area_map.fillna(0)).mean(dim="ivt_str")
             else:
                 raise RuntimeError("Neither take_subcrop_sum nor take_subcrop_wtdmean???")
         this_map *= varInfo['multiplier'][v]
         
         # Weight based on EarthStats data, if needed
-        if "BIAS" in thisVar:
+        if "BIAS" in thisVar and earthstats is not None:
             if posNeg:
                 raise RuntimeError("EarthStats weighting not tested for posNeg")
             if "PROD" in thisVar:
@@ -359,14 +371,16 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 ds0 = cc.get_yield_ann(ds0, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
                 ds1 = cc.get_yield_ann(ds1, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
                 
+            earthstats_ds = None
             if "BIAS" in thisVar:
-                if earthstats is None:
-                    raise RuntimeError("Pass earthstats to maps_allCrops() if you want to calculate bias.")
-                earthstats_ds = earthstats[case0['res']].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
-                ds0 = cc.get_diff_earthstat(ds0, case0, earthstats_ds, reses)
-                ds1 = cc.get_diff_earthstat(ds1, case1, earthstats_ds, reses)
-            else:
-                earthstats_ds = None
+                if np.any([x in thisVar for x in ["GSLEN", "HDATE", "SDATE"]]):
+                    raise RuntimeError(f"Bias-difference maps not yet supported for rx variables ({thisVar})")
+                else:
+                    if earthstats is None:
+                        raise RuntimeError("Pass earthstats to maps_allCrops() if you want to calculate bias.")
+                    earthstats_ds = earthstats[case0['res']].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
+                    ds0 = cc.get_diff_earthstat(ds0, case0, earthstats_ds, reses)
+                    ds1 = cc.get_diff_earthstat(ds1, case1, earthstats_ds, reses)                
 
             this_ds = ds1.copy()
             if is_diffdiff:
@@ -391,7 +405,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             this_ds = this_ds\
                     .sel({time_dim : slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
             
-            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg, take_subcrop_sum, take_subcrop_wtdmean)
+            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg, take_subcrop_sum, take_subcrop_wtdmean, rx_ds, rx_parent_casename)
             
             if not multiCol:
                 # plt.show()
@@ -416,16 +430,44 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                     fig_outfile = os.path.join(outDir_figs, f"Map {this_suptitle} {plot_y1}-{plot_yN}.png").replace('Mean annual ', '').replace(':', '')
                 print(this_suptitle)
                 
+                rx_parent_casename = None
+                rx2_da = None
+                earthstats_ds = None
                 if "BIAS" in thisVar:
-                    if earthstats is None:
-                        raise RuntimeError("Pass earthstats to maps_allCrops() if you want to calculate bias.")
-                    earthstats_ds = earthstats[case['res']].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
-                    this_ds = cc.get_diff_earthstat(this_ds, case, earthstats_ds, reses)
-                    this_ds[thisVar] = this_ds[thisVar.replace("_BIAS", "_DIFF")]
-                else:
-                    earthstats_ds = None
+                    if np.any([x in thisVar for x in ["GSLEN", "HDATE", "SDATE"]]):
+                        rx_parent_casename, rx_ds, _, _ = cc.get_rx_case(cases, list(cases.keys()), ny, thisVar.replace("_BIAS", ""))
+                        
+                        # Get the name of a variable of interest in the rx Dataset
+                        rx_varPrefix_list = []
+                        for x in rx_ds:
+                            if "lon" in rx_ds[x].dims:
+                                rx_varParts = x.split("_")
+                                if rx_varParts[0] not in rx_varPrefix_list:
+                                    rx_varPrefix_list.append(rx_varParts[0])
+                        if len(rx_varPrefix_list) == 0:
+                            raise RuntimeError("No matching variables found in rx_ds")
+                        elif len(rx_varPrefix_list) > 1:
+                            raise RuntimeError(f"Too many matching variables found in rx_ds; prefixes: {rx_varPrefix_list}")
+                        rx_varPrefix = rx_varPrefix_list[0]
+                        
+                        # Get new DataArray with included crops on dimension ivt_str
+                        itype_veg_list = np.unique(this_ds['patches1d_itype_veg'])
+                        itype_veg_str_list = [utils.ivt_int2str(x) for x in itype_veg_list]
+                        rx_varList = [f"{rx_varPrefix}_{x}" for x in itype_veg_list]
+                        rx2_da = xr.concat(objs=[rx_ds[x] for x in rx_varList],
+                                           dim="ivt_str")
+                        rx2_da = rx2_da.assign_coords({'ivt_str': itype_veg_str_list})
+                        if "time" in rx_ds and rx_ds.dims["time"]==1:
+                            rx2_da = rx2_da.isel(time=0, drop=True)
+                        
+                    else:
+                        if earthstats is None:
+                            raise RuntimeError("Pass earthstats to maps_allCrops() if you want to calculate bias.")
+                        earthstats_ds = earthstats[case['res']].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
+                        this_ds = cc.get_diff_earthstat(this_ds, case, earthstats_ds, reses)
+                        this_ds[thisVar] = this_ds[thisVar.replace("_BIAS", "_DIFF")]
                 
-                make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "BIAS" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg, take_subcrop_sum, take_subcrop_wtdmean)
+                make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "BIAS" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg, take_subcrop_sum, take_subcrop_wtdmean, rx2_da, rx_parent_casename)
                 
                 if not multiCol:
                     # plt.show()
