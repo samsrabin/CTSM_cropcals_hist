@@ -255,6 +255,9 @@ for i, (casename, case) in enumerate(cases.items()):
     if not np.array_equal(case['ds']['time'].values, lu_ds['time'].values):
         raise RuntimeError(f"Time axis mismatch between {casename} outputs and land use file")
     
+    # Save crop area to case Dataset
+    case['ds']['AREA_CFT'] = lu_ds['AREA_CFT']
+    
     # Where was there crop area at sowing?
     # Straightforward: 'time' axis lines up for model outputs and LU
     case['ds']['croparea_positive_sowing'] = lu_ds['AREA_CFT'] > 0
@@ -649,11 +652,12 @@ ref_casename = 'CLM Default'
 # ref_casename = 'rx'
 
 overwrite = True
+save_netcdfs = False
 
 plot_y1 = 1980
 plot_yN = 2010
 
-if ref_casename=="rx":
+if ref_casename=="rx" or len(caselist)==4:
     skip_SDATES = ['Prescribed Calendars']
 else:
     skip_SDATES = None
