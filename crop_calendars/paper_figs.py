@@ -491,21 +491,6 @@ earthstats['f19_g17_ctsm5.2'] = earthstats['f19_g17']
 print("Done importing FAO EarthStat.")
 
 
-# %% Get yields, including difference from EarthStat
-print("Getting yields...")
-
-# Yield settings
-min_viable_hui = "ggcmi3"
-mxmats_tmp = None
-
-# Get yields
-for i, (casename, case) in enumerate(cases.items()):
-    case['ds'] = cc.get_yield_ann(case['ds'], case, min_viable_hui=min_viable_hui, mxmats=mxmats_tmp, lu_ds=lu_ds)
-    case = cc.get_diff_earthstat(case, earthstats, reses)
-
-print("Done.")
-
-
 # %% Import country map and key
 
 # Half-degree countries from Brendan
