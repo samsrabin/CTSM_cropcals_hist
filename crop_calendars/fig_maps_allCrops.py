@@ -116,10 +116,12 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
         if "BIAS" in thisVar and earthstats is not None:
             if posNeg:
                 raise RuntimeError("EarthStats weighting not tested for posNeg")
-            if "PROD" in thisVar:
-                earthstats_weights_da = earthstats['Production'].sel(crop=crop)
-            else:
+            elif "PROD" not in thisVar:
                 raise RuntimeError(f"EarthStat weighting not set up for {thisVar}")
+            print(f" * Weighting by Earthstat production...")
+            earthstats_thisCrop = earthstats.isel(patch=np.where(earthstats['patches1d_itype_combinedCropCLM_str']==crop)[0])
+            earthstats_weights_da = utils.grid_one_variable(earthstats_thisCrop, "Production")
+                
             if not (np.array_equal(this_map.lon, earthstats_weights_da.lon) and np.array_equal(this_map.lat, earthstats_weights_da.lat) and np.array_equal(this_map.time, earthstats_weights_da.time)):
                 raise RuntimeError("Unexpected dim mismatch between this_map and EarthStats weights")
             this_map_weighted = this_map.weighted(earthstats_weights_da.fillna(0))
