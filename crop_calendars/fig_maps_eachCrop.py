@@ -10,6 +10,9 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
 import cropcal_module as cc
+
+import importlib
+importlib.reload(sys.modules['cropcal_figs_module'])
 from cropcal_figs_module import *
 
 gslen_colorbar_max = 364
@@ -700,6 +703,15 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, 
                         diff_Ncolors = None
                         diff_this_cmap = None
                         diff_cbar_ticklabels = None
+                    
+                    # Darker near-zero color
+                    if diff_this_cmap is not None:
+                        diff_this_cmap = get_ListedColormap(diff_cmap, diff_this_cmap, diff_Ncolors-1)
+                        new_colors = np.concatenate((diff_this_cmap.colors[:int(diff_Ncolors/2)],
+                                                     np.array([cropcal_colors['underlay_lightest']]),
+                                                     diff_this_cmap.colors[int(diff_Ncolors/2)+1:]),
+                                                    axis=0)
+                        diff_this_cmap = mcolors.ListedColormap(new_colors)
                     
                     units, vrange, vrange_diff, fig, ims, axes, cbs, manual_colors = loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar_thisVar, vmin=vmin, vmax=vmax, new_axes=False, Ncolors=Ncolors, abs_cmap=this_cmap, diff_vmin=diff_vmin, diff_vmax=diff_vmax, diff_Ncolors=diff_Ncolors, diff_cmap=diff_this_cmap, diff_ticklabels=diff_cbar_ticklabels, force_diffmap_within_vrange=force_diffmap_within_vrange, cbar_labelpad=cbar_labelpad, cbar_ticklabels=cbar_ticklabels, extend_abs=extend)
                 

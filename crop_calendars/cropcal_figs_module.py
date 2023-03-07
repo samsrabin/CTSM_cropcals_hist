@@ -38,6 +38,8 @@ cropcal_colors = {
     'div_other_nonnorm': 'PuOr_r',
     'div_other_norm': 'RdBu_r',
     'underlay': [0.75, 0.75, 0.75, 1],
+    'underlay_lighter': [0.85, 0.85, 0.85, 1],
+    'underlay_lightest': [0.92, 0.92, 0.92, 1],
 }
 cropcal_colors['5.0 lu'] = cropcal_colors['clm default']
 cropcal_colors['5.2 lu'] = cropcal_colors['prescribed calendars']
@@ -121,21 +123,7 @@ def chunk_colorbar(this_map, cbar_spacing, cmap, crop, fontsize, pct_absdiffs_ma
         # Add color for that bin
         if underlay is not None:
             raise RuntimeError("You need a different color to distinguish maskcolorbar_near0 cells from other-masked cells")
-        if isinstance(this_cmap, mcolors.LinearSegmentedColormap):
-            this_cmap = cm.get_cmap(cmap)
-            color_list = [this_cmap(x) for x in np.arange(0, 1, 1/Nbins)]
-            color_list = []
-            for i, x in enumerate(np.arange(0, 1+1e-9, 1/Nbins)):
-                color_list.append(this_cmap(x))
-                if i>0 and color_list[i] == color_list[i-1]:
-                    print(f"{prev_x} → color_list[{i-1}] = {color_list[i-1]}")
-                    print(f"{x} → color_list[{i}] = {color_list[i]}")
-                    raise RuntimeError("Repeated color!")
-                prev_x = x
-            this_cmap = mcolors.ListedColormap(color_list)
-        elif not isinstance(this_cmap, mcolors.ListedColormap):
-            raise RuntimeError(f"Not sure how to get list of colors from {type(this_cmap)}")
-        
+        this_cmap = get_ListedColormap(cmap, this_cmap, Nbins)
         if posNeg:
             if crop == "Crops decreasing":
                 new_colors = np.concatenate((this_cmap.colors[:int(Nbins/2)],
@@ -169,6 +157,25 @@ def get_amount_masked(crop, this_map_timemean, sumdiff_beforemask, pct_absdiffs_
     print(f"   Masked {crop} ({reason}): {round(pct_absdiffs_masked_here, 1)}%")
     pct_absdiffs_masked_before = pct_absdiffs_masked
     return pct_absdiffs_masked_before
+
+
+def get_ListedColormap(cmap, this_cmap, Nbins):
+    if isinstance(this_cmap, mcolors.LinearSegmentedColormap):
+        this_cmap = cm.get_cmap(cmap)
+        color_list = [this_cmap(x) for x in np.arange(0, 1, 1/Nbins)]
+        color_list = []
+        for i, x in enumerate(np.arange(0, 1+1e-9, 1/Nbins)):
+            color_list.append(this_cmap(x))
+            if i>0 and color_list[i] == color_list[i-1]:
+                print(f"{prev_x} → color_list[{i-1}] = {color_list[i-1]}")
+                print(f"{x} → color_list[{i}] = {color_list[i]}")
+                raise RuntimeError("Repeated color!")
+            prev_x = x
+        this_cmap = mcolors.ListedColormap(color_list)
+    elif not isinstance(this_cmap, mcolors.ListedColormap):
+        raise RuntimeError(f"Not sure how to get list of colors from {type(this_cmap)}")
+    
+    return this_cmap
 
 
 def get_threshold_lowestpercentile_cumulative(this_map_timemean, frac_to_include):
