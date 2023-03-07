@@ -84,8 +84,9 @@ def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
     grays = [dark_gray, light_gray]
     
     for i, casename in enumerate(caselist):
-        if casename.lower() in ccf.cropcal_colors:
-            color = ccf.cropcal_colors[casename.lower()]
+        casename_for_colors = casename.lower().replace(" (0)", "").replace(" (1)", "")
+        if casename_for_colors in ccf.cropcal_colors:
+            color = ccf.cropcal_colors[casename_for_colors]
         elif i <= 1:
             color = grays[i]
         else:
@@ -155,8 +156,9 @@ def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabe
     
     p_symbols = []
     for i, casename in enumerate(caselist):
-        if casename.lower() in ccf.cropcal_colors:
-            color = ccf.cropcal_colors[casename.lower()]
+        casename_for_colors = casename.lower().replace(" (0)", "").replace(" (1)", "")
+        if casename_for_colors in ccf.cropcal_colors:
+            color = ccf.cropcal_colors[casename_for_colors]
         else:
             color = cm.Dark2(i)
         if casename in ["Prescribed Sowing", "Prescribed Maturity"]:
