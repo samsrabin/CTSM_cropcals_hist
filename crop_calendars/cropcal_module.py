@@ -1600,6 +1600,13 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
     
     return topN_ds, topN_dt_ds, topN_ya_ds
 
+
+def get_gridspec(case):
+    case_res = case['res']
+    for x in ["_ctsm5.2"]:
+        case_res = case_res.replace(x, "")
+    return case_res
+
  
 def get_ts_prod_clm_yc_da(yield_gd, lu_ds, yearList, cropList_combined_clm):
 

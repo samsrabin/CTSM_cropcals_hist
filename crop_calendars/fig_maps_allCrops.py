@@ -380,7 +380,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 else:
                     if earthstats is None:
                         raise RuntimeError("Pass earthstats to maps_allCrops() if you want to calculate bias.")
-                    earthstats_ds = earthstats[case0['res']].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
+                    earthstats_ds = earthstats[cc.get_gridspec(case0)].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
                     ds0 = cc.get_diff_earthstat(ds0, case0, earthstats_ds, reses)
                     ds1 = cc.get_diff_earthstat(ds1, case1, earthstats_ds, reses)                
 
@@ -465,7 +465,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                     else:
                         if earthstats is None:
                             raise RuntimeError("Pass earthstats to maps_allCrops() if you want to calculate bias.")
-                        earthstats_ds = earthstats[case['res']].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
+                        earthstats_ds = earthstats[cc.get_gridspec(case)].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
                         this_ds = cc.get_diff_earthstat(this_ds, case, earthstats_ds, reses)
                         this_ds[thisVar] = this_ds[thisVar.replace("_BIAS", "_DIFF")]
                 

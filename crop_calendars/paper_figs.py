@@ -429,8 +429,26 @@ earthstats_gd['f09_g17'] = earthstats_gd['f09_g17'].isel(time=[i for i,x in enum
 
 # Interpolate to lower res, starting with just variables that won't get messed up by the interpolation
 print("Interpolating to f19_g17...")
+res_ds = None
+for r in reses.keys():
+    if "f19_g17" in r and "ds" in reses[r]:
+        res_ds = reses[r]["ds"]
+        break
+if res_ds is None:
+    raise RuntimeError(f"No f19_g17 Dataset found in reses! Keys checked: {reses.keys()}")
+interp_lons = res_ds['lon']
+interp_lats = res_ds['lat']
 interp_lons = reses['f19_g17']['ds']['lon']
 interp_lats = reses['f19_g17']['ds']['lat']
+res_ds = None
+for r in reses.keys():
+    if "f19_g17" in r and "ds" in reses[r]:
+        res_ds = reses[r]["ds"]
+        break
+if res_ds is None:
+    raise RuntimeError(f"No f19_g17 Dataset found in reses! Keys checked: {reses.keys()}")
+interp_lons = res_ds['lon']
+interp_lats = res_ds['lat']
 drop_vars = ['Area', 'HarvestArea', 'IrrigatedArea', 'PhysicalArea', 'RainfedArea', 'Production']
 earthstats_gd['f19_g17'] = earthstats_gd['f09_g17']\
     .drop(labels=drop_vars)\
@@ -452,7 +470,7 @@ for v in earthstats_gd['f19_g17']:
 #	  PhysicalArea ≠ Area * LandFraction * PhysicalFraction (max rel diff 100%)
 
 # Re-calculate variables that were dropped
-f19_g17_cellarea = utils.grid_one_variable(reses['f19_g17']['ds'], 'AREA', fillValue=0)
+f19_g17_cellarea = utils.grid_one_variable(res_ds, 'AREA', fillValue=0)
 f19_g17_landarea = f19_g17_cellarea * earthstats_gd['f19_g17']['LandFraction']
 f19_g17_croparea_ha = f19_g17_landarea * earthstats_gd['f19_g17']['PhysicalFraction']*100
 recalc_ds = xr.Dataset(data_vars = \
