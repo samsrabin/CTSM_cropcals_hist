@@ -557,14 +557,12 @@ def main(argv):
             lower = lat_bin_edges[b]
             upper = lat_bin_edges[b+1]
             bin_names.append(f"{lower}–{upper}")
-            
-        if args.run1_name.lower() in cropcal_colors:
-            color_old = cropcal_colors[args.run1_name.lower()]
-        else:
+        
+        color_old = cropcal_colors_cases(args.run1_name)
+        if color_old is None:
             color_old = '#beaed4'
-        if args.run2_name.lower() in cropcal_colors:
-            color_new = cropcal_colors[args.run2_name.lower()]
-        else:
+        color_new = cropcal_colors_cases(args.run2_name)
+        if color_new is None:
             color_new = '#7fc97f'
         gdd_units = 'GDD (°C • day)'
     

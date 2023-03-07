@@ -24,13 +24,8 @@ import importlib
 importlib.reload(sys.modules['cropcal_figs_module'])
 from cropcal_figs_module import *
 
+# Colormaps (maps)
 cropcal_colors = {
-    # Cases (line and scatter plots)
-    'clm default': [x/255 for x in [92, 219, 219]],
-    'prescribed calendars': [x/255 for x in [250, 102, 240]],
-    'prescribed maturity': [x/255 for x in [128,0,0]],
-    'prescribed sowing': [x/255 for x in [133, 92, 255]],
-    # Colormaps (maps)
     'seq_timeofyear': 'twilight_shifted',
     'seq_other': 'plasma', # magma_r? CMRmap_r?
     'div_yieldirr': 'BrBG',
@@ -41,8 +36,23 @@ cropcal_colors = {
     'underlay_lighter': [0.85, 0.85, 0.85, 1],
     'underlay_lightest': [0.92, 0.92, 0.92, 1],
 }
-cropcal_colors['5.0 lu'] = cropcal_colors['clm default']
-cropcal_colors['5.2 lu'] = cropcal_colors['prescribed calendars']
+
+# Cases (line and scatter plots)
+def cropcal_colors_cases(casename):
+    case_color_dict = {
+        'clm default': [x/255 for x in [92, 219, 219]],
+        'prescribed calendars': [x/255 for x in [250, 102, 240]],
+        'prescribed maturity': [x/255 for x in [128,0,0]],
+        'prescribed sowing': [x/255 for x in [133, 92, 255]],
+    }
+    case_color_dict['5.0 lu'] = case_color_dict['clm default']
+    case_color_dict['5.2 lu'] = case_color_dict['prescribed calendars']
+    
+    case_color = None
+    casename_for_colors = casename.lower().replace(" (0)", "").replace(" (1)", "")
+    if casename_for_colors in case_color_dict:
+        case_color = case_color_dict[casename_for_colors]
+    return case_color
 
 
 def chunk_colorbar(this_map, cbar_spacing, cmap, crop, fontsize, pct_absdiffs_masked_before, sumdiff_beforemask, varInfo, vmin, vmax, posNeg=False, underlay=None, v=0):

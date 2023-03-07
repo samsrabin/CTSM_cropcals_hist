@@ -1116,7 +1116,7 @@ else:
 topYears = np.arange(top_y1, top_yN+1)
 NtopYears = len(topYears)
 
-legend_members = caselist + ['FAOSTAT']
+legend_members = ['FAOSTAT'] + caselist
 
 fao_crops = np.unique(fao_all_ctry.Crop.values)
 for thisCrop in fao_crops:
@@ -1166,13 +1166,18 @@ for thisCrop in fao_crops:
         r2_change_text = ""
                 
         ax = axes[c]
-        xr.plot.line(plot_ds[thisVar].sel(Country=country),
-                     hue='Case',
-                     ax=ax)
         xr.plot.line(plot_ds[f'{thisVar} (FAOSTAT)'].sel(Country=country),
                      'k--', ax=ax)
         
-        for case in caselist:
+        for ca, case in enumerate(caselist):
+            
+            color = cropcal_colors_cases(case)
+            if color is None:
+                color = cm.Dark2(ca)
+            xr.plot.line(plot_ds[thisVar].sel(Country=country, Case=case),
+                         color=color,
+                         ax=ax)
+        
             if c==0 and case==caselist[0]:
                 print("    WARNING: No shifting allowed in calculation of correlation!")
             lr = stats.linregress(x = topN_dt_ds['Yield (FAOSTAT)'].sel(Country=country),
@@ -1197,7 +1202,8 @@ for thisCrop in fao_crops:
             # sc[i_h].set_edgecolor(color)
         
         # ax.set_aspect('equal')
-        ax.get_legend().remove()
+        if ax.get_legend() is not None:
+            ax.get_legend().remove()
         ax.set_xlabel(None)
         ax.set_ylabel(None)
         if c == Ntop_global-1:
