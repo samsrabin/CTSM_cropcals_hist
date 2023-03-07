@@ -441,17 +441,6 @@ if res_ds is None:
     raise RuntimeError(f"No f19_g17 Dataset found in reses! Keys checked: {reses.keys()}")
 interp_lons = res_ds['lon']
 interp_lats = res_ds['lat']
-interp_lons = reses['f19_g17']['ds']['lon']
-interp_lats = reses['f19_g17']['ds']['lat']
-res_ds = None
-for r in reses.keys():
-    if "f19_g17" in r and "ds" in reses[r]:
-        res_ds = reses[r]["ds"]
-        break
-if res_ds is None:
-    raise RuntimeError(f"No f19_g17 Dataset found in reses! Keys checked: {reses.keys()}")
-interp_lons = res_ds['lon']
-interp_lats = res_ds['lat']
 drop_vars = ['Area', 'HarvestArea', 'IrrigatedArea', 'PhysicalArea', 'RainfedArea', 'Production']
 earthstats_gd['f19_g17'] = earthstats_gd['f09_g17']\
     .drop(labels=drop_vars)\
