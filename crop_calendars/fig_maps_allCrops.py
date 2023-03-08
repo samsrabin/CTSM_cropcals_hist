@@ -334,19 +334,20 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
         
         # Does this variable get summed across subcrops, or weighted-meaned?
         take_subcrop_sum = False
+        theseUnits = varInfo['units'][v]
         for units in ["Mt", "km$^3$", "km$^3$ yr$^{-1}$"]:
-            if units in varInfo['units']:
+            if units in theseUnits:
                 take_subcrop_sum = True
                 break
         take_subcrop_wtdmean = False
         for units in ["t/ha", "days"]:
-            if units in varInfo['units']:
+            if units in theseUnits:
                 take_subcrop_wtdmean = True
                 break
         if take_subcrop_sum and take_subcrop_wtdmean:
-            raise RuntimeError(f"Units '{varInfo['units']}' have both take_subcrop_sum and take_subcrop_wtdmean specified somehow")
+            raise RuntimeError(f"Units '{theseUnits}' have both take_subcrop_sum and take_subcrop_wtdmean specified somehow")
         if not (take_subcrop_sum or take_subcrop_wtdmean):
-            raise RuntimeError(f"Define across-subcrop operation for units '{varInfo['units']}'")
+            raise RuntimeError(f"Define across-subcrop operation for units '{theseUnits}'")
         
         # Special setup for posNeg
         if posNeg:
