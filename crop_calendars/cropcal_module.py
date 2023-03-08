@@ -1110,7 +1110,20 @@ def get_faostat_country_ts(fao_all_ctry, thisCrop_fao, top_y1, top_yN, country, 
         tmp = tmp.groupby(by="Year").agg("sum")
     else:
         tmp = tmp.query(f'Area == "{country}"')
-    return tmp['Value'].values
+    
+    # Get values for which this country is in the FAO data
+    years = np.arange(top_y1, top_yN+1)
+    yearCodes = list(tmp.index)
+    if yearCodes[0] > 2100:
+        if 'Year' in tmp.columns:
+            yearCodes = tmp['Year'].values
+        else:
+            yearCodes = tmp['Year Code'].values
+    _, IA, _ = np.intersect1d(years, yearCodes, return_indices=True)
+    result = np.full(years.shape, np.nan)
+    result[IA] = tmp['Value'].values
+    
+    return result
 
 
 def get_diff_earthstat(case_ds, case, earthstats_ds, reses):
@@ -1430,13 +1443,9 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
     Ntop += 1
     
     # Which countries are not found in our countries map?
-    any_ctry_notfound = False
     for thisCountry in list(topN_countries):
         if thisCountry not in countries_key.name.values and thisCountry != "World":
             print(f'❗ {thisCountry} not in countries_key')
-            any_ctry_notfound = True
-    if any_ctry_notfound:
-        raise RuntimeError('At least one country in FAO not found in key')
 
     NtopYears = len(topYears)
     
@@ -1499,7 +1508,9 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
             else:
                 country_id = countries_key.query(f'name == "{country}"')['num'].values
                 if len(country_id) != 1:
-                    raise RuntimeError(f'Expected 1 match of {country} in countries_key; got {len(country_id)}')
+                    if len(country_id) == 0:
+                        continue
+                    raise RuntimeError(f'Expected 0 or 1 match of {country} in countries_key; got {len(country_id)}')
                 prod_thisCountry_da = prod_da.where(countries_da == country_id)
                 area_thisCountry_da = area_da.where(countries_da == country_id)
                 
@@ -1518,10 +1529,6 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
                 prod_earthstat_yc[:,c] = get_earthstat_country_ts(earthstats, case, 'Production', countries_map, thisCrop_clm, i_theseYears_earthstat, country_id)
                 area_earthstat_yc[:,c] = get_earthstat_country_ts(earthstats, case, 'HarvestArea', countries_map, thisCrop_clm, i_theseYears_earthstat, country_id)
     
-    if np.any(np.isnan(prod_ar)):
-        raise RuntimeError("NaN in prod_ar")
-    if np.any(np.isnan(area_ar)):
-        raise RuntimeError("NaN in area_ar")
     if np.any(area_ar==0):
         raise RuntimeError("0 in area_ar")
     

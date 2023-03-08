@@ -1087,7 +1087,8 @@ mxmat_limited = False
 
 Ntop = 10
 # top_y1 = 1961 # First year of FAO data
-top_y1 = 1992 # Pre-1992, you start getting USSR, which isn't in map
+top_y1 = 1980 # Start of analysis period
+# top_y1 = 1992 # Pre-1992, you start getting USSR, which isn't in map
 top_yN = 2009
 overwrite = True
 portrait = False
@@ -1180,19 +1181,29 @@ for thisCrop in fao_crops:
         
             if c==0 and case==caselist[0]:
                 print("    WARNING: No shifting allowed in calculation of correlation!")
-            lr = stats.linregress(x = topN_dt_ds['Yield (FAOSTAT)'].sel(Country=country),
-                                  y = topN_dt_ds['Yield'].sel(Country=country, Case=case))
-            if case == "CLM Default":
-                t = "{r1:.3g} $\\rightarrow$ "
-                r2_change_text += t.format(r1=lr.rvalue**2)
-            elif case == "Prescribed Calendars":
-                r2_change_text += "{r2:.3g}".format(r2=lr.rvalue**2)
+            linreg_x = topN_dt_ds['Yield (FAOSTAT)'].sel(Country=country).values
+            linreg_y = topN_dt_ds['Yield'].sel(Country=country, Case=case).values
+            where_x_and_y_notnan = np.where(~(np.isnan(linreg_x) | np.isnan(linreg_y)))
+            if np.any(where_x_and_y_notnan):
+                linreg_x = linreg_x[where_x_and_y_notnan]
+                linreg_y = linreg_y[where_x_and_y_notnan]
+                lr = stats.linregress(x = linreg_x,
+                                      y = linreg_y)
+                if np.isnan(lr.rvalue**2):
+                    raise RuntimeError("R^2 is NaN")
+                if case == "CLM Default":
+                    t = "{r1:.3g} $\\rightarrow$ "
+                    r2_change_text += t.format(r1=lr.rvalue**2)
+                elif case == "Prescribed Calendars":
+                    r2_change_text += "{r2:.3g}".format(r2=lr.rvalue**2)
                 
         # Set title
-        country_bf = ''
+        thisTitle = ''
         for w in country.split(' '):
-            country_bf += r'$\bf{' + w + r'}$' + ' '
-        ax.set_title(country_bf + f'($R^2$ {r2_change_text})')
+            thisTitle += r'$\bf{' + w + r'}$' + ' '
+        if r2_change_text:
+            thisTitle += f'($R^2$ {r2_change_text})'
+        ax.set_title(thisTitle)
         
         # Set CLM Default to be dashed line if Original baseline is included
         if "Original baseline" in caselist:
