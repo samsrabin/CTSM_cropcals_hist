@@ -1785,7 +1785,7 @@ varList = {
         'multiplier': 1},
     'YIELD_ANN_ABSBIASEARTHSTAT_DIFF': {
         'suptitle':   'Mean annual yield difference rel. EarthStat',
-        'units':      'Change in abs. bias (t/ha)',
+        'units':      '∆ abs.\nbias (t/ha)',
         'multiplier': 1},
     'PROD_ANN_BIASEARTHSTAT': {
         'suptitle':   'Mean annual production bias rel. EarthStat',
