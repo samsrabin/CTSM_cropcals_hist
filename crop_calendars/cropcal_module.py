@@ -1409,8 +1409,9 @@ def get_timeseries_bias(sim, obs, weights=None):
         raise RuntimeError("Need to collapse all dimensions of weights into the first.")
     
     # Simulations should be Ncases x Npoints
-    if sim.ndim < 2:
-        raise RuntimeError("sim array must have at least 2 dimensions (Ncases x Npoints)")    
+    add_dummy_0th_dim = sim.ndim < 2
+    if add_dummy_0th_dim:
+        sim = np.expand_dims(sim, axis=0)
     
     # Weights and obs should be the same shape
     if weights_provided and obs.shape != weights.shape:
@@ -1426,6 +1427,9 @@ def get_timeseries_bias(sim, obs, weights=None):
     else:
         Npoints = sim.shape[1]
         bias = 1/Npoints * np.sum(sim - obs, axis=1)
+    
+    if add_dummy_0th_dim:
+        bias = bias[0]
     
     return bias
 

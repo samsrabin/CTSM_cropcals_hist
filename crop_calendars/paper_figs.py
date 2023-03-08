@@ -959,7 +959,7 @@ for c, thisCrop in enumerate(fao_crops):
         mxmats_tmp = mxmats
     else:
         mxmats_tmp = None
-    topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats, min_viable_hui, mxmats_tmp)
+    topN_ds, topN_dt_ds, topN_anom_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats, min_viable_hui, mxmats_tmp)
     Ntop_global = Ntop + 1
     
     print("    Plotting...")
@@ -968,7 +968,7 @@ for c, thisCrop in enumerate(fao_crops):
     elif which_to_plot == "Detrended yield":
         plot_ds = topN_dt_ds
     elif which_to_plot == "Yield anomaly":
-        plot_ds = topN_ya_ds
+        plot_ds = topN_anom_ds
     else:
         raise RuntimeError(f"Which dataset should be used for '{which_to_plot}'?")
 
@@ -981,7 +981,7 @@ for c, thisCrop in enumerate(fao_crops):
     for c, country in enumerate(plot_ds.Country.values):
         
         # Text describing R-squared changes for each country
-        r2_change_text = ""
+        stat_change_text = ""
         
         ax = axes[c]
         sc = xr.plot.scatter(plot_ds.sel(Country=country),
@@ -995,15 +995,15 @@ for c, thisCrop in enumerate(fao_crops):
                                          y = plot_ds['Yield'].sel(Country=country, Case=case))
             if case == "CLM Default":
                 t = "{r1:.3g} $\\rightarrow$ "
-                r2_change_text += t.format(r1=lr.rvalue**2)
+                stat_change_text += t.format(r1=lr.rvalue**2)
             elif case == "Prescribed Calendars":
-                r2_change_text += "{r2:.3g}".format(r2=lr.rvalue**2)
+                stat_change_text += "{r2:.3g}".format(r2=lr.rvalue**2)
                 
         # Set title
         country_bf = ''
         for w in country.split(' '):
             country_bf += r'$\bf{' + w + r'}$' + ' '
-        ax.set_title(country_bf + f'($R^2$ {r2_change_text})')
+        ax.set_title(country_bf + f'($R^2$ {stat_change_text})')
         
         # Set CLM Default to have hollow circles if Original baseline is included
         if "Original baseline" in caselist:
@@ -1169,8 +1169,8 @@ for thisCrop in fao_crops:
 
     for c, country in enumerate(plot_ds.Country.values):
         
-        # Text describing R-squared changes for each country
-        r2_change_text = ""
+        # Text describing statistic changes for each country
+        stat_change_text = ""
                 
         ax = axes[c]
         xr.plot.line(plot_ds[f'{thisVar} (FAOSTAT)'].sel(Country=country),
@@ -1186,29 +1186,28 @@ for thisCrop in fao_crops:
                          ax=ax)
         
             if c==0 and case==caselist[0]:
-                print("    WARNING: No shifting allowed in calculation of correlation!")
-            linreg_x = topN_dt_ds['Yield (FAOSTAT)'].sel(Country=country).values
-            linreg_y = topN_dt_ds['Yield'].sel(Country=country, Case=case).values
-            where_x_and_y_notnan = np.where(~(np.isnan(linreg_x) | np.isnan(linreg_y)))
+                print("    WARNING: No shifting allowed in calculation of bias!")
+            xdata = plot_ds[f'{thisVar} (FAOSTAT)'].sel(Country=country).values
+            ydata = plot_ds[thisVar].sel(Country=country, Case=case).values
+            where_x_and_y_notnan = np.where(~(np.isnan(xdata) | np.isnan(ydata)))
             if np.any(where_x_and_y_notnan):
-                linreg_x = linreg_x[where_x_and_y_notnan]
-                linreg_y = linreg_y[where_x_and_y_notnan]
-                lr = stats.linregress(x = linreg_x,
-                                      y = linreg_y)
-                if np.isnan(lr.rvalue**2):
-                    raise RuntimeError("R^2 is NaN")
+                xdata = xdata[where_x_and_y_notnan]
+                ydata = ydata[where_x_and_y_notnan]
+                bias = cc.get_timeseries_bias(ydata, xdata)
+                if np.isnan(bias):
+                    raise RuntimeError("Bias is NaN")
                 if case == "CLM Default":
                     t = "{r1:.3g} $\\rightarrow$ "
-                    r2_change_text += t.format(r1=lr.rvalue**2)
+                    stat_change_text += t.format(r1=bias)
                 elif case == "Prescribed Calendars":
-                    r2_change_text += "{r2:.3g}".format(r2=lr.rvalue**2)
+                    stat_change_text += "{r2:.3g}".format(r2=bias)
                 
         # Set title
         thisTitle = ''
         for w in country.split(' '):
             thisTitle += r'$\bf{' + w + r'}$' + ' '
-        if r2_change_text:
-            thisTitle += f'($R^2$ {r2_change_text})'
+        if stat_change_text:
+            thisTitle += f'({stat_change_text})'
         ax.set_title(thisTitle)
         
         # Set CLM Default to be dashed line if Original baseline is included
