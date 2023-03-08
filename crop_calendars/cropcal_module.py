@@ -177,6 +177,18 @@ def check_and_trim_years(y1, yN, ds_in):
     return ds_in
 
 
+def check_case_earthstats_dim_match(case, earthstats_ds, dim):
+    dim_used_in_case = dim in case and np.any([dim in case[x].dims for x in case])
+    dim_used_in_earthstats = dim in earthstats_ds and np.any([dim in earthstats_ds[x].dims for x in earthstats_ds])
+    if dim_used_in_case:
+        if not dim_used_in_earthstats:
+            raise RuntimeError(f"{dim} in case Dataset but not EarthStats")
+        elif not np.array_equal(case[dim], earthstats_ds[dim]):
+            raise RuntimeError(f"{dim} mismatch between case and EarthStats Datasets")
+    elif dim_used_in_earthstats:
+        raise RuntimeError(f"{dim} in EarthStats Dataset but not case")
+
+
 def check_constant_vars(this_ds, case, ignore_nan, constantGSs=None, verbose=True, throw_error=True):
     
     if isinstance(case, str):
@@ -1161,6 +1173,10 @@ def get_diff_earthstat(case_ds, case, earthstats_ds, reses):
         gridspec = get_gridspec(case)
         earthstats_ds = earthstats_ds[gridspec]
     
+    # Ensure lon/lat match
+    check_case_earthstats_dim_match(case, earthstats_ds, 'lon')
+    check_case_earthstats_dim_match(case, earthstats_ds, 'lat')
+        
     attrs_tgt_dict = {
         'min_viable_hui': tgt_min_viable_hui,
         'mxmat_limited': tgt_mxmat_limited,
