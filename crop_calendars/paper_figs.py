@@ -1086,10 +1086,16 @@ min_viable_hui = "ggcmi3"
 mxmat_limited = False
 
 Ntop = 10
+
+# The years with which to determine the "top" countries
 # top_y1 = 1961 # First year of FAO data
-top_y1 = 1980 # Start of analysis period
-# top_y1 = 1992 # Pre-1992, you start getting USSR, which isn't in map
+top_y1 = 1992 # Pre-1992, you start getting USSR, which isn't in map
 top_yN = 2009
+
+# The years to show on the plot
+plot_y1 = 1980
+plot_yN = 2009
+
 overwrite = True
 portrait = False
 
@@ -1115,7 +1121,7 @@ else:
     suptitle_ypos = 0.93
 
 topYears = np.arange(top_y1, top_yN+1)
-NtopYears = len(topYears)
+plotYears = np.arange(plot_y1, plot_yN+1)
 
 legend_members = ['FAOSTAT'] + caselist
 
@@ -1125,16 +1131,16 @@ for thisCrop in fao_crops:
         
     thisCrop_clm = cc.cropnames_fao2clm(thisCrop)
     
-    suptitle = f"{thisCrop}, FAOSTAT vs CLM ({top_y1}-{top_yN})"
+    suptitle = f"{thisCrop}, FAOSTAT vs CLM (top countries {top_y1}-{top_yN})"
     file_prefix = which_to_plot.replace('aly','')
-    fig_outfile = outDir_figs + f"{file_prefix} timeseries top 10 " + suptitle + ".pdf"
+    fig_outfile = outDir_figs + f"{file_prefix} timeseries {plot_y1}-{plot_yN} top 10 " + suptitle + ".pdf"
     if os.path.exists(fig_outfile) and not overwrite:
         print(f'    Skipping {thisCrop} (file exists).')
         continue
     
     # Get yield datasets
     print("    Analyzing...")
-    topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats, min_viable_hui, mxmats_tmp)
+    topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, plotYears, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats, min_viable_hui, mxmats_tmp)
     Ntop_global = Ntop + 1
     
     print("    Plotting...")

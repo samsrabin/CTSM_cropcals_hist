@@ -1431,7 +1431,7 @@ def get_timeseries_bias(sim, obs, fig_caselist, weights=None):
 
 
 # Get yield dataset for top N countries (plus World)
-def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_all_ctry, earthstats, min_viable_hui, mxmats):
+def get_topN_ds(cases, reses, plotYears, topYears, Ntop, thisCrop_fao, countries_key, fao_all_ctry, earthstats, min_viable_hui, mxmats):
 
     top_y1 = topYears[0]
     top_yN = topYears[-1]
@@ -1447,18 +1447,20 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
         if thisCountry not in countries_key.name.values and thisCountry != "World":
             print(f'❗ {thisCountry} not in countries_key')
 
-    NtopYears = len(topYears)
+    plot_y1 = plotYears[0]
+    plot_yN = plotYears[-1]
+    NplotYears = len(plotYears)
     
     thisCrop_clm = cropnames_fao2clm(thisCrop_fao)
-    i_theseYears_earthstat = [i for i, x in enumerate(earthstats['f19_g17'].time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
+    i_theseYears_earthstat = [i for i, x in enumerate(earthstats['f19_g17'].time.values) if (x.year >= plot_y1) and (x.year <= plot_yN)]
     caselist = [k for k,v in cases.items()]
     
-    prod_ar = np.full((len(cases), NtopYears, Ntop), np.nan)
-    area_ar = np.full((len(cases), NtopYears, Ntop), np.nan)
-    prod_faostat_yc = np.full((NtopYears, Ntop), np.nan)
-    area_faostat_yc = np.full((NtopYears, Ntop), np.nan)
-    prod_earthstat_yc = np.full((NtopYears, Ntop), np.nan)
-    area_earthstat_yc = np.full((NtopYears, Ntop), np.nan)
+    prod_ar = np.full((len(cases), NplotYears, Ntop), np.nan)
+    area_ar = np.full((len(cases), NplotYears, Ntop), np.nan)
+    prod_faostat_yc = np.full((NplotYears, Ntop), np.nan)
+    area_faostat_yc = np.full((NplotYears, Ntop), np.nan)
+    prod_earthstat_yc = np.full((NplotYears, Ntop), np.nan)
+    area_earthstat_yc = np.full((NplotYears, Ntop), np.nan)
     
     for i_case, (casename, case) in enumerate(cases.items()):
         case_ds = case['ds']
@@ -1466,8 +1468,8 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
         countries = lu_ds['countries'].load()
         countries_map = reses[case['res']]['dsg']['countries'].load()
 
-        i_theseYears_case = [i for i, x in enumerate(case_ds.time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
-        i_theseYears_lu = [i for i, x in enumerate(lu_ds.time.values) if (x.year >= top_y1) and (x.year <= top_yN)]
+        i_theseYears_case = [i for i, x in enumerate(case_ds.time.values) if (x.year >= plot_y1) and (x.year <= plot_yN)]
+        i_theseYears_lu = [i for i, x in enumerate(lu_ds.time.values) if (x.year >= plot_y1) and (x.year <= plot_yN)]
         
         # Find this crop in production and area data
         i_thisCrop_case = [i for i, x in enumerate(case_ds.patches1d_itype_veg_str.values) if thisCrop_clm in x]
@@ -1521,8 +1523,8 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
                 
             # FAOSTAT production (tons) and area (ha)
             if i_case == 0:
-                prod_faostat_yc[:,c] = get_faostat_country_ts(fao_all_ctry, thisCrop_fao, top_y1, top_yN, country, "Production")
-                area_faostat_yc[:,c] = get_faostat_country_ts(fao_all_ctry, thisCrop_fao, top_y1, top_yN, country, "Area harvested")
+                prod_faostat_yc[:,c] = get_faostat_country_ts(fao_all_ctry, thisCrop_fao, plot_y1, plot_yN, country, "Production")
+                area_faostat_yc[:,c] = get_faostat_country_ts(fao_all_ctry, thisCrop_fao, plot_y1, plot_yN, country, "Area harvested")
             
             # EarthStat
             if np.all(np.isnan(prod_earthstat_yc[:,c])) and case['res']=='f09_g17':
@@ -1533,7 +1535,7 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
         raise RuntimeError("0 in area_ar")
     
     new_coords = {'Case': caselist,
-                      'Year': topYears,
+                      'Year': plotYears,
                       'Country': topN_countries}
     prod_da = xr.DataArray(data = prod_ar,
                                   coords = new_coords,
@@ -1544,20 +1546,20 @@ def get_topN_ds(cases, reses, topYears, Ntop, thisCrop_fao, countries_key, fao_a
     yield_da = prod_da / area_da
     yield_da = yield_da.assign_attrs({'units': 'tons/ha'})
     prod_faostat_da = xr.DataArray(data = prod_faostat_yc,
-                                   coords = {'Year': topYears,
+                                   coords = {'Year': plotYears,
                                              'Country': topN_countries},
                                    attrs = {'units': 'tons'})
     area_faostat_da = xr.DataArray(data = area_faostat_yc,
-                                   coords = {'Year': topYears,
+                                   coords = {'Year': plotYears,
                                              'Country': topN_countries},
                                    attrs = {'units': 'ha'})
     yield_faostat_da = prod_faostat_da / area_faostat_da
     yield_faostat_da = yield_faostat_da.assign_attrs({'units': 'tons/ha'})
     prod_earthstat_da = xr.DataArray(data = prod_earthstat_yc,
-                                     coords = {'Year': topYears,
+                                     coords = {'Year': plotYears,
                                                'Country': topN_countries},)
     area_earthstat_da = xr.DataArray(data = area_earthstat_yc,
-                                     coords = {'Year': topYears,
+                                     coords = {'Year': plotYears,
                                                'Country': topN_countries})
     yield_earthstat_da = prod_earthstat_da / area_earthstat_da
     
