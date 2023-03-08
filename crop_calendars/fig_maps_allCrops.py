@@ -98,7 +98,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
         if rx2_da is None:
             this_map = utils.grid_one_variable(this_ds, thisVar, vegtype=list(theseCrops))
         else:
-            this_map = utils.grid_one_variable(this_ds, thisVar.replace("_BIAS", ""), vegtype=list(theseCrops))
+            this_map = utils.grid_one_variable(this_ds, thisVar.replace("ABSBIAS", "BIAS").replace("_BIAS", ""), vegtype=list(theseCrops))
         if not posNeg:
             if take_subcrop_sum:
                 this_map = this_map.sum(dim="ivt_str")
@@ -386,8 +386,8 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                     if earthstats is None:
                         raise RuntimeError("Pass earthstats to maps_allCrops() if you want to calculate bias.")
                     earthstats_ds = earthstats[cc.get_gridspec(case0)].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
-                    ds0 = cc.get_diff_earthstat(ds0, case0, earthstats_ds, reses)
-                    ds1 = cc.get_diff_earthstat(ds1, case1, earthstats_ds, reses)                
+                    ds0 = cc.get_diff_earthstat(ds0, case0, earthstats_ds, reses, use_absolute_bias="ABSBIAS" in thisVar)
+                    ds1 = cc.get_diff_earthstat(ds1, case1, earthstats_ds, reses, use_absolute_bias="ABSBIAS" in thisVar)
 
             this_ds = ds1.copy()
             if is_diffdiff:
@@ -398,11 +398,11 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 diff_prod_var = diff_yield_var.replace("YIELD", "PROD")
                 undiff_prod_var = undiff_yield_var.replace("YIELD", "PROD")
                 if "BIAS" in thisVar:
-                    undiff_yield_var = undiff_yield_var.replace("BIAS", "DIFF")
-                    undiff_prod_var = undiff_prod_var.replace("BIAS", "DIFF")
-                this_ds[diff_yield_var] = np.fabs(ds1[undiff_yield_var]) - np.fabs(ds0[undiff_yield_var])
+                    undiff_yield_var = undiff_yield_var.replace("ABSBIAS", "BIAS").replace("BIAS", "DIFF")
+                    undiff_prod_var = undiff_prod_var.replace("ABSBIAS", "BIAS").replace("BIAS", "DIFF")
+                this_ds[diff_yield_var] = ds1[undiff_yield_var] - ds0[undiff_yield_var]
                 if undiff_prod_var in this_ds:
-                    this_ds[diff_prod_var] = np.fabs(ds1[undiff_prod_var]) - np.fabs(ds0[undiff_prod_var])
+                    this_ds[diff_prod_var] = ds1[undiff_prod_var] - ds0[undiff_prod_var]
             else:
                 if "DIFFPOSNEG" in thisVar:
                     thisVar_base = thisVar.replace("_DIFFPOSNEG", "")
@@ -439,7 +439,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                 
                 if "BIAS" in thisVar:
                     if np.any([x in thisVar for x in ["GSLEN", "HDATE", "SDATE"]]):
-                        rx_parent_casename, rx_ds, _, _ = cc.get_rx_case(cases, list(cases.keys()), ny, thisVar.replace("_BIAS", ""))
+                        rx_parent_casename, rx_ds, _, _ = cc.get_rx_case(cases, list(cases.keys()), ny, thisVar.replace("ABSBIAS", "BIAS").replace("_BIAS", ""))
                         
                         # Get the name of a variable of interest in the rx Dataset
                         rx_varPrefix_list = []
@@ -468,8 +468,8 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                         if earthstats is None:
                             raise RuntimeError("Pass earthstats to maps_allCrops() if you want to calculate bias.")
                         earthstats_ds = earthstats[cc.get_gridspec(case)].sel({time_dim: slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
-                        this_ds = cc.get_diff_earthstat(this_ds, case, earthstats_ds, reses)
-                        this_ds[thisVar] = this_ds[thisVar.replace("_BIAS", "_DIFF")]
+                        this_ds = cc.get_diff_earthstat(this_ds, case, earthstats_ds, reses, use_absolute_bias="ABSBIAS" in thisVar)
+                        this_ds[thisVar] = this_ds[thisVar.replace("ABSBIAS", "BIAS").replace("_BIAS", "_DIFF")]
                 
                 make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "BIAS" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg, take_subcrop_sum, take_subcrop_wtdmean, rx2_da, rx_parent_casename)
                 

@@ -1783,7 +1783,7 @@ varList = {
         'suptitle':   'Mean annual yield difference rel. EarthStat',
         'units':      't/ha',
         'multiplier': 1},
-    'YIELD_ANN_BIASEARTHSTAT_DIFF': {
+    'YIELD_ANN_ABSBIASEARTHSTAT_DIFF': {
         'suptitle':   'Mean annual yield difference rel. EarthStat',
         'units':      'Change in abs. bias (t/ha)',
         'multiplier': 1},
@@ -1791,7 +1791,7 @@ varList = {
         'suptitle':   'Mean annual production bias rel. EarthStat',
         'units':      'Mt',
         'multiplier': 1e-6}, # t to Mt
-    'PROD_ANN_BIASEARTHSTAT_DIFF': {
+    'PROD_ANN_ABSBIASEARTHSTAT_DIFF': {
         'suptitle':   'Mean annual production bias rel. EarthStat',
         'units':      '∆ abs.\nbias (Mt)',
         'multiplier': 1e-6, # t to Mt
@@ -1854,12 +1854,12 @@ figsize = (14,16)
 croptitle_side="left"
 
 varList = {
-    'PROD_ANN_DIFF.PROD_ANN_BIASEARTHSTAT_DIFF': {
-        'suptitle':   ['Change in production', 'Change in absolute bias'],
+    'PROD_ANN_DIFF.PROD_ANN_ABSBIASEARTHSTAT_DIFF': {
+        'suptitle':   ['Change in production', 'Change in abs. production bias'],
         'units':      ['Mt', 'Mt'],
         'multiplier': [1e-12, 1e-6], # g to Mt, t to Mt
         'maskcolorbar_near0': ["percentile|5|cumulative", "percentile|5|cumulative"],
-        'suppress_difftext': [True, True]}
+        'suppress_difftext': [True, True]},
 }
 
 # Yield settings

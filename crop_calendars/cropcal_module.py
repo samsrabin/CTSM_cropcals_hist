@@ -1165,7 +1165,7 @@ def get_faostat_country_ts(fao_all_ctry, thisCrop_fao, top_y1, top_yN, country, 
     return result
 
 
-def get_diff_earthstat(case_ds, case, earthstats_ds, reses):
+def get_diff_earthstat(case_ds, case, earthstats_ds, reses, use_absolute_bias=False):
     
     tgt_min_viable_hui =  case_ds['YIELD_ANN'].attrs['min_viable_hui']
     tgt_mxmat_limited =  case_ds['YIELD_ANN'].attrs['mxmat_limited']
@@ -1180,20 +1180,27 @@ def get_diff_earthstat(case_ds, case, earthstats_ds, reses):
     attrs_tgt_dict = {
         'min_viable_hui': tgt_min_viable_hui,
         'mxmat_limited': tgt_mxmat_limited,
+        'absolute_bias': use_absolute_bias
     }
     
     if attrs_differ_or_missing(case_ds, "YIELD_ANN_DIFFEARTHSTAT", attrs_tgt_dict):
         case_ds['YIELD_ANN_DIFFEARTHSTAT'] = (case_ds['YIELD_ANN']*1e-6*1e4 - earthstats_ds['Yield'])
+        if use_absolute_bias:
+            case_ds['YIELD_ANN_DIFFEARTHSTAT'] = np.fabs(case_ds['YIELD_ANN_DIFFEARTHSTAT'])
         case_ds['YIELD_ANN_DIFFEARTHSTAT'] = case_ds['YIELD_ANN_DIFFEARTHSTAT'].where(earthstats_ds['PhysicalArea'] > 0)
         case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['min_viable_hui'] = tgt_min_viable_hui
         case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['mxmat_limited'] = tgt_mxmat_limited
         case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['units'] = 'tons / ha'
+        case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['absolute_bias'] = use_absolute_bias
     
     if attrs_differ_or_missing(case_ds, "PROD_ANN_DIFFEARTHSTAT", attrs_tgt_dict):
         case_ds['PROD_ANN_DIFFEARTHSTAT'] = case_ds['YIELD_ANN_DIFFEARTHSTAT'] * reses[case['res']]['ds']['AREA_CFT']*1e-4
+        if use_absolute_bias:
+            case_ds['PROD_ANN_DIFFEARTHSTAT'] = np.fabs(case_ds['PROD_ANN_DIFFEARTHSTAT'])
         case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['units'] = 'tons'
         case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['min_viable_hui'] = tgt_min_viable_hui
         case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['mxmat_limited'] = tgt_mxmat_limited
+        case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['absolute_bias'] = use_absolute_bias
     
     return case_ds
 
