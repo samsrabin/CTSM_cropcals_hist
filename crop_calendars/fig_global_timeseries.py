@@ -746,7 +746,7 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             if verbose:
                 print(f"Comparing to {this_obs}:")
             
-            bias = cc.get_timeseries_bias(ydata_yield_dt[inds_sim,:], ydata_yield_dt[o,:], fig_caselist, weights=ydata_prod[o,:])
+            bias = cc.get_timeseries_bias(ydata_yield_dt[inds_sim,:], ydata_yield_dt[o,:], weights=ydata_prod[o,:])
             if this_obs == obs_for_fig:
                 bias0 = bias
             if verbose:
@@ -851,9 +851,9 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
 
         # Get shifted bias
         o = fig_caselist.index(obs_for_fig)
-        bias_shifted = cc.get_timeseries_bias(ydata_yield_biased_dt_touse[inds_sim,:], ydata_yield_biased_dt_touse[o,:], fig_caselist, weights=ydata_prod[o,:])
-        bias_shiftL = cc.get_timeseries_bias(ydata_yield_biased_shiftL_dt[inds_sim,:], ydata_yield_biased_dt_touse[o,:], fig_caselist, weights=ydata_prod[o,:])
-        bias_shiftR = cc.get_timeseries_bias(ydata_yield_biased_shiftR_dt[inds_sim,:], ydata_yield_biased_dt_touse[o,:], fig_caselist, weights=ydata_prod[o,:])
+        bias_shifted = cc.get_timeseries_bias(ydata_yield_biased_dt_touse[inds_sim,:], ydata_yield_biased_dt_touse[o,:], weights=ydata_prod[o,:])
+        bias_shiftL = cc.get_timeseries_bias(ydata_yield_biased_shiftL_dt[inds_sim,:], ydata_yield_biased_dt_touse[o,:], weights=ydata_prod[o,:])
+        bias_shiftR = cc.get_timeseries_bias(ydata_yield_biased_shiftR_dt[inds_sim,:], ydata_yield_biased_dt_touse[o,:], weights=ydata_prod[o,:])
         
         # Make plots for this crop
         if not noFigs:

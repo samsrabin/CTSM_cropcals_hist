@@ -1396,7 +1396,7 @@ def get_rx_case(cases, fig_caselist, ny, this_var):
     return rx_parent_casename, rx_ds, rx_row_label, ny
 
 
-def get_timeseries_bias(sim, obs, fig_caselist, weights=None):
+def get_timeseries_bias(sim, obs, weights=None):
     
     weights_provided = weights is not None
     
