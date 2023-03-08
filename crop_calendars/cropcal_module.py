@@ -139,6 +139,17 @@ def annual_mean_from_monthly(ds, var):
     return obs_sum / ones_out
 
 
+def attrs_differ_or_missing(ds, var, attrs_tgt_dict):
+    if var not in ds:
+        return True
+    
+    for attr, tgt in attrs_tgt_dict.items():
+        if attr not in ds[var].attrs or ds[var].attrs[attr] != tgt:
+            return True
+    
+    return False
+
+
 # After importing a file, restrict it to years of interest.
 def check_and_trim_years(y1, yN, ds_in):
     ### In annual outputs, file with name Y is actually results from year Y-1.
@@ -1150,14 +1161,19 @@ def get_diff_earthstat(case_ds, case, earthstats_ds, reses):
         gridspec = get_gridspec(case)
         earthstats_ds = earthstats_ds[gridspec]
     
-    if "YIELD_ANN_DIFFEARTHSTAT" not in case_ds or (case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['min_viable_hui'] != tgt_min_viable_hui or case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['mxmat_limited'] != tgt_mxmat_limited):
+    attrs_tgt_dict = {
+        'min_viable_hui': tgt_min_viable_hui,
+        'mxmat_limited': tgt_mxmat_limited,
+    }
+    
+    if attrs_differ_or_missing(case_ds, "YIELD_ANN_DIFFEARTHSTAT", attrs_tgt_dict):
         case_ds['YIELD_ANN_DIFFEARTHSTAT'] = (case_ds['YIELD_ANN']*1e-6*1e4 - earthstats_ds['Yield'])
         case_ds['YIELD_ANN_DIFFEARTHSTAT'] = case_ds['YIELD_ANN_DIFFEARTHSTAT'].where(earthstats_ds['PhysicalArea'] > 0)
         case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['min_viable_hui'] = tgt_min_viable_hui
         case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['mxmat_limited'] = tgt_mxmat_limited
         case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['units'] = 'tons / ha'
     
-    if "PROD_ANN_DIFFEARTHSTAT" not in case_ds or (case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['min_viable_hui'] != tgt_min_viable_hui or case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['mxmat_limited'] != tgt_mxmat_limited):
+    if attrs_differ_or_missing(case_ds, "PROD_ANN_DIFFEARTHSTAT", attrs_tgt_dict):
         case_ds['PROD_ANN_DIFFEARTHSTAT'] = case_ds['YIELD_ANN_DIFFEARTHSTAT'] * reses[case['res']]['ds']['AREA_CFT']*1e-4
         case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['units'] = 'tons'
         case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['min_viable_hui'] = tgt_min_viable_hui
