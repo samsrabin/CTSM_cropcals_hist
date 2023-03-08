@@ -204,6 +204,8 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
         # If doing so, SET UP TO mask out all but cells comprising top 95% of absolute differences.
         # This masking actually happens later, via chunk_colorbar().
         if 'maskcolorbar_near0' in varInfo and varInfo['maskcolorbar_near0'][v]:
+            if not take_subcrop_sum:
+                raise RuntimeError("Do not maskcolorbar_near0 for variables where summing across different subcrops/gridcells doesn't make sense")
             any_masked = True
             
         # Get color bar info
