@@ -1094,14 +1094,30 @@ def get_caselist(which_cases):
     return cases
 
 
-def get_earthstat_country_ts(earthstats, case, thisVar, countries_map, thisCrop_clm, i_theseYears_earthstat, country_id):
-    tmp = earthstats[case['res']][thisVar]\
-        .interp_like(countries_map)\
+def get_earthstat_country_ts(earthstats, res, thisVar, countries_map, thisCrop_clm, i_theseYears_earthstat, country_id):
+    
+    if not np.array_equal(earthstats[res]['lon'], countries_map['lon']):
+        raise RuntimeError("Longitude mismatch between EarthStats and country map")
+    if not np.array_equal(earthstats[res]['lat'], countries_map['lat']):
+        raise RuntimeError("Latitude mismatch between EarthStats and country map")
+    
+    tmp = earthstats[res][thisVar]\
         .sel(crop=thisCrop_clm.title())\
         .isel(time=i_theseYears_earthstat)
     if country_id != None:
         tmp = tmp.where(countries_map == country_id)
-    return tmp.sum(dim=['lon', 'lat']).values
+    
+    result = tmp.sum(dim=['lon', 'lat']).values
+    if np.any(np.isnan(result)):
+        raise RuntimeError("NaN in EarthStat country timeseries")
+    
+    # Deal with negative values (zero out very small ones)
+    if np.any(result < 0):
+        if np.any(result[result < 0] < -1e-24):
+            raise RuntimeError(f"Negative value(s) in EarthStat country timeseries; min {np.min(result)}")
+        result[result < 0] = 0
+    
+    return result
 
 
 def get_faostat_country_ts(fao_all_ctry, thisCrop_fao, top_y1, top_yN, country, element):
@@ -1450,6 +1466,12 @@ def get_topN_ds(cases, reses, plotYears, topYears, Ntop, thisCrop_fao, countries
     for thisCountry in list(topN_countries):
         if thisCountry not in countries_key.name.values and thisCountry != "World":
             print(f'❗ {thisCountry} not in countries_key')
+    
+    # Set canonical EarthStats resolution
+    earthstats_res = 'f09_g17'
+    if earthstats_res not in earthstats:
+        raise RuntimeError(f"What EarthStat resolution should be used to get country timeseries, if not {earthstats_res}?")
+    countries_map = earthstats[earthstats_res]['countries'].load()
 
     plot_y1 = plotYears[0]
     plot_yN = plotYears[-1]
@@ -1470,7 +1492,6 @@ def get_topN_ds(cases, reses, plotYears, topYears, Ntop, thisCrop_fao, countries
         case_ds = case['ds']
         lu_ds = reses[case['res']]['ds']
         countries = lu_ds['countries'].load()
-        countries_map = reses[case['res']]['dsg']['countries'].load()
 
         i_theseYears_case = [i for i, x in enumerate(case_ds.time.values) if (x.year >= plot_y1) and (x.year <= plot_yN)]
         i_theseYears_lu = [i for i, x in enumerate(lu_ds.time.values) if (x.year >= plot_y1) and (x.year <= plot_yN)]
@@ -1506,7 +1527,7 @@ def get_topN_ds(cases, reses, plotYears, topYears, Ntop, thisCrop_fao, countries
             .apply(xr.DataArray.mean, dim='patch', skipna=True)
         
         # Get each top-N country's time series for this crop
-        for c, country in enumerate(topN_countries):			  
+        for c, country in enumerate(topN_countries):
             if country == "World":
                 country_id = None
                 prod_thisCountry_da = prod_da
@@ -1531,9 +1552,11 @@ def get_topN_ds(cases, reses, plotYears, topYears, Ntop, thisCrop_fao, countries
                 area_faostat_yc[:,c] = get_faostat_country_ts(fao_all_ctry, thisCrop_fao, plot_y1, plot_yN, country, "Area harvested")
             
             # EarthStat
-            if np.all(np.isnan(prod_earthstat_yc[:,c])) and case['res']=='f09_g17':
-                prod_earthstat_yc[:,c] = get_earthstat_country_ts(earthstats, case, 'Production', countries_map, thisCrop_clm, i_theseYears_earthstat, country_id)
-                area_earthstat_yc[:,c] = get_earthstat_country_ts(earthstats, case, 'HarvestArea', countries_map, thisCrop_clm, i_theseYears_earthstat, country_id)
+            if np.all(np.isnan(prod_earthstat_yc[:,c])):
+                prod_earthstat_yc[:,c] = get_earthstat_country_ts(earthstats, earthstats_res, 'Production', countries_map, thisCrop_clm, i_theseYears_earthstat, country_id)
+                area_earthstat_yc[:,c] = get_earthstat_country_ts(earthstats, earthstats_res, 'HarvestArea', countries_map, thisCrop_clm, i_theseYears_earthstat, country_id)
+                if np.any((prod_earthstat_yc[:,c]>0) & (area_earthstat_yc[:,c]==0)):
+                    raise RuntimeError(f"EarthStat has 0 area but positive production for {country}")
     
     if np.any(area_ar==0):
         raise RuntimeError("0 in area_ar")
@@ -1565,7 +1588,13 @@ def get_topN_ds(cases, reses, plotYears, topYears, Ntop, thisCrop_fao, countries
     area_earthstat_da = xr.DataArray(data = area_earthstat_yc,
                                      coords = {'Year': plotYears,
                                                'Country': topN_countries})
+    if np.any((prod_earthstat_da.values>0) & (area_earthstat_da.values==0)):
+        raise RuntimeError("EarthStat has 0 area but positive production")
     yield_earthstat_da = prod_earthstat_da / area_earthstat_da
+    if np.any(np.isinf(yield_earthstat_da)):
+        for c, country in enumerate(topN_countries):
+            if np.any(np.isinf(yield_earthstat_da[:,c])):
+                raise RuntimeError(f"EarthStat has Inf yield for {country}")
     
     topN_ds = xr.Dataset(data_vars = {'Production': prod_da,
                                       'Production (FAOSTAT)': prod_faostat_da,

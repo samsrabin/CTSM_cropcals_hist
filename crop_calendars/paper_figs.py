@@ -506,7 +506,14 @@ print("Done importing FAO EarthStat.")
 # Half-degree countries from Brendan
 countries = xr.open_dataset('/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_brendan/gadm0.mask.nc4')
 
-# Nearest-neighbor remap countries to LU resolutions
+# Nearest-neighbor remap countries to gridspecs we have EarthStats data for
+for gridspec, dsg in earthstats_gd.items():
+    dsg['countries'] = utils.lon_idl2pm(countries).interp_like(dsg['Area'], method='nearest')['gadm0']
+    if gridspec in earthstats:
+        ds = earthstats[gridspec]
+        ds['countries'] = cc.ungrid(dsg['countries'], ds, 'Area', lon='patches1d_ixy', lat='patches1d_jxy')
+
+# Save those to LU Datasets as well
 for resname, res in reses.items():
     if 'dsg' not in res:
         continue
@@ -1104,6 +1111,9 @@ which_to_plot = "Production"
 # which_to_plot = "Yield, detrended"
 # which_to_plot = "Yield, anomaly"
 
+# ref_dataset = "FAOSTAT"
+ref_dataset = "EarthStat"
+
 if mxmat_limited:
     mxmats_tmp = mxmats
 else:
@@ -1123,7 +1133,7 @@ else:
 topYears = np.arange(top_y1, top_yN+1)
 plotYears = np.arange(plot_y1, plot_yN+1)
 
-legend_members = ['FAOSTAT'] + caselist
+legend_members = [ref_dataset] + caselist
 
 fao_crops = np.unique(fao_all_ctry.Crop.values)
 for thisCrop in fao_crops:
@@ -1131,7 +1141,7 @@ for thisCrop in fao_crops:
         
     thisCrop_clm = cc.cropnames_fao2clm(thisCrop)
     
-    suptitle = f"{thisCrop}, FAOSTAT vs CLM (top countries {top_y1}-{top_yN})"
+    suptitle = f"{thisCrop}, {ref_dataset} vs CLM (top countries {top_y1}-{top_yN})"
     file_prefix = which_to_plot.replace('aly','')
     fig_outfile = outDir_figs + f"{file_prefix} timeseries {plot_y1}-{plot_yN} top 10 " + suptitle + ".pdf"
     if os.path.exists(fig_outfile) and not overwrite:
@@ -1140,7 +1150,7 @@ for thisCrop in fao_crops:
     
     # Get yield datasets
     print("    Analyzing...")
-    topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, plotYears, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats, min_viable_hui, mxmats_tmp)
+    topN_ds, topN_dt_ds, topN_ya_ds = cc.get_topN_ds(cases, reses, plotYears, topYears, Ntop, thisCrop, countries_key, fao_all_ctry, earthstats_gd, min_viable_hui, mxmats_tmp)
     Ntop_global = Ntop + 1
     
     print("    Plotting...")
@@ -1173,7 +1183,7 @@ for thisCrop in fao_crops:
         stat_change_text = ""
                 
         ax = axes[c]
-        xr.plot.line(plot_ds[f'{thisVar} (FAOSTAT)'].sel(Country=country),
+        xr.plot.line(plot_ds[f'{thisVar} ({ref_dataset})'].sel(Country=country),
                      'k--', ax=ax)
         
         for ca, case in enumerate(caselist):
@@ -1187,7 +1197,7 @@ for thisCrop in fao_crops:
         
             if c==0 and case==caselist[0]:
                 print("    WARNING: No shifting allowed in calculation of bias!")
-            xdata = plot_ds[f'{thisVar} (FAOSTAT)'].sel(Country=country).values
+            xdata = plot_ds[f'{thisVar} ({ref_dataset})'].sel(Country=country).values
             ydata = plot_ds[thisVar].sel(Country=country, Case=case).values
             where_x_and_y_notnan = np.where(~(np.isnan(xdata) | np.isnan(ydata)))
             if np.any(where_x_and_y_notnan):
