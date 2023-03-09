@@ -1,11 +1,15 @@
 # %% Setup
 
-# which_cases = "main2.2022"
-which_cases = "main2"
 # which_cases = "ctsm_lu_5.0_vs_5.2"
-# which_cases = "originalCLM"
-# which_cases = "originalBaseline" # As originalCLM, but without cmip6
+# which_cases = "diagnose.52"
+# which_cases = "diagnose.2022"
 # which_cases = "diagnose"
+which_cases = "main2.52"
+# which_cases = "main2.2022"
+# which_cases = "main2"
+# which_cases = "originalBaseline" # As originalCLM, but without cmip6
+# which_cases = "originalCLM"
+
 
 # Include irrigation?
 incl_irrig = True
