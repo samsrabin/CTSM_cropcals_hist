@@ -1621,7 +1621,7 @@ def get_topN_ds(cases, reses, plotYears, topYears, Ntop, thisCrop_fao, countries
             raise RuntimeError(f'No matches found for {thisCrop_fao} in lu_ds.patches1d_itype_veg')
       
         # Production...
-        case_ds = get_yield_ann(case_ds, min_viable_hui=min_viable_hui, mxmats=mxmats)
+        case_ds = get_yield_ann(case_ds, min_viable_hui=min_viable_hui, mxmats=mxmats, lu_ds=lu_ds)
         tmp_ds = case_ds.isel(patch=i_thisCrop_case, time=i_theseYears_case)
         prod_da = tmp_ds['PROD_ANN']\
             .groupby(tmp_ds['patches1d_gi'])\
