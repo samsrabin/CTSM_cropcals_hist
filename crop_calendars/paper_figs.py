@@ -1860,6 +1860,18 @@ varList = {
         'multiplier': [1e-12, 1e-6], # g to Mt, t to Mt
         'maskcolorbar_near0': ["percentile|5|cumulative", "percentile|5|cumulative"],
         'suppress_difftext': [True, True]},
+    'PROD_ANN_DIFF.YIELD_ANN_ABSBIASEARTHSTAT_DIFF': {
+        'suptitle':   ['Change in production', 'Change in abs. yield bias'],
+        'units':      ['Mt', 't/ha'],
+        'multiplier': [1e-12, 1e-6 * 1e4], # g to Mt, g/m2 to tons/ha
+        'maskcolorbar_near0': ["percentile|5|cumulative", False],
+        'suppress_difftext': [True, True]},
+    'YIELD_ANN_DIFF.YIELD_ANN_ABSBIASEARTHSTAT_DIFF': {
+        'suptitle':   ['Change in yield', 'Change in abs. yield bias'],
+        'units':      ['t/ha', 't/ha'],
+        'multiplier': [1e-6 * 1e4, 1e-6 * 1e4],  # g/m2 to tons/ha
+        'maskcolorbar_near0': [False, False],
+        'suppress_difftext': [True, True]},
 }
 
 # Yield settings
