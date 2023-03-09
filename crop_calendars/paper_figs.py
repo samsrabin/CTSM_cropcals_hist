@@ -28,7 +28,7 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
 import cropcal_module as cc
-from cropcal_figs_module import *
+import cropcal_figs_module as ccf
 
 # Import general CTSM Python utilities
 my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
@@ -561,7 +561,7 @@ print('Done with import and setup.')
 
 
 
-# %% Compare area, production, yield, and irrigation of individual crops
+# %% * Compare area, production, yield, and irrigation of individual crops
 importlib.reload(cc)
 importlib.reload(sys.modules['fig_global_timeseries'])
 from fig_global_timeseries import global_timeseries_yieldetc, global_timeseries_irrig_inclcrops, global_timeseries_irrig_allcrops
@@ -1080,6 +1080,8 @@ print("Done.")
     
 # %% Make line plots, FAOSTAT vs. CLM, of top 10 countries for each crop
 importlib.reload(cc)
+importlib.reload(sys.modules['cropcal_figs_module'])
+from cropcal_figs_module import *
 
 # Yield settings
 min_viable_hui = "ggcmi3"
@@ -1818,10 +1820,12 @@ print("Done.")
 
 
 # %% Make maps for 3 crops (rows) and 2 variables (columns)
+importlib.reload(cc)
 importlib.reload(sys.modules['cropcal_figs_module'])
 from cropcal_figs_module import *
 importlib.reload(sys.modules['fig_maps_allCrops'])
 from fig_maps_allCrops import *
+importlib.reload(utils)
 
 crop_subset = ['Cotton', 'Rice', 'Sugarcane']
 # crop_subset = ['Corn', 'Soybean', 'Wheat']; 

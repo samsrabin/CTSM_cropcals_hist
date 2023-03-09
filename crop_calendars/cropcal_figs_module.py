@@ -272,9 +272,9 @@ def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_labelpad=4.0, 
         plt.text(0, 0.95, f"({subplot_label})", transform=ax.transAxes,
              fontsize=fontsize['axislabels'])
     
-    # # Country borders
-    # ax.add_feature(cfeature.BORDERS, linewidth=linewidth, edgecolor="white")
-    # ax.add_feature(cfeature.BORDERS, linewidth=linewidth*0.6)
+    # Country borders
+    ax.add_feature(cfeature.BORDERS, linewidth=linewidth, edgecolor="white", alpha=0.5)
+    ax.add_feature(cfeature.BORDERS, linewidth=linewidth*0.6, alpha=0.3)
     
     # Coastlines
     ax.coastlines(linewidth=linewidth, color="white", alpha=0.5)

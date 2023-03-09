@@ -11,11 +11,13 @@ from cropcal_figs_module import *
 import importlib
 importlib.reload(sys.modules['cropcal_figs_module'])
 from cropcal_figs_module import *
+importlib.reload(cc)
 
 # Import general CTSM Python utilities
 my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
 sys.path.append(my_ctsm_python_gallery)
 import utils
+importlib.reload(utils)
 
 import numpy as np
 import xarray as xr

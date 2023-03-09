@@ -13,6 +13,9 @@ my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myf
 sys.path.append(my_ctsm_python_gallery)
 import utils
 
+import importlib
+importlib.reload(ccf)
+
 import numpy as np
 import xarray as xr
 from scipy import signal, stats

@@ -14,6 +14,7 @@ import cropcal_module as cc
 import importlib
 importlib.reload(sys.modules['cropcal_figs_module'])
 from cropcal_figs_module import *
+importlib.reload(cc)
 
 gslen_colorbar_max = 364
 
