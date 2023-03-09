@@ -666,62 +666,51 @@ varList = {
     'GDDHARV': {
         'suptitle':   'Mean harvest requirement',
         'time_dim':   'gs',
-        'units':      'GDD',
-        'multiplier': 1},
+        'units':      'GDD'},
     'YIELD_ANN': {
         'suptitle':   'Mean annual yield',
         'time_dim':   'time',
-        'units':      't/ha',
-        'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
+        'units':      't/ha'},
     'PROD_ANN': {
         'suptitle':   'Mean annual production',
         'time_dim':   'time',
-        'units':      'Mt',
-        'multiplier': 1e-12}, # g to Mt
+        'units':      'Mt'},
     'GSLEN': {
         'suptitle':   'Mean growing season length',
         'time_dim':   'gs',
         'units':      'days',
-        'multiplier': 1,
         'chunk_colorbar': True},
     'HDATES': {
         'suptitle':   'Mean harvest date',
         'time_dim':   'gs',
         'units':      'day of year',
-        'multiplier': 1,
         'chunk_colorbar': True},
     'HUI': {
         'suptitle':   'Mean HUI at harvest',
         'time_dim':   'gs',
-        'units':      'GDD',
-        'multiplier': 1},
+        'units':      'GDD'},
     'HUIFRAC': {
         'suptitle':   'Mean HUI at harvest (fraction of required)',
         'time_dim':   'gs',
-        'units':      'Fraction of required',
-        'multiplier': 1},
+        'units':      'Fraction of required'},
     'SDATES': {
         'suptitle':   'Mean sowing date',
         'time_dim':   'gs',
         'units':      'day of year',
-        'multiplier': 1,
         'chunk_colorbar': True,
         'skip_cases': skip_SDATES},
     'MATURE': {
         'suptitle':   'Mature harvests',
         'time_dim':   'gs',
-        'units':      'fraction',
-        'multiplier': 1},
+        'units':      'fraction'},
     'IRRIG_DEMAND_PATCH_ANN': {
         'suptitle':   'Mean irrigation water demand',
         'time_dim':   'time',
-        'units':      'km$^3$ yr$^{-1}$',
-        'multiplier': 1e-9},
+        'units':      'km$^3$'},
     'QIRRIG_DEMAND_PATCH_PKMTH': {
         'suptitle':   'Mean irrigation water demand: Peak month',
         'time_dim':   "time", # Only used to set label "Year"
-        'units':      'month',
-        'multiplier': 1},
+        'units':      'month'},
 }
 
 nx = 2
@@ -1768,68 +1757,54 @@ crop_subset = None; ny = 3; nx = 2; figsize = (14,16); croptitle_side="top"
 varList = {
     'PROD_ANN': {
         'suptitle':   'Mean annual production',
-        'units':      'Mt',
-        'multiplier': 1e-12}, # g to Mt
+        'units':      'Mt'},
     'PROD_ANN_DIFF': {
         'suptitle':   'Mean annual production',
         'units':      'Mt',
-        'multiplier': 1e-12, # g to Mt
         'maskcolorbar_near0': "percentile|5|cumulative"},
     'YIELD_ANN': {
         'suptitle':   'Mean annual yield',
-        'units':      't/ha',
-        'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
+        'units':      't/ha'},
     'YIELD_ANN_DIFF': {
         'suptitle':   'Mean annual yield',
-        'units':      't/ha',
-        'multiplier': 1e-6 * 1e4}, # g/m2 to tons/ha
+        'units':      't/ha'},
     'YIELD_ANN_BIASEARTHSTAT': {
         'suptitle':   'Mean annual yield difference rel. EarthStat',
-        'units':      't/ha',
-        'multiplier': 1},
+        'units':      't/ha'},
     'YIELD_ANN_ABSBIASEARTHSTAT_DIFF': {
         'suptitle':   'Mean annual yield difference rel. EarthStat',
-        'units':      '∆ abs.\nbias (t/ha)',
-        'multiplier': 1},
+        'units':      '∆ abs.\nbias (t/ha)'},
     'PROD_ANN_BIASEARTHSTAT': {
         'suptitle':   'Mean annual production bias rel. EarthStat',
-        'units':      'Mt',
-        'multiplier': 1e-6}, # t to Mt
+        'units':      'Mt'},
     'PROD_ANN_ABSBIASEARTHSTAT_DIFF': {
         'suptitle':   'Mean annual production bias rel. EarthStat',
         'units':      '∆ abs.\nbias (Mt)',
-        'multiplier': 1e-6, # t to Mt
         'maskcolorbar_near0': "percentile|5|cumulative"},
     'IRRIG_DEMAND_PATCH_ANN': {
         'suptitle':   'Mean annual irrigation',
-        'units':      'km$^3$ yr$^{-1}$',
-        'multiplier': 1e-9}, # g to Mt
+        'units':      'km$^3$',},
     'IRRIG_DEMAND_PATCH_ANN_DIFF': {
         'suptitle':   'Mean annual irrigation difference',
-        'units':      'km$^3$ yr$^{-1}$',
-        'multiplier': 1e-9, # m3 to km3
+        'units':      'km$^3$',
         'maskcolorbar_near0': "percentile|5|cumulative"},
     'IRRIG_DEMAND_PATCH_ANN_DIFFPOSNEG': {
         'suptitle':   'Components of total mean annual irrigation difference',
-        'units':      'km$^3$ yr$^{-1}$',
-        'multiplier': 1e-9, # m3 to km3
+        'units':      'km$^3$',
         'maskcolorbar_near0': "percentile|5|cumulative",
         'suppress_difftext': True},
     'GSLEN': {
         'suptitle':   'Mean growing season length',
         'time_dim':   'gs',
-        'units':      'days',
-        'multiplier': 1},
+        'units':      'days'},
     'GSLEN_DIFF': {
         'suptitle':   'Mean growing season length difference',
         'time_dim':   'gs',
-        'units':      'days',
-        'multiplier': 1},
+        'units':      'days'},
     'GSLEN_BIAS': {
         'suptitle':   'Mean growing season length bias',
         'time_dim':   'gs',
-        'units':      'days',
-        'multiplier': 1},
+        'units':      'days'},
 }
 
 # Yield settings

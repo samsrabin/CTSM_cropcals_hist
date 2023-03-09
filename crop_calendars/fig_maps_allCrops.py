@@ -99,6 +99,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
             this_map = utils.grid_one_variable(this_ds, thisVar, vegtype=list(theseCrops))
         else:
             this_map = utils.grid_one_variable(this_ds, thisVar.replace("ABSBIAS", "BIAS").replace("_BIAS", ""), vegtype=list(theseCrops))
+        this_map_attrs = this_map.attrs
         if not posNeg:
             if take_subcrop_sum:
                 this_map = this_map.sum(dim="ivt_str")
@@ -110,7 +111,8 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
                     this_map -= this_rx2_da.weighted(area_map.fillna(0)).mean(dim="ivt_str")
             else:
                 raise RuntimeError("Neither take_subcrop_sum nor take_subcrop_wtdmean???")
-        this_map *= varInfo['multiplier'][v]
+        this_map.attrs = this_map_attrs
+        this_map = cc.convert_units(this_map, varInfo['units'][v])
         
         # Weight based on EarthStats data, if needed
         if False: #"BIAS" in thisVar and earthstats is not None:
@@ -403,14 +405,17 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                     undiff_yield_var = undiff_yield_var.replace("ABSBIAS", "BIAS").replace("BIAS", "DIFF")
                     undiff_prod_var = undiff_prod_var.replace("ABSBIAS", "BIAS").replace("BIAS", "DIFF")
                 this_ds[diff_yield_var] = ds1[undiff_yield_var] - ds0[undiff_yield_var]
+                this_ds[diff_yield_var].attrs['units'] = ds1[undiff_yield_var].attrs['units']
                 if undiff_prod_var in this_ds:
                     this_ds[diff_prod_var] = ds1[undiff_prod_var] - ds0[undiff_prod_var]
+                    this_ds[diff_prod_var].attrs['units'] = ds1[undiff_prod_var].attrs['units']
             else:
                 if "DIFFPOSNEG" in thisVar:
                     thisVar_base = thisVar.replace("_DIFFPOSNEG", "")
                 else:
                     thisVar_base = thisVar.replace("_DIFF", "")
                 this_ds[thisVar] = ds1[thisVar_base] - ds0[thisVar_base]
+                this_ds[thisVar].attrs['units'] = ds1[thisVar_base].attrs['units']
             this_ds = this_ds\
                     .sel({time_dim : slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
             

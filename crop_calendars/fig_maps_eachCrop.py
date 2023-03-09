@@ -317,6 +317,7 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_i
             this_map, croparea_ever_positive, time_dim = get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_types, plot_y1, plot_yN, ref_casename)
             if time_dim == "continue":
                 continue
+        this_map_attrs = this_map.attrs
         c += 1
             
         # Get mean, set colormap
@@ -403,7 +404,8 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_i
         else: # other units
             if time_dim in this_map.dims:
                 this_map = this_map.mean(dim=time_dim)
-            this_map *= var_info['multiplier']
+            this_map.attrs = this_map_attrs
+            this_map = cc.convert_units(this_map, var_info['units'])
             if plotting_diffs:
                 this_map = this_map - refcase_map
                 if diff_cmap:

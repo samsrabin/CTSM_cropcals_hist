@@ -22,6 +22,26 @@ import os
 import glob
 
 
+# Define conversion multipliers, {from: {to1, to2, ...}, ...}
+multiplier_dict = {
+    # Mass
+    'g': {
+        'Mt': 1e-12,
+    },
+    't': {
+        'Mt': 1e-6,
+    },
+    # Volume
+    'm3': {
+        'km3': 1e-9,
+    },
+    # Yield
+    'g/m2': {
+        't/ha': 1e-6 * 1e4,
+    },
+}
+
+
 def adjust_grainC(da_in, patches1d_itype_veg_str):
     # Parameters from Danica's 2020 paper
     fyield = 0.85 # 85% harvest efficiency (Kucharik & Brye, 2003)
@@ -672,6 +692,7 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
                                 name = newname,
                                 attrs = da_yhp.attrs)
             this_ds_gs[newname] = da_pg
+            this_ds_gs[newname].attrs['units'] = this_ds[v].attrs['units']
     else:
         # Print details about example bad patch(es)
         if min(unique_Nseasons) < Ngs:
@@ -683,6 +704,15 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
             p = np.where(np.sum(~np.isnan(hdates_pg2), axis=1) == max(unique_Nseasons))[0][0]
             print_onepatch_wrongNgs(p, this_ds, sdates_ymp, hdates_ymp, sdates_pym, hdates_pym, sdates_pym2, hdates_pym2, sdates_pym3, hdates_pym3, sdates_pg, hdates_pg, sdates_pg2, hdates_pg2)
         raise RuntimeError(f"Can't convert time*mxharvests axes to growingseason axis: discrepancy of {discrepancy} patch-seasons")
+    
+    # Preserve units
+    for v1 in this_ds_gs:
+        v0 = v1
+        if v0 not in this_ds: v0 += "_PERHARV"
+        if v0 not in this_ds:
+            continue
+        if 'units' in this_ds[v0].attrs:
+            this_ds_gs[v1].attrs['units'] = this_ds[v0].attrs['units']
     
     if incl_orig:
         return this_ds_gs, this_ds
@@ -764,6 +794,39 @@ def convert_axis_time2gs_old(this_ds, myVars):
     new_ds_gs.coords["lat"] = this_ds.coords["lat"]
     
     return new_ds_gs
+
+
+def convert_units(da, tgt_units):
+    if 'units' not in da.attrs.keys():
+        raise RuntimeError("convert_units(): 'units' missing from DataArray attributes")
+    
+    # Simplify units
+    def simplify(units):
+        units = (units
+                 .replace('$', '')
+                 .replace('^', '')
+                 .replace('\n', ' ')
+                 .replace('tonnes', 't')
+                 .replace('∆ abs. bias ', '')
+                 .replace(')', '')
+                 .replace('ddays', 'GDD')
+                 )
+        return units
+    da_units = simplify(da.attrs['units'])
+    tgt_units = simplify(tgt_units)
+    
+    if da_units == tgt_units:
+        return da
+    
+    if da_units not in multiplier_dict.keys() or tgt_units not in multiplier_dict[da_units].keys():
+        if tgt_units not in multiplier_dict.keys() or da_units not in multiplier_dict[tgt_units].keys():
+            raise RuntimeError(f"Conversion multiplier between {da_units} and {tgt_units} is not defined")
+    if da_units in multiplier_dict.keys():
+        multiplier = multiplier_dict[da_units][tgt_units]
+    else:
+        multiplier = 1.0 / multiplier_dict[tgt_units][da_units]
+    
+    return da * multiplier
 
 
 def cropnames_fao2clm(cropList_in):
@@ -1184,20 +1247,33 @@ def get_diff_earthstat(case_ds, case, earthstats_ds, reses, use_absolute_bias=Fa
     }
     
     if attrs_differ_or_missing(case_ds, "YIELD_ANN_DIFFEARTHSTAT", attrs_tgt_dict):
-        case_ds['YIELD_ANN_DIFFEARTHSTAT'] = (case_ds['YIELD_ANN']*1e-6*1e4 - earthstats_ds['Yield'])
+        case_ds['YIELD_ANN_DIFFEARTHSTAT'] = convert_units(case_ds['YIELD_ANN'], 'g/m2') - convert_units(earthstats_ds['Yield'], 'g/m2')
         if use_absolute_bias:
             case_ds['YIELD_ANN_DIFFEARTHSTAT'] = np.fabs(case_ds['YIELD_ANN_DIFFEARTHSTAT'])
         case_ds['YIELD_ANN_DIFFEARTHSTAT'] = case_ds['YIELD_ANN_DIFFEARTHSTAT'].where(earthstats_ds['PhysicalArea'] > 0)
         case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['min_viable_hui'] = tgt_min_viable_hui
         case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['mxmat_limited'] = tgt_mxmat_limited
-        case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['units'] = 'tons / ha'
+        case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['units'] = case_ds['YIELD_ANN'].attrs['units']
         case_ds['YIELD_ANN_DIFFEARTHSTAT'].attrs['absolute_bias'] = use_absolute_bias
     
     if attrs_differ_or_missing(case_ds, "PROD_ANN_DIFFEARTHSTAT", attrs_tgt_dict):
-        case_ds['PROD_ANN_DIFFEARTHSTAT'] = case_ds['YIELD_ANN_DIFFEARTHSTAT'] * reses[case['res']]['ds']['AREA_CFT']*1e-4
+        yield_tmp = case_ds['YIELD_ANN_DIFFEARTHSTAT']
+        area_tmp = reses[case['res']]['ds']['AREA_CFT']
+        case_ds['PROD_ANN_DIFFEARTHSTAT'] = yield_tmp * area_tmp
         if use_absolute_bias:
             case_ds['PROD_ANN_DIFFEARTHSTAT'] = np.fabs(case_ds['PROD_ANN_DIFFEARTHSTAT'])
-        case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['units'] = 'tons'
+        
+        # Set units
+        if 'units' not in yield_tmp.attrs:
+            raise RuntimeError("Units missing from YIELD_ANN_DIFFEARTHSTAT")
+        if yield_tmp.attrs['units'] != 'g/m2':
+            raise RuntimeError(f"Unknown units in YIELD_ANN_DIFFEARTHSTAT: {yield_tmp.attrs['units']}")
+        if 'units' not in area_tmp.attrs:
+            raise RuntimeError("Units missing from AREA_CFT")
+        if area_tmp.attrs['units'] != 'm2':
+            raise RuntimeError(f"Unknown units in AREA_CFT: {area_tmp.attrs['units']}")
+        case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['units'] = 'g'
+        
         case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['min_viable_hui'] = tgt_min_viable_hui
         case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['mxmat_limited'] = tgt_mxmat_limited
         case_ds['PROD_ANN_DIFFEARTHSTAT'].attrs['absolute_bias'] = use_absolute_bias
@@ -1237,6 +1313,7 @@ def get_gs_len_da(this_da):
     tmp = this_da.values
     tmp[tmp < 0] = 365 + tmp[tmp < 0]
     this_da.values = tmp
+    this_da.attrs['units'] = 'days'
     return this_da
 
 
@@ -1872,6 +1949,7 @@ def get_yield_ann(ds, min_viable_hui=1.0, mxmats=None, force_update=False, lu_ds
                                     attrs = grainc_to_food_ann_orig.attrs,
                                     coords = grainc_to_food_ann_orig.coords
                                     ).where(~np.isnan(grainc_to_food_ann_orig))
+        ds['YIELD_ANN'].attrs['units'] = ds['YIELD_PERHARV'].attrs['units']
         
         # Save details
         ds["YIELD_ANN"].attrs['min_viable_hui'] = min_viable_hui
@@ -1884,8 +1962,14 @@ def get_yield_ann(ds, min_viable_hui=1.0, mxmats=None, force_update=False, lu_ds
     ##############
     
     if lu_ds is not None and do_calculate("PROD", ds, force_update, min_viable_hui, mxmat_limited):
-        ds["PROD_ANN"] = ds["YIELD_ANN"] * lu_ds['AREA_CFT']
+        if lu_ds['AREA_CFT'].attrs['units'] != "m2":
+            raise RuntimeError(f"Unknown units of lu_ds['AREA_CFT']: {lu_ds['AREA_CFT'].attrs['units']}")
+        if ds['YIELD_ANN'].attrs['units'] != "g/m2":
+            raise RuntimeError(f"Unknown units of ds['YIELD_ANN']: {ds['YIELD_ANN'].attrs['units']}")
+        ds['PROD_ANN'] = ds['YIELD_ANN'] * lu_ds['AREA_CFT']
+        ds['PROD_ANN'].attrs['units'] = "g"
         ds['AREA_CFT'] = lu_ds['AREA_CFT']
+        ds['AREA_CFT'].attrs['units'] = lu_ds['AREA_CFT'].attrs['units']
         
         # Save details
         ds["PROD_ANN"].attrs['min_viable_hui'] = min_viable_hui
@@ -2061,6 +2145,8 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
     # Get HUI accumulation as fraction of required
     this_ds_gs["HUIFRAC"] = this_ds_gs["HUI"] / this_ds_gs["GDDHARV"]
     this_ds_gs["HUIFRAC_PERHARV"] = this_ds["HUI_PERHARV"] / this_ds["GDDHARV_PERHARV"]
+    for v in ['HUIFRAC', 'HUIFRAC_PERHARV']:
+        this_ds_gs[v].attrs['units'] = "Fraction of required"
     
     # Avoid tiny negative values
     varList_no_negative = ["GRAIN", "REASON", "GDD", "HUI", "YEAR", "DATE", "GSLEN"]
@@ -2745,7 +2831,7 @@ def zero_immatures(ds, out_var="YIELD", min_viable_hui=None, mxmats=None, forAnn
             min_viable_hui_touse = min_viable_hui
         if np.any(huifrac < min_viable_hui_touse):
             print(f"Setting {out_var} to zero where minimum viable HUI ({min_viable_hui}) wasn't reached")
-            tmp_da = ds[in_var]
+            tmp_da = ds[in_var].copy()
             tmp = tmp_da.copy().values
             dont_include = (huifrac < min_viable_hui_touse) & (tmp > 0)
             tmp[np.where(dont_include)] = 0
@@ -2773,6 +2859,10 @@ def zero_immatures(ds, out_var="YIELD", min_viable_hui=None, mxmats=None, forAnn
         ds[out_var] = adjust_grainC(ds[out_var], ds.patches1d_itype_veg_str)
     
     # Save details
+    if "MATURE" not in out_var:
+        if ds[in_var].attrs['units'] != "gC/m^2":
+            raise RuntimeError(f"Unrecognized units of {in_var}: {ds[in_var].attrs['units']}")
+        ds[out_var].attrs['units'] = "g/m2"
     ds[out_var].attrs['min_viable_hui'] = min_viable_hui
     ds[out_var].attrs['mxmat_limited'] = mxmat_limited
     
