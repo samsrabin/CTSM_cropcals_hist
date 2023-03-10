@@ -103,6 +103,7 @@ def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
         da.isel(Case=i).plot.line(x='x_name', ax=ax_this, 
                                   color=color, linestyle=linestyle,
                                   linewidth=3)
+        # print(f"   {casename}: {da.isel(Case=i).mean().values}")
     
     if subplot_label is not None:
         ypos = 0.93 # From before, with ny=4
