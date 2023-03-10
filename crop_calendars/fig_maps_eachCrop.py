@@ -212,21 +212,24 @@ def get_cases_with_var(cases, this_var, var_info, lu_ds, min_viable_hui, mxmats_
 def get_figure_info(ny, nx, ref_casename):
     hspace = None
     cbar_labelpad = 4.0
+    wspace = None
     if ny == 1:
         print("WARNING: Check that the layout looks good for ny == 1")
         figsize = (24, 7.5)	  # width, height
         suptitle_ypos = 0.85
     elif ny == 2:
-        if nx == 1:
-            figsize = (10, 8.5)		# width, height
-        else:
-            figsize = (14, 8)		# width, height
         if ref_casename:
             suptitle_xpos = 0.515
             suptitle_ypos = 0.95
         else:
             suptitle_xpos = 0.55
             suptitle_ypos = 1
+        if nx == 1:
+            figsize = (10, 8.5)		# width, height
+        else:
+            figsize = (14, 8)		# width, height
+            wspace = 0.1
+            suptitle_ypos += 0.02
         cbar_pos = [0.17, 0.05, 0.725, 0.025]	# left edge, bottom edge, width, height
         new_sp_bottom = 0.11
         new_sp_left = None
@@ -236,6 +239,7 @@ def get_figure_info(ny, nx, ref_casename):
         if ref_casename:
             suptitle_xpos = 0.5
             suptitle_ypos = 0.77
+            wspace = 0.1
         else:
             suptitle_xpos = 0.5
             suptitle_ypos = 0.85
@@ -267,7 +271,7 @@ def get_figure_info(ny, nx, ref_casename):
     else:
         raise ValueError(f"Set up for ny = {ny}")
     
-    return cbar_pos, figsize, hspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos, cbar_labelpad
+    return cbar_pos, figsize, hspace, wspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos, cbar_labelpad
 
 
 def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_info, rx_row_label, rx_parent_casename, rx_ds, thisCrop_main, found_types, fig, ims, axes, cbs, plot_y1, plot_yN, chunk_colorbar, vmin=None, vmax=None, new_axes=True, Ncolors=None, abs_cmap=None, diff_cmap=None, diff_vmin=None, diff_vmax=None, diff_Ncolors=None, diff_ticklabels=None, force_diffmap_within_vrange=False, save_netcdfs=False, cbar_labelpad=4.0, cbar_ticklabels=None, extend_abs=None, extend_diff=None):
@@ -625,7 +629,7 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, 
             fig_caselist = [ref_casename] + [x for x in fig_caselist if x != ref_casename]
         
         # Now set some figure parameters based on # cases
-        cbar_pos, figsize, hspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos, cbar_labelpad = get_figure_info(ny, nx, ref_casename)
+        cbar_pos, figsize, hspace, wspace, new_sp_bottom, new_sp_left, suptitle_xpos, suptitle_ypos, cbar_labelpad = get_figure_info(ny, nx, ref_casename)
 
         for thisCrop_main in clm_types:
             this_suptitle = thisCrop_main.capitalize() + ": " + suptitle
@@ -746,6 +750,8 @@ def maps_eachCrop(cases, clm_types, clm_types_rfir, dpi, lu_ds, min_viable_hui, 
             
             if hspace is not None:
                 plt.subplots_adjust(hspace=hspace)
+            if wspace is not None:
+                plt.subplots_adjust(wspace=wspace)
             
             # plt.show()
             # return
