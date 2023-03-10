@@ -356,6 +356,16 @@ def loop_case_maps(cases, ny, nx, fig_caselist, c, ref_casename, this_var, var_i
                     bounds = np.arange(-165, 165+1, 30)
                     ticklabels_to_use = bounds
                     cmap_to_use = cm.get_cmap(cmap)
+                    Ncolors = len(bounds)
+                    
+                    # Darken middle color
+                    cmap_to_use = get_ListedColormap(cmap, cmap_to_use, Ncolors)
+                    new_colors = np.concatenate((cmap_to_use.colors[:int(Ncolors/2)],
+                                                 np.array([cropcal_colors['underlay']]),
+                                                 cmap_to_use.colors[int(Ncolors/2)+1:]),
+                                                axis=0)
+                    cmap_to_use = mcolors.ListedColormap(new_colors)
+                    
                     extend = "both"
                 else:
                     vmax = np.nanmax(np.abs(this_map.values))

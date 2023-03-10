@@ -169,9 +169,9 @@ def get_amount_masked(crop, this_map_timemean, sumdiff_beforemask, pct_absdiffs_
     return pct_absdiffs_masked_before
 
 
-def get_ListedColormap(cmap, this_cmap, Nbins):
+def get_ListedColormap(cmap_name, this_cmap, Nbins):
     if isinstance(this_cmap, mcolors.LinearSegmentedColormap):
-        this_cmap = cm.get_cmap(cmap)
+        this_cmap = cm.get_cmap(cmap_name)
         color_list = [this_cmap(x) for x in np.arange(0, 1, 1/Nbins)]
         color_list = []
         for i, x in enumerate(np.arange(0, 1+1e-9, 1/Nbins)):
