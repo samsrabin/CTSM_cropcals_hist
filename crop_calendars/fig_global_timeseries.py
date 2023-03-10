@@ -77,7 +77,7 @@ def get_ydata_gridcells(thisVar, plot_y1, plot_yN, cases, fig_caselist):
     return ydata_thisVar
 
 
-def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel, y1, yN, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None, show_legend=False, ylabel_xcoord=-0.125, ny=None):
+def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel, y1, yN, stats2=None, stats_round=None, shift_symbols=None, subplot_label=None, show_legend=False, ylabel_xcoord=-0.125, ny=None, verbose_varName=None):
     da = xr.DataArray(data = ydata_this,
                             coords = {'Case': caselist,
                                       'x_name': np.arange(y1,yN+1)})
@@ -103,7 +103,8 @@ def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
         da.isel(Case=i).plot.line(x='x_name', ax=ax_this, 
                                   color=color, linestyle=linestyle,
                                   linewidth=3)
-        # print(f"   {casename}: {da.isel(Case=i).mean().values}")
+        if verbose_varName:
+            print(f"   {verbose_varName} {casename}: {da.isel(Case=i).mean().values}")
     
     if subplot_label is not None:
         ypos = 0.93 # From before, with ny=4
@@ -894,7 +895,7 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             make_1plot_lines(ax_lines_prod, ydata_prod_touse, fig_caselist, thisCrop_clm, ylabel_prod, xlabel, plot_y1, plot_yN, shift_symbols=shift_symbols, subplot_label=subplot_str, ny=ny)
             if len(min_viable_hui_list) > 1:
                 bias_shifted = None
-            make_1plot_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=bias_round, shift_symbols=shift_symbols, subplot_label=subplot_str, ny=ny)
+            make_1plot_lines(ax_lines_yield, ydata_yield_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=bias_round, shift_symbols=shift_symbols, subplot_label=subplot_str, ny=ny) #, verbose_varName="Yield")
             make_1plot_lines(ax_lines_yield_dt, ydata_yield_dt_touse, fig_caselist, thisCrop_clm, ylabel_yield, xlabel, plot_y1, plot_yN, stats2=bias_shifted, stats_round=bias_round, shift_symbols=shift_symbols, subplot_label=subplot_str, ny=ny)
             
             if include_shiftsens:
