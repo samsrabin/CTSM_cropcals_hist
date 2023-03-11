@@ -1255,6 +1255,160 @@ for thisCrop in fao_crops:
 print("Done.")
 
 
+# %% Get top countries contributing to production difference
+
+def get_country_data(ds, clm_crop, countries_thiscrop):
+    da_thiscrop = (ds
+                   .sel(time=slice("1980-01-01", "2009-01-01"))
+                   .isel(patch=np.where(case_ds['patches1d_itype_combinedCropCLM_str']==clm_crop)[0])
+                   .groupby(countries_thiscrop)
+                   .sum(dim='patch')
+                   .mean(dim='time')
+                   )
+    return da_thiscrop
+
+topN = 10
+gridline_alpha = 0.2
+wspace = 0.8
+hspace = 0.25
+
+# Get FAOSTAT means for each country over 1992-2009
+fao_all_ctry['Area'] = [x.replace("'", "") for x in fao_all_ctry['Area']]
+fao80_meanProd_byCountry = cc.get_mean_byCountry(fao_all_ctry[fao_all_ctry['Element']=='Production'], 1980, 2009)
+fao80_meanArea_byCountry = cc.get_mean_byCountry(fao_all_ctry[fao_all_ctry['Element']=='Area harvested'], 1980, 2009)
+fao92_meanProd_byCountry = cc.get_mean_byCountry(fao_all_ctry[fao_all_ctry['Element']=='Production'], 1992, 2009)
+fao92_meanArea_byCountry = cc.get_mean_byCountry(fao_all_ctry[fao_all_ctry['Element']=='Area harvested'], 1992, 2009)
+
+fig_simProdDiff, axes_simProdDiff = plt.subplots(nrows=3, ncols=2, figsize=(10, 13))
+fig_absBiasDiff, axes_absBiasDiff = plt.subplots(nrows=3, ncols=2, figsize=(10, 13))
+fig_faoProd, axes_faoProd = plt.subplots(nrows=3, ncols=2, figsize=(10, 13))
+
+# fao_crops = np.unique(fao_all_ctry.Crop.values)
+fao_crops = ['Maize', 'Seed cotton', 'Rice, paddy', 'Soybeans', 'Sugar cane', 'Wheat']
+for c, fao_crop in enumerate(fao_crops):
+    
+    # Get data info
+    clm_crop = cc.cropnames_fao2clm(fao_crop).capitalize()
+    print(f"{fao_crop} ({clm_crop})")
+    countries_thiscrop = lu_ds['countries'].isel(patch=np.where(case_ds['patches1d_itype_combinedCropCLM_str']==clm_crop)[0])
+    
+    # Get plot info
+    spx = c%2
+    spy = int(np.floor(c/2))
+    ax_simProdDiff = axes_simProdDiff[spy][spx]
+    ax_absBiasDiff = axes_absBiasDiff[spy][spx]
+    ax_faoProd = axes_faoProd[spy][spx]
+    
+    # Change in production
+    prod0 = get_country_data(cases['CLM Default']['ds']['PROD_ANN'], clm_crop, countries_thiscrop)
+    prod1 = get_country_data(cases['Prescribed Calendars']['ds']['PROD_ANN'], clm_crop, countries_thiscrop)
+    prod0_pd = prod0.to_pandas()
+    prod1_pd = prod1.to_pandas()
+    da_thiscrop = prod1 - prod0
+    pd_thiscrop = da_thiscrop.to_pandas()
+    pd_thiscrop_topNneg = pd_thiscrop.nsmallest(topN)
+    pd_thiscrop_topNpos = pd_thiscrop.nlargest(topN)
+    countries_topNneg_int = [int(x) for x in pd_thiscrop_topNneg.axes[0]]
+    countries_topNpos_int = [int(x) for x in pd_thiscrop_topNpos.axes[0]]
+    countries_topNneg = [countries_key.name.values[countries_key.num == x][0] for x in countries_topNneg_int]
+    countries_topNpos = [countries_key.name.values[countries_key.num == x][0] for x in countries_topNpos_int]
+    topNcountries_int = np.flip(np.concatenate((countries_topNpos_int, np.flip(countries_topNneg_int))))
+    topNcountries = np.flip(np.concatenate((countries_topNpos, np.flip(countries_topNneg))))
+    ylabels = [x.replace("Democratic Republic of the", "D.R.") for x in topNcountries]
+    # Convert units
+    units = 'Mt'
+    xdata = np.flip(1e-12*np.concatenate((pd_thiscrop_topNpos, np.flip(pd_thiscrop_topNneg))))
+    # Make plot
+    ax_simProdDiff.barh(np.arange(2*topN), xdata,
+                        tick_label=ylabels)
+    ax_simProdDiff.set_title(clm_crop, weight="bold")
+    ax_simProdDiff.set_xlabel(units)
+    fig_simProdDiff.suptitle("Production (1980-2009):\nPrescribed Calendars minus CLM Default",
+                             y=0.94, weight="bold")
+    plt.subplots_adjust(wspace=wspace, hspace=hspace)
+    ax_simProdDiff.grid(True, axis='y', alpha=gridline_alpha)
+    
+    # Of those countries, how much is absolute yield bias changed?
+    area0 = get_country_data(cases['CLM Default']['ds']['AREA_CFT'], clm_crop, countries_thiscrop)
+    area1 = get_country_data(cases['Prescribed Calendars']['ds']['AREA_CFT'], clm_crop, countries_thiscrop)
+    yield0 = prod0 / area0
+    yield1 = prod1 / area1
+    units = "t/ha"
+    yield0 *= 1e-6 * 1e4
+    yield1 *= 1e-6 * 1e4
+    yield0_pd = pd.DataFrame(yield0.to_pandas())
+    yield1_pd = pd.DataFrame(yield1.to_pandas())
+    fao80_meanProd_byCountry_thisCrop = pd.DataFrame(fao80_meanProd_byCountry[fao_crop])
+    fao80_meanArea_byCountry_thisCrop = pd.DataFrame(fao80_meanArea_byCountry[fao_crop])
+    yield0_list = []
+    yield1_list = []
+    yieldFao_list = []
+    for country in topNcountries:
+        country_int = countries_key['num'][countries_key['name']==country].values[0]
+        yield0_list.append(yield0_pd.query(f"countries == {country_int}").values[0][0])
+        yield1_list.append(yield1_pd.query(f"countries == {country_int}").values[0][0])
+        if country == "Venezuela":
+            country += " (Bolivarian Republic of)"
+        elif country == "Iran":
+            country += " (Islamic Republic of)"
+        elif country == "Taiwan":
+            country = "China, Taiwan Province of"
+        elif country == "Brunei":
+            country += " Darussalam"
+        elif country == "South Korea":
+            country = "Republic of Korea"
+        elif country == "North Korea":
+            country = "Democratic Peoples Republic of Korea"
+        elif country == "Republic of Congo":
+            country = "Congo"
+        elif country == "United Kingdom":
+            country = "United Kingdom of Great Britain and Northern Ireland"
+        prod = fao80_meanProd_byCountry_thisCrop.query(f"Area == '{country}'").values[0][0]
+        area = fao80_meanArea_byCountry_thisCrop.query(f"Area == '{country}'").values[0][0]
+        yieldFao_list.append(prod / area)
+    bias0 = np.array(yield0_list) - np.array(yieldFao_list)
+    bias1 = np.array(yield1_list) - np.array(yieldFao_list)
+    absBiasDiff = np.abs(bias1) - np.abs(bias0)
+    # Make plot
+    ax_absBiasDiff.barh(np.arange(2*topN), absBiasDiff,
+                        tick_label=ylabels)
+    ax_absBiasDiff.set_title(clm_crop, weight="bold")
+    ax_absBiasDiff.set_xlabel(units)
+    fig_absBiasDiff.suptitle("Absolute yield bias (1980-2009):\nPrescribed Calendars minus CLM Default",
+                             y=0.94, weight="bold")
+    plt.subplots_adjust(wspace=wspace, hspace=hspace)
+    ax_absBiasDiff.grid(True, axis='y', alpha=gridline_alpha)
+    
+    # The top FAOSTAT producing countries in 1992-2009
+    fao92_meanProd_byCountry_thisCrop = pd.DataFrame(fao92_meanProd_byCountry[fao_crop])
+    fao92_meanProd_byCountry_thisCrop_topN = fao92_meanProd_byCountry_thisCrop.nlargest(topN, columns="Value")
+    fao92_meanProd_byCountry_thisCrop_other = fao92_meanProd_byCountry_thisCrop.nlargest(topN, columns="Value")
+    # fao_cumul_contributions_topN = 100*fao92_meanProd_byCountry_thisCrop_other.cumsum() / fao92_meanProd_byCountry_thisCrop.sum()
+    # Make plot
+    units = "Mt"
+    ylabels = [x[1] for x in fao92_meanProd_byCountry_thisCrop_topN.axes[0]]
+    ylabels = np.flip(ylabels, axis=0)
+    xdata = 1e-6*np.flip(np.squeeze(fao92_meanProd_byCountry_thisCrop_topN.values), axis=0)
+    ax_faoProd.barh(np.arange(topN), xdata,
+                    tick_label=ylabels)
+    ax_faoProd.set_title(clm_crop, weight="bold")
+    ax_faoProd.set_xlabel(units)
+    fig_faoProd.suptitle("Production (1980-2009): FAOSTAT",
+                         y=0.94, weight="bold")
+    
+fig_simProdDiff.subplots_adjust(wspace=wspace, hspace=hspace)
+outfile = os.path.join(outDir_figs, f"Top {topN} countries, bars, ∆ Production.pdf")
+fig_simProdDiff.savefig(outfile, dpi='figure', bbox_inches='tight')
+
+fig_absBiasDiff.subplots_adjust(wspace=wspace, hspace=hspace)
+outfile = os.path.join(outDir_figs, f"Top {topN} countries from ∆ production, bars, ∆ Yield.pdf")
+fig_absBiasDiff.savefig(outfile, dpi='figure', bbox_inches='tight')
+
+fig_faoProd.subplots_adjust(wspace=wspace, hspace=hspace)
+outfile = os.path.join(outDir_figs, f"Top {topN} countries, bars, FAO production.pdf")
+fig_faoProd.savefig(outfile, dpi='figure', bbox_inches='tight')
+
+
 # %% Get country totals
 
 # country = "World"
