@@ -808,6 +808,7 @@ def convert_units(da, tgt_units):
                  .replace('\n', ' ')
                  .replace('tonnes', 't')
                  .replace('∆ abs. bias ', '')
+                 .replace('(', '')
                  .replace(')', '')
                  .replace('ddays', 'GDD')
                  )
