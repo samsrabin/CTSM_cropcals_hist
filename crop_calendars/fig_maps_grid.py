@@ -23,7 +23,7 @@ fontsize['axislabels'] = 14
 fontsize['ticklabels'] = 14
 fontsize['suptitle'] = 22
 
-dpi = 150
+dpi = 300
 
 
 # Functions
@@ -82,7 +82,7 @@ def set_custom_middle_color(cmap, bounds):
     return cmap_to_use
 
 
-def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=None, nx=1, custom_figname=None):
+def maps_gridlevel_vars(cases, varList, dpi=300, outDir_figs=None, y1=None, yN=None, nx=1, custom_figname=None):
     
     cbar_labelpad = 13
     subplot_str = None

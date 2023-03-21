@@ -299,7 +299,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
     plt.subplots_adjust(hspace=hspace)
 
 
-def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cropList_combined_clm_nototal, figsize, crop_subset=None, croptitle_side="top", dpi=150, earthstats=None, low_area_threshold_m2=1e4, min_viable_hui="ggcmi3", mxmats=None, ny=2, nx=3, plot_y1=1980, plot_yN=2009):
+def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, cropList_combined_clm_nototal, figsize, crop_subset=None, croptitle_side="top", dpi=300, earthstats=None, low_area_threshold_m2=1e4, min_viable_hui="ggcmi3", mxmats=None, ny=2, nx=3, plot_y1=1980, plot_yN=2009):
     
     if crop_subset==cropList_combined_clm_nototal:
         crop_subset = None

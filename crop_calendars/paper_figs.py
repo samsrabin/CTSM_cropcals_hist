@@ -714,7 +714,7 @@ varList = {
 }
 
 nx = 2
-dpi = 150
+dpi = 300
     
 if mxmat_limited:
     mxmats_tmp = mxmats
@@ -1894,7 +1894,7 @@ for thisVar_orig in varList:
         
         # Save
         outfile = os.path.join(outDir_figs, f"{filename_prefix}_{vegtype_str_figfile}.png")
-        plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
+        plt.savefig(outfile, dpi=300, transparent=False, facecolor='white', \
                     bbox_inches='tight')
         plt.close()
 print("Done.")
