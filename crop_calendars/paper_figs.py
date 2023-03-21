@@ -1944,6 +1944,10 @@ varList = {
         'suptitle':   'Mean annual irrigation difference',
         'units':      'km$^3$',
         'maskcolorbar_near0': "percentile|5|cumulative"},
+    'IRRIG_DEMAND_PATCH_ANN_DIFF_ALLEXPSIMCROPS': {
+        'suptitle':   'Mean annual irrigation difference',
+        'units':      'km$^3$',
+        'maskcolorbar_near0': "percentile|5|cumulative"},
     'IRRIG_DEMAND_PATCH_ANN_DIFFPOSNEG': {
         'suptitle':   'Components of total mean annual irrigation difference',
         'units':      'km$^3$',

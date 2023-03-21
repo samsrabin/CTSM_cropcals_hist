@@ -42,7 +42,7 @@ def get_underlay(this_ds, area_map_sum):
     return underlay
 
 
-def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats, posNeg, take_subcrop_sum, take_subcrop_wtdmean, rx2_da, rx_parent_casename):
+def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats, posNeg, allExpSimCrops, take_subcrop_sum, take_subcrop_wtdmean, rx2_da, rx_parent_casename):
     
     if rx2_da is not None and earthstats is not None:
         raise RuntimeError("How are both rx and earthstats Datasets specified?")
@@ -65,6 +65,9 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
         if Nvars > 1:
             raise RuntimeError("posNeg not tested with Nvars > 1")
         cropList = ["Crops decreasing", "Crops increasing"]
+    elif allExpSimCrops:
+        cropList = ["All explicitly-simulated crops"]
+        this_suptitle = this_suptitle.replace("all explicitly-simulated crops", "").replace(" ()", "")
     else:
         cropList = cropList_combined_clm_nototal
 
@@ -80,15 +83,13 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
             if rx2_da is not None:
                 this_rx2_da = rx2_da.sel(ivt_str=theseCrops)
         else:
-            # Include all of the 6 explicitly-simulated crops
-            if not posNeg:
-                raise RuntimeError(f"{crop} is not in cropList_combined_clm_nototal but this isn't a posNeg figure")
+            # Include all of the explicitly-simulated crops (or potentially just irrigated ones)
             this_ds = ds_in
             theseCrops = list()
             for porc in cropList_combined_clm_nototal:
                 tmp = list(np.unique(np.unique(ds_in['patches1d_itype_veg_str'].isel(patch=np.where(ds_in['patches1d_itype_combinedCropCLM_str'] == porc)[0]))))
                 for tmpx in tmp:
-                    if tmpx not in theseCrops:
+                    if tmpx not in theseCrops and ("irrigated" in tmpx or "IRRIG" not in thisVar):
                         theseCrops.append(tmpx)
 
         # Get area of these CFTs
@@ -236,7 +237,9 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
             underlay = underlay.where(area_map_sum>low_area_threshold_m2)
         
         # Plot map
-        subplot_str = chr(ord('`') + thisPlot) # or ord('@') for capital
+        subplot_str = None
+        if ny * nx > 1:
+            subplot_str = chr(ord('`') + thisPlot) # or ord('@') for capital
         im, cb = make_map(ax, this_map_timemean, fontsize, show_cbar=True, vmin=vmin, vmax=vmax, cmap=this_cmap, extend_nonbounds=None, underlay=underlay, underlay_color=cropcal_colors['underlay'], bounds=bounds, extend_bounds="neither", ticklabels=ticks_orig, cbar_spacing=cbar_spacing, subplot_label=subplot_str)
         
         show_cbar_label = True
@@ -253,6 +256,9 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
             cbar_label = cbar_label.replace('\n', ' ')
         elif ny==1 and nx==2:
             cbar_labelpad = 13
+            cbar_label = cbar_label.replace('\n', ' ')
+        elif ny==1 and nx==1:
+            cbar_labelpad = 10
             cbar_label = cbar_label.replace('\n', ' ')
         if show_cbar_label:
             cb.set_label(label=cbar_label, fontsize=fontsize['axislabels'], x=cbar_label_x, labelpad=cbar_labelpad)
@@ -277,6 +283,9 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
         hspace = -0.4
         this_suptitle = this_suptitle.replace(": ", ":\n")
         suptitle_y = 0.79
+    elif ny==1 and nx==1:
+        this_suptitle = this_suptitle.replace(": ", ":\n")
+        suptitle_y = 1.15
     elif ny==2 and nx==3:
         hspace = 0
         suptitle_y = 0.82
@@ -325,6 +334,14 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
     
         # Process variable info
         posNeg = "POSNEG" in thisVar
+        allExpSimCrops = "ALLEXPSIMCROPS" in thisVar
+        if posNeg and allExpSimCrops:
+            raise RuntimeError('Positive-negative component figures incompatible with "all explicitly simulated crops"')
+        if allExpSimCrops:
+            thisVar = thisVar.replace("_ALLEXPSIMCROPS", "").replace("ALLEXPSIMCROPS_", "")
+            if multiCol:
+                raise RuntimeError('multiCol not (yet) compatible with "all explicitly simulated crops"')
+        
         is_diff = thisVar.endswith("_DIFF") or thisVar.endswith("_DIFFPOSNEG")
         if is_diff:
             if len(these_cases) != 2:
@@ -355,11 +372,17 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
         if not (take_subcrop_sum or take_subcrop_wtdmean):
             raise RuntimeError(f"Define across-subcrop operation for units '{theseUnits}'")
         
-        # Special setup for posNeg
+        # Special setup for posNeg and "all 6 explicitly-simulated crops"
         if posNeg:
             ny = 1
             nx = 2
             figsize = (14, 3.75)
+        elif allExpSimCrops:
+            ny = 1
+            nx = 1
+            figsize = (8, 3.75)
+            dpi = 300
+            filename_suffix += " (all explicitly-simulated crops)"
 
         if is_diff:
             if not multiCol:
@@ -421,7 +444,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
             this_ds = this_ds\
                     .sel({time_dim : slice(f"{plot_y1}-01-01", f"{plot_yN}-12-31")})
             
-            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg, take_subcrop_sum, take_subcrop_wtdmean, rx_ds, rx_parent_casename)
+            make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, is_diff, is_diffdiff, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg, allExpSimCrops, take_subcrop_sum, take_subcrop_wtdmean, rx_ds, rx_parent_casename)
             
             if not multiCol:
                 # plt.show()
@@ -480,7 +503,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                         this_ds = cc.get_diff_earthstat(this_ds, case, earthstats_ds, reses, use_absolute_bias="ABSBIAS" in thisVar)
                         this_ds[thisVar] = this_ds[thisVar.replace("ABSBIAS", "BIAS").replace("_BIAS", "_DIFF")]
                 
-                make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "BIAS" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg, take_subcrop_sum, take_subcrop_wtdmean, rx2_da, rx_parent_casename)
+                make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, this_ds, this_suptitle, "BIAS" in thisVar, False, low_area_threshold_m2, croptitle_side, v, Nvars, fig, earthstats_ds, posNeg, allExpSimCrops, take_subcrop_sum, take_subcrop_wtdmean, rx2_da, rx_parent_casename)
                 
                 if not multiCol:
                     # plt.show()
