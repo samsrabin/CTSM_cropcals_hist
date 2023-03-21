@@ -317,6 +317,17 @@ def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_labelpad=4.0, 
 # Note that we're not actually masking here; we're just setting a special color for a particular part of the colorbar
 def maskcolorbar_near0(binwidth, bounds, cbar_spacing, crop, nearzero_thresh, pct_absdiffs_masked_before, posNeg, sumdiff_beforemask, this_map_timemean, ticklocations, vmax, vmin):
     ticklabels = None
+    
+    # Setting this to False will cause some weird results that I'm not going to try and fix for now.
+    # For example:
+        # Floating-point errors like 0.6000000000001
+        # When there are 2 color bins between near-zero bin and first labeled tick,
+        #    there should be an extra tick+label between those 2
+    use_proportional_cbar = True
+    if use_proportional_cbar:
+        cbar_spacing = "proportional"
+    else:
+        cbar_spacing = "uniform"
             
     # Add near-zero bin
     if posNeg:
@@ -325,18 +336,31 @@ def maskcolorbar_near0(binwidth, bounds, cbar_spacing, crop, nearzero_thresh, pc
             ticklocations = ticklocations[np.where(ticklocations <= 0)]
             bounds = np.concatenate((np.arange(vmin, -binwidth+1e-9, binwidth),
                                         np.array([-nearzero_thresh, 0])))
+            if not use_proportional_cbar:
+                ticklabels = np.concatenate(([str(x) for x in ticklocations[ticklocations<0]],
+                                             ["-{:.2g}".format(nearzero_thresh)],
+                                             ["0"]))
+                ticklocations = np.concatenate((ticklocations[ticklocations < 0], [-nearzero_thresh, 0]))
         elif crop == "Crops increasing":
             vmin = 0
             ticklocations = ticklocations[np.where(ticklocations >= 0)]
             bounds = np.concatenate((np.array([0, nearzero_thresh]),
                                         np.arange(binwidth, vmax+1e-9, binwidth)))
+            if not use_proportional_cbar:
+                ticklabels = np.concatenate((["0"],
+                                             ["{:.2g}".format(nearzero_thresh)],
+                                             [str(x) for x in ticklocations[ticklocations>0]],))
+                ticklocations = np.concatenate(([0, nearzero_thresh], ticklocations[ticklocations > 0]))
         else:
             raise RuntimeError(f"posNeg: Crop {crop} not recognized for color bar")
     else:
         bounds = np.concatenate((np.arange(vmin, -binwidth+1e-9, binwidth),
                                     np.array([-nearzero_thresh, nearzero_thresh]),
                                     np.arange(binwidth, vmax+1e-9, binwidth)))
-    cbar_spacing = "proportional"
+        if not use_proportional_cbar:
+            ticklabels = np.concatenate(([str(x) for x in ticklocations[ticklocations<0]],
+                                         ["±{:.2g}".format(nearzero_thresh)],
+                                         [str(x) for x in ticklocations[ticklocations>0]]))
     
     # Get stats
     this_map_timemean_fake = this_map_timemean.where(np.abs(this_map_timemean) >= nearzero_thresh)
