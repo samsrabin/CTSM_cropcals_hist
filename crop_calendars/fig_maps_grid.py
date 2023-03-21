@@ -116,7 +116,7 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
         vrange = None
         cbar_max = None
         extend = "neither"
-        ticklabels_to_use = None
+        ticklocations_to_use = None
         cbar_units = None
         cmap_to_use = None
         bounds = None
@@ -179,7 +179,7 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
                 # Get plot info
                 bounds = np.arange(-6.5, 7.5, 1)
                 extend = "neither"
-                ticklabels_to_use = np.arange(-6,7,1)
+                ticklocations_to_use = np.arange(-6,7,1)
                 if "suppress_difftext" in var_info and var_info['suppress_difftext']:
                     cbar_units = var_info['units']
                 else:
@@ -214,7 +214,7 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
             if nx > 1:
                 subplot_str = chr(ord('`') + subplot_num+1) # or ord('@') for capital
             ax = f.add_subplot(1, nx, subplot_num%nx + 1, projection=ccrs.PlateCarree())
-            im, cb = ccf.make_map(ax, this_map, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, show_cbar=True, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, cbar_max=cbar_max, subplot_label=subplot_str, cbar_labelpad=cbar_labelpad)
+            im, cb = ccf.make_map(ax, this_map, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, show_cbar=True, ticklocations=ticklocations_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, cbar_max=cbar_max, subplot_label=subplot_str, cbar_labelpad=cbar_labelpad)
             
             if ds0 is not None and "tmp" in ds0:
                 ds0 = ds0.drop_vars("tmp")
@@ -250,7 +250,7 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
                 bounds = np.arange(0.5, 13.5, 1)
                 cmap_to_use = cm.get_cmap(ccf.cropcal_colors['seq_timeofyear'])
                 extend = "neither"
-                ticklabels_to_use = np.arange(1,13,1)
+                ticklocations_to_use = np.arange(1,13,1)
                 cbar_units = "Month"
                 
             if cbar_units is None:
@@ -287,7 +287,7 @@ def maps_gridlevel_vars(cases, varList, dpi=150, outDir_figs=None, y1=None, yN=N
                 if nx > 1:
                     subplot_str = chr(ord('`') + subplot_num+1) # or ord('@') for capital
                 ax = f.add_subplot(1, nx, subplot_num%nx + 1, projection=ccrs.PlateCarree())
-                im, cb = ccf.make_map(ax, this_map, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, show_cbar=True, ticklabels=ticklabels_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, cbar_max=cbar_max, subplot_label=subplot_str, cbar_labelpad=cbar_labelpad)
+                im, cb = ccf.make_map(ax, this_map, fontsize, units=cbar_units, cmap=cmap_to_use, vrange=vrange, show_cbar=True, ticklocations=ticklocations_to_use, extend_nonbounds=extend, bounds=bounds, extend_bounds=extend, cbar_max=cbar_max, subplot_label=subplot_str, cbar_labelpad=cbar_labelpad)
                 
                 if "_PKMTH" in this_var:
                     cb.set_ticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])

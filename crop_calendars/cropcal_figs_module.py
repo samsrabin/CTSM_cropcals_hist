@@ -62,8 +62,8 @@ def chunk_colorbar(this_map, cbar_spacing, cmap, crop, fontsize, pct_absdiffs_ma
     cb0.ax.tick_params(labelsize=fontsize['ticklabels'])
     
     # Where did plt.colorbar() draw bin boundaries? These are referred to as "tick marks," but note that the extreme values might lie outside [vmin, vmax].
-    ticks_orig = cb0.get_ticks()
-    bounds = ticks_orig
+    ticklocations = cb0.get_ticks()
+    bounds = ticklocations
     
     # In our plot, we will move vmin left and vmax right to ensure that the tick marks are the color bin boundaries.
     if cb0.vmin < bounds[0]:
@@ -94,10 +94,10 @@ def chunk_colorbar(this_map, cbar_spacing, cmap, crop, fontsize, pct_absdiffs_ma
         vmax -= binwidth
         vmin += binwidth
         Nbins-=2
-        if ticks_orig[0] < vmin:
-            ticks_orig = ticks_orig[1:]
-        if ticks_orig[-1] > vmax:
-            ticks_orig = ticks_orig[:-1]
+        if ticklocations[0] < vmin:
+            ticklocations = ticklocations[1:]
+        if ticklocations[-1] > vmax:
+            ticklocations = ticklocations[:-1]
         
     # Get new colormap with the right number of bins.
     this_cmap = cm.get_cmap(cmap, Nbins)
@@ -128,7 +128,7 @@ def chunk_colorbar(this_map, cbar_spacing, cmap, crop, fontsize, pct_absdiffs_ma
             raise RuntimeError("Can only parse string values of maskcolorbar_near0")
         
         # Add near-zero bin
-        bounds, cbar_spacing, pct_absdiffs_masked_before, ticks_orig, vmax, vmin = maskcolorbar_near0(binwidth, bounds, cbar_spacing, crop, nearzero_thresh, pct_absdiffs_masked_before, posNeg, sumdiff_beforemask, this_map, ticks_orig, vmax, vmin)
+        bounds, cbar_spacing, pct_absdiffs_masked_before, ticklabels, ticklocations, vmax, vmin = maskcolorbar_near0(binwidth, bounds, cbar_spacing, crop, nearzero_thresh, pct_absdiffs_masked_before, posNeg, sumdiff_beforemask, this_map, ticklocations, vmax, vmin)
         
         # Add color for that bin
         if underlay is not None:
@@ -157,7 +157,7 @@ def chunk_colorbar(this_map, cbar_spacing, cmap, crop, fontsize, pct_absdiffs_ma
     plt.cla()
     cb0.remove()
     
-    return bounds, cbar_spacing, pct_absdiffs_masked_before, this_cmap, ticks_orig, vmin, vmax
+    return bounds, cbar_spacing, pct_absdiffs_masked_before, this_cmap, ticklabels, ticklocations, vmin, vmax
 
 
 def get_amount_masked(crop, this_map_timemean, sumdiff_beforemask, pct_absdiffs_masked_before, reason):
@@ -243,7 +243,7 @@ def get_non_rx_map(var_info, cases, casename, this_var, thisCrop_main, found_typ
     return this_map, croparea_ever_positive, time_dim
 
 
-def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_labelpad=4.0, cbar_max=None, cbar_spacing='uniform', cmap=cropcal_colors['seq_other'], extend_bounds='both', extend_nonbounds='both', linewidth=1.0, lonlat_bin_width=None, show_cbar=False, subplot_label=None, this_title=None, ticklabels=None, underlay=None, underlay_color=None, units=None, vmax=None, vmin=None, vrange=None):
+def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_labelpad=4.0, cbar_max=None, cbar_spacing='uniform', cmap=cropcal_colors['seq_other'], extend_bounds='both', extend_nonbounds='both', linewidth=1.0, lonlat_bin_width=None, show_cbar=False, subplot_label=None, this_title=None, ticklabels=None, ticklocations=None, underlay=None, underlay_color=None, units=None, vmax=None, vmin=None, vrange=None):
     
     
     if underlay is not None:
@@ -291,7 +291,7 @@ def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_labelpad=4.0, 
         else:
             cbar = plt.colorbar(im, ax=ax, orientation="horizontal", fraction=0.1, pad=0.02, extend=extend_nonbounds, spacing=cbar_spacing)
         
-        deal_with_ticklabels(cbar, cbar_max, ticklabels, units, im)
+        deal_with_ticklabels(cbar, cbar_max, ticklabels, ticklocations, units, im)
         cbar.set_label(label=units, fontsize=fontsize['axislabels'], verticalalignment="center", labelpad=cbar_labelpad)
         cbar.ax.tick_params(labelsize=fontsize['ticklabels'])
         if units is not None and "month" in units.lower():
@@ -315,18 +315,19 @@ def make_map(ax, this_map, fontsize, bounds=None, cbar=None, cbar_labelpad=4.0, 
 
 
 # Note that we're not actually masking here; we're just setting a special color for a particular part of the colorbar
-def maskcolorbar_near0(binwidth, bounds, cbar_spacing, crop, nearzero_thresh, pct_absdiffs_masked_before, posNeg, sumdiff_beforemask, this_map_timemean, ticks_orig, vmax, vmin):
+def maskcolorbar_near0(binwidth, bounds, cbar_spacing, crop, nearzero_thresh, pct_absdiffs_masked_before, posNeg, sumdiff_beforemask, this_map_timemean, ticklocations, vmax, vmin):
+    ticklabels = None
             
     # Add near-zero bin
     if posNeg:
         if crop == "Crops decreasing":
             vmax = 0
-            ticks_orig = ticks_orig[np.where(ticks_orig <= 0)]
+            ticklocations = ticklocations[np.where(ticklocations <= 0)]
             bounds = np.concatenate((np.arange(vmin, -binwidth+1e-9, binwidth),
                                         np.array([-nearzero_thresh, 0])))
         elif crop == "Crops increasing":
             vmin = 0
-            ticks_orig = ticks_orig[np.where(ticks_orig >= 0)]
+            ticklocations = ticklocations[np.where(ticklocations >= 0)]
             bounds = np.concatenate((np.array([0, nearzero_thresh]),
                                         np.arange(binwidth, vmax+1e-9, binwidth)))
         else:
@@ -346,20 +347,24 @@ def maskcolorbar_near0(binwidth, bounds, cbar_spacing, crop, nearzero_thresh, pc
     # Because this is just a fake mask we must not do any additional masking, real or fake, after this. If we do, then our diagnostics for that will be messed up. To ensure we don't try to do any subsequent masking, set this to None, which should throw an error in get_amount_masked().
     pct_absdiffs_masked_before = None
     
-    return bounds, cbar_spacing, pct_absdiffs_masked_before, ticks_orig, vmax, vmin
+    return bounds, cbar_spacing, pct_absdiffs_masked_before, ticklabels, ticklocations, vmax, vmin
 
 
-def deal_with_ticklabels(cbar, cbar_max, ticklabels, units, im):
-    if ticklabels is not None:
-        cbar.set_ticks(ticklabels)
+def deal_with_ticklabels(cbar, cbar_max, ticklabels, ticklocations, units, im):
+    if ticklocations is not None:
+        cbar.set_ticks(ticklocations)
         if units is not None and units.lower() == "month":
             cbar.set_ticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
             units == "Month"
+        elif ticklabels is not None:
+            cbar.set_ticklabels(ticklabels)
     if isinstance(im, mplcol.QuadMesh):
         clim_max = im.get_clim()[1]
     else:
         clim_max = im
     if cbar_max is not None and clim_max > cbar_max:
+        if ticklabels is not None:
+            raise RuntimeError("How to handle this now that you are specifying ticklocations separate from ticklabels?")
         ticks = cbar.get_ticks()
         if ticks[-2] > cbar_max:
             raise RuntimeError(f"Specified cbar_max is {cbar_max} but highest bin BEGINS at {ticks[-2]}")

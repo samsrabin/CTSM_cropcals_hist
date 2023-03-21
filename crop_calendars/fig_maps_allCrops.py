@@ -224,11 +224,12 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
         # Chunk colormap ONLY when masking
         this_cmap = cmap
         bounds = None
-        ticks_orig = None
+        ticklabels = None
+        ticklocations = None
         cbar_spacing = "uniform"
         if any_masked:
             if is_diff:
-                bounds, cbar_spacing, pct_absdiffs_masked_before, this_cmap, ticks_orig, vmin, vmax = chunk_colorbar(this_map_timemean, cbar_spacing, cmap, crop, fontsize, pct_absdiffs_masked_before, sumdiff_beforemask, varInfo, vmin, vmax, posNeg=posNeg, underlay=underlay, v=v)
+                bounds, cbar_spacing, pct_absdiffs_masked_before, this_cmap, ticklabels, ticklocations, vmin, vmax = chunk_colorbar(this_map_timemean, cbar_spacing, cmap, crop, fontsize, pct_absdiffs_masked_before, sumdiff_beforemask, varInfo, vmin, vmax, posNeg=posNeg, underlay=underlay, v=v)
             else:
                 raise RuntimeError("How do you have an underlay without a difference map")
         
@@ -240,7 +241,7 @@ def make_fig(thisVar, varInfo, cropList_combined_clm_nototal, ny, nx, ds_in, thi
         subplot_str = None
         if ny * nx > 1:
             subplot_str = chr(ord('`') + thisPlot) # or ord('@') for capital
-        im, cb = make_map(ax, this_map_timemean, fontsize, show_cbar=True, vmin=vmin, vmax=vmax, cmap=this_cmap, extend_nonbounds=None, underlay=underlay, underlay_color=cropcal_colors['underlay'], bounds=bounds, extend_bounds="neither", ticklabels=ticks_orig, cbar_spacing=cbar_spacing, subplot_label=subplot_str)
+        im, cb = make_map(ax, this_map_timemean, fontsize, show_cbar=True, vmin=vmin, vmax=vmax, cmap=this_cmap, extend_nonbounds=None, underlay=underlay, underlay_color=cropcal_colors['underlay'], bounds=bounds, extend_bounds="neither", ticklabels=ticklabels, ticklocations=ticklocations, cbar_spacing=cbar_spacing, subplot_label=subplot_str)
         
         show_cbar_label = True
         cbar_label = varInfo['units'][v]
