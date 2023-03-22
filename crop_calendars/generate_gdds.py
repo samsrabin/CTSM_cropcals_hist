@@ -180,7 +180,7 @@ def main(argv):
                         action="store_true", default=False)
     
     # Get arguments
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     for k, v in sorted(vars(args).items()):
         print(f"{k}: {v}")
     save_figs = not args.dont_save_figs
