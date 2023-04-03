@@ -55,7 +55,7 @@ def main(argv):
     ##################################################################
 
     # Sum all crops' max area, merging unrepresented types into their representative type
-    cft_list_int = surf['cft'].values[surf['cft'].values>=17]
+    cft_list_int = surf['cft'].values
     max_merged_pct_crop = np.full_like(surf['PCT_CFT'], 0.0)
     for i, c in enumerate(cft_list_int):
         mergetarget = params['mergetoclmpft'].sel(pft=c).values
