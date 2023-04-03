@@ -103,7 +103,7 @@ def main(argv):
     new_fsurdat = os.path.basename(new_fsurdat)
     new_surf.to_netcdf(new_fsurdat, format="NETCDF3_64BIT")
 
-    print(f"Done!")
+    print(new_fsurdat)
 
 
 if __name__ == "__main__":
