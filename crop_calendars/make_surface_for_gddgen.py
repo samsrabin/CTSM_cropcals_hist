@@ -4,35 +4,10 @@ import argparse
 import sys
 import os
 
-def main(argv):
+# Trying to minimize the number of crop PFTs that need to be simulated.
+# CLM currently giving errors about wt_cft not summing to 1.
+def get_new_fsurdat_v1(surf, lu, params):
     
-    ###############################
-    ### Process input arguments ###
-    ###############################
-    
-    # Set arguments
-    parser = argparse.ArgumentParser(description="ADD DESCRIPTION HERE")
-    parser.add_argument("-l", "--flanduse_timeseries", "--flanduse-timeseries", 
-                        help="Land-use timeseries file (flanduse_timeseries) for CLM run",
-                        required=True)
-    parser.add_argument("-p", "--paramfile", 
-                        help="Parameter file (paramfile) for CLM run",
-                        required=True)
-    parser.add_argument("-s", "--fsurdat", 
-                        help="Surface dataset (fsurdat) for CLM run",
-                        required=True)
-    args = parser.parse_args(argv)
-
-
-    ##############
-    ### Import ###
-    ##############
-
-    lu = xr.open_dataset(args.flanduse_timeseries)
-    surf = xr.open_dataset(args.fsurdat)
-    params = xr.open_dataset(args.paramfile)
-
-
     ##########################################
     ### %% Get new PCT_CROP and PCT_NATVEG ###
     ##########################################
@@ -48,12 +23,12 @@ def main(argv):
     if np.any((new_natveg_da > 0) & (surf['PCT_NATVEG'] == 0)):
         print("You created some NATVEG area. Not necessarily a problem, but unexpected.")
     new_natveg_da.attrs = surf['PCT_NATVEG'].attrs
-
-
+    
+    
     ##################################################################
     ### Get new PCT_CFT (percentage of cropland that is each crop) ###
     ##################################################################
-
+    
     # Sum all crops' max area, merging unrepresented types into their representative type
     cft_list_int = surf['cft'].values
     max_merged_pct_crop = np.full_like(surf['PCT_CFT'], 0.0)
@@ -85,6 +60,39 @@ def main(argv):
     new_pct_cft_da = xr.DataArray(data=new_pct_cft,
                                   dims=surf['PCT_CFT'].dims,
                                   attrs=surf['PCT_CFT'].attrs)
+    
+    return new_pct_crop_da, new_natveg_da, new_pct_cft_da
+
+
+def main(argv):
+    
+    ###############################
+    ### Process input arguments ###
+    ###############################
+    
+    # Set arguments
+    parser = argparse.ArgumentParser(description="ADD DESCRIPTION HERE")
+    parser.add_argument("-l", "--flanduse_timeseries", "--flanduse-timeseries", 
+                        help="Land-use timeseries file (flanduse_timeseries) for CLM run",
+                        required=True)
+    parser.add_argument("-p", "--paramfile", 
+                        help="Parameter file (paramfile) for CLM run",
+                        required=True)
+    parser.add_argument("-s", "--fsurdat", 
+                        help="Surface dataset (fsurdat) for CLM run",
+                        required=True)
+    args = parser.parse_args(argv)
+
+
+    ##########################
+    ### Import and process ###
+    ##########################
+
+    lu = xr.open_dataset(args.flanduse_timeseries)
+    surf = xr.open_dataset(args.fsurdat)
+    params = xr.open_dataset(args.paramfile)
+
+    new_pct_crop_da, new_natveg_da, new_pct_cft_da = get_new_fsurdat_v1(surf, lu, params)
     
     
     #############################
