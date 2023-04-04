@@ -9,6 +9,7 @@ which_cases = "main2.52"
 # which_cases = "main2"
 # which_cases = "originalBaseline" # As originalCLM, but without cmip6
 # which_cases = "originalCLM"
+# which_cases = "test"
 
 
 # Include irrigation?

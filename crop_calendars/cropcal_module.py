@@ -1009,6 +1009,20 @@ def fullname_to_combinedCrop(fullnames, cropList_combined_clm):
 
 def get_caselist(which_cases):
     cases = {}
+    
+    if which_cases == "test":
+        cases['Prescribed Calendars'] = \
+            {'filepath': '/Users/sam/Downloads/tests_10x15_20230329_rxboth.clm2.h1.1995-01-01-00000.nc',
+            'constantVars': ["SDATES", "GDDHARV"],
+            'constantGSs': None, # 'None' with constantVars specified means all should be constant
+            'res': 'f10_f10_mg37',
+            'rx_sdates_file': "/Users/Shared/CESM_work/crop_dates_mostrice/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.20230330_165301.nc",
+            'rx_hdates_file': "/Users/Shared/CESM_work/crop_dates_mostrice/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.20230330_165301.nc",
+            'rx_gdds_file': "/Users/Shared/CESM_work/crop_dates_mostrice/gdds_20230331_122447.nc",
+            'verbosename': 'Test',
+            'gdd_min': 1.0}
+        return cases
+    
     if which_cases == "originalCLM":
         # A run that someone else did
         cases['cmip6'] = \
