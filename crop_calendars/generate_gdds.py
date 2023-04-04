@@ -758,3 +758,10 @@ def main(argv):
 
 if __name__ == "__main__":
    main(sys.argv[1:])
+
+# run_outputs="/Users/Shared/CESM_runs/tests_10x15_20230329_gddgen/202303301820"
+# sdates_file="/Users/Shared/CESM_work/crop_dates_mostrice/sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.20230330_165301.nc"
+# hdates_file="/Users/Shared/CESM_work/crop_dates_mostrice/hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37.2000-2000.20230330_165301.nc"
+# y1='1995'
+# yN='2003'
+# main(['-r', run_outputs, '-sd', sdates_file, '-hd', hdates_file, '-1', y1, '-n', yN, '--dont-save-figs'])
