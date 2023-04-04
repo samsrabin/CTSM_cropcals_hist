@@ -77,7 +77,7 @@ def main(argv):
 
     # Split crop area evenly among ever-included crops
     new_pct_cft = np.full_like(surf['PCT_CFT'].isel(cft=0), 0.0)
-    new_pct_cft[N_crops_ever_active > 0] = 1.0 / N_crops_ever_active[N_crops_ever_active > 0]
+    new_pct_cft[N_crops_ever_active > 0] = 100 / N_crops_ever_active[N_crops_ever_active > 0]
     new_pct_cft = np.expand_dims(new_pct_cft, axis=0)
     new_pct_cft = np.tile(new_pct_cft, reps=[surf.dims['cft'], 1, 1])
     where_zero = np.where(max_merged_pct_crop_da)
