@@ -314,7 +314,7 @@ def main(argv):
         
         for v, thisVar in enumerate(dummy_vars):
             if thisVar in gdd_maps_ds:
-                error(logger, f'{thisVar} is already in gdd_maps_ds. Why overwrite it with dummy?')
+                gddfn.error(logger, f'{thisVar} is already in gdd_maps_ds. Why overwrite it with dummy?')
             dummy_gridded.name = thisVar
             dummy_gridded.attrs["long_name"] = dummy_longnames[v]
             gdd_maps_ds[thisVar] = dummy_gridded
@@ -512,11 +512,11 @@ def main(argv):
     def make_figures(args, thisDir=None, gdd_maps_ds=None, gddharv_maps_ds=None, outdir_figs=None, linewidth=1.5):
         if not gdd_maps_ds:
             if not thisDir:
-                error(logger, 'If not providing gdd_maps_ds, you must provide thisDir (location of gdd_maps.nc)')
+                gddfn.error(logger, 'If not providing gdd_maps_ds, you must provide thisDir (location of gdd_maps.nc)')
             gdd_maps_ds = xr.open_dataset(thisDir + 'gdd_maps.nc')
         if not gddharv_maps_ds:
             if not thisDir:
-                error(logger, 'If not providing gddharv_maps_ds, you must provide thisDir (location of gddharv_maps.nc)')
+                gddfn.error(logger, 'If not providing gddharv_maps_ds, you must provide thisDir (location of gddharv_maps.nc)')
             gddharv_maps_ds = xr.open_dataset(thisDir + 'gdd_maps.nc')
     
         # Get info
@@ -623,7 +623,7 @@ def main(argv):
                                         wspace=0.2)
                 ax = fig.add_subplot(spec[0,0],projection=ccrs.PlateCarree())
             else:
-                error(logger, f"layout {layout} not recognized")
+                gddfn.error(logger, f"layout {layout} not recognized")
             
             thisMin = int(np.round(np.nanmin(gddharv_map_yx)))
             thisMax = int(np.round(np.nanmax(gddharv_map_yx)))
@@ -636,7 +636,7 @@ def main(argv):
             elif layout in ["2x2", "3x2"]:
                 ax = fig.add_subplot(spec[1,0],projection=ccrs.PlateCarree())
             else:
-                error(logger, f"layout {layout} not recognized")
+                gddfn.error(logger, f"layout {layout} not recognized")
             thisMin = int(np.round(np.nanmin(gdd_map_yx)))
             thisMax = int(np.round(np.nanmax(gdd_map_yx)))
             thisTitle = f"{args.run2_name} (range {thisMin}–{thisMax})"
@@ -701,7 +701,7 @@ def main(argv):
             elif layout in ["2x2", "3x2"]:
                 ax = fig.add_subplot(spec[:,1])
             else:
-                error(logger, f"layout {layout} not recognized")
+                gddfn.error(logger, f"layout {layout} not recognized")
     
             # Shift bottom of plot up to make room for legend
             ax_pos = ax.get_position()
