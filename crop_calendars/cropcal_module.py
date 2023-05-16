@@ -2061,8 +2061,9 @@ def import_output(filename, myVars, y1=None, yN=None, myVegtypes=utils.define_mg
                   sdates_rx_ds=None, gdds_rx_ds=None, verbose=False, incl_irrig=True):
     # Import
     this_ds = utils.import_ds(filename,
-                                myVars=myVars,
-                                myVegtypes=myVegtypes)
+                              myVars=myVars,
+                              myVegtypes=myVegtypes,
+                              chunks={'time': 1})
     
     # Trim to years of interest (do not include extra year needed for finishing last growing season)
     if y1 and yN:
