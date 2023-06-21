@@ -46,12 +46,12 @@ outdir = "/Users/Shared/CESM_work/crop_dates_mostrice/"
 # templatefile = "/Users/Shared/CESM_runs/halfdeg_test/2022-04-22/halfdeg_test.clm2.h1.1850-01-01-00000.nc"
 # indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar/"
 # file_specifier = "_ggcmi_crop_calendar_phase3_v1.01" # In name of input and output files
-# ### f19_g17 ("2-degree", actually 2.5° lon x 1.875° lat; i.e., 144x96)
+### f19_g17 ("2-degree", actually 2.5° lon x 1.875° lat; i.e., 144x96)
 # templatefile = "/Users/Shared/CESM_runs/spinup_ctsm5.1.dev092_I1850Clm50BgcCrop_f19-g17_pt2/lnd/hist/spinup_ctsm5.1.dev092_I1850Clm50BgcCrop_f19-g17_pt2.clm2.h0.1801-12.nc"
 # indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar-nninterp-f19_g17/"
 # file_specifier = "_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17" # In name of input and output files
 ### f09_g17 ("1-degree", actually ???° lon x ???° lat; i.e., 288x192)
-templatefile = "/Users/Shared/CESM_work/CropEvalData_ssr/danica_timeseries-cmip6_i.e21.IHIST.f09_g17/month_1/ssr_trimmed_annual.nc"
+templatefile = "/Users/Shared/CESM_work/f09_g17.shdates_template.nc"
 indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar-nninterp-f09_g17/"
 file_specifier = "_ggcmi_crop_calendar_phase3_v1.01_nninterp-f09_g17" # In name of input and output files
 
@@ -178,6 +178,8 @@ if np.size(template_ds.time) == 0:
         template_ds.mscur.values = np.array([0,]).astype(type(template_ds.mscur.values[0]))
     if "nstep" in template_ds:
         template_ds.nstep.values = np.array([0,]).astype(type(template_ds.nstep.values[0]))
+else:
+    raise RuntimeError("Try using just a normal, unprocessed output file that doesn't include year 2000")
 y1 = template_ds.time.values[0].year
 yN = template_ds.time.values[-1].year
 template_ds.attrs = out_attrs
