@@ -35,13 +35,14 @@ import utils
 # %% Setup
 
 # Where to save output files
-outdir = "/Users/Shared/CESM_work/crop_dates_mostrice/"
+# outdir = "/Users/Shared/CESM_work/crop_dates_mostrice/"
+outdir = "/Users/sam/Downloads/testing_10x15_20230724/"
 
 # Files/directories to use for inputs
 ### f10_f10_mg37
-# templatefile = "/Users/Shared/CESM_runs/f10_f10_mg37/2021-11-23/f10_f10_mg37.clm2.h3.2000-01-01-00000.nc"
-# indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar-nninterp-f10_f10_mg37/"
-# file_specifier = "_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37" # In name of input and output files
+templatefile = "/Users/Shared/CESM_runs/f10_f10_mg37/2021-11-23/f10_f10_mg37.clm2.h3.2000-01-01-00000.nc"
+indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar-nninterp-f10_f10_mg37/"
+file_specifier = "_ggcmi_crop_calendar_phase3_v1.01_nninterp-f10_f10_mg37" # In name of input and output files
 ### half degree
 # templatefile = "/Users/Shared/CESM_runs/halfdeg_test/2022-04-22/halfdeg_test.clm2.h1.1850-01-01-00000.nc"
 # indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar/"
@@ -51,9 +52,9 @@ outdir = "/Users/Shared/CESM_work/crop_dates_mostrice/"
 # indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar-nninterp-f19_g17/"
 # file_specifier = "_ggcmi_crop_calendar_phase3_v1.01_nninterp-f19_g17" # In name of input and output files
 ### f09_g17 ("1-degree", actually ???° lon x ???° lat; i.e., 288x192)
-templatefile = "/Users/Shared/CESM_work/f09_g17.shdates_template.nc"
-indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar-nninterp-f09_g17/"
-file_specifier = "_ggcmi_crop_calendar_phase3_v1.01_nninterp-f09_g17" # In name of input and output files
+# templatefile = "/Users/Shared/CESM_work/f09_g17.shdates_template.nc"
+# indir = "/Users/Shared/GGCMI/AgMIP.input/phase3/ISIMIP3/crop_calendar-nninterp-f09_g17/"
+# file_specifier = "_ggcmi_crop_calendar_phase3_v1.01_nninterp-f09_g17" # In name of input and output files
 
 
 # Add current date/time to output attributes
