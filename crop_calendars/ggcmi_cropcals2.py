@@ -178,8 +178,6 @@ if np.size(template_ds.time) == 0:
         template_ds.mscur.values = np.array([0,]).astype(type(template_ds.mscur.values[0]))
     if "nstep" in template_ds:
         template_ds.nstep.values = np.array([0,]).astype(type(template_ds.nstep.values[0]))
-else:
-    raise RuntimeError("Try using just a normal, unprocessed output file that doesn't include year 2000")
 y1 = template_ds.time.values[0].year
 yN = template_ds.time.values[-1].year
 template_ds.attrs = out_attrs
