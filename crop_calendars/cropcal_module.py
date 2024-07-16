@@ -1456,8 +1456,9 @@ def get_caselist(which_cases):
         cases = {}
         topdir = "/glade/campaign/cgd/tss/people/samrabin/cropcals-2024/run-outputs/2deg_1958-2014_20240714"
         outDir_figs = topdir
-        # casebase_list = ["default", "rx_sdates", "rx_swindows", "rx_swindows_adaptGGCMI"]
-        casebase_list = ["default", "rx_sdates"]
+        # casebase_list = ["default", "rx_sdates"]
+        casebase_list = ["default", "rx_sdates", "rx_swindows", "rx_swindows_adaptGGCMI"]
+        # casebase_list = ["rx_swindows_adaptGGCMI", "default", "rx_sdates", "rx_swindows"]
         casename_prefix = "20230714_cropcals_pr2_1deg"
         res = "f19_g17_ctsm5.2.c240216"
         dir_cropcals_processed = "/glade/campaign/cesm/cesmdata/cseg/inputdata/lnd/clm2/cropdata/calendars/processed"
@@ -1467,24 +1468,31 @@ def get_caselist(which_cases):
         gdd_min = 1.0
         for casebase in casebase_list:
             casename = ".".join([casename_prefix, casebase])
-            if casebase == "default":
+            verbosename = casename
+            if casebase in ["default", "rx_swindows_adaptGGCMI"]:
                 constantVars = None
                 constantGSs = None  # 'None' w/ constantVars specified means all should be constant
                 rx_sdates_file = None
                 rx_hdates_file = None
                 rx_gdds_file = None
-                verbosename = casename
             elif casebase == "rx_sdates":
                 constantVars = ["SDATES", "GDDHARV"]
                 constantGSs = None  # 'None' w/ constantVars specified means all should be constant
                 rx_sdates_file = rx_sdates_file0
                 rx_hdates_file = rx_hdates_file0
                 rx_gdds_file = rx_gdds_file0
-                verbosename = casename
+            elif casebase == "rx_swindows":
+                constantVars = ["GDDHARV"]
+                constantGSs = None  # 'None' w/ constantVars specified means all should be constant
+                rx_sdates_file = None
+                rx_hdates_file = None
+                rx_gdds_file = rx_gdds_file0
+            else:
+                raise ValueError(f"casebase {casebase} not recognized")
             cases[casebase] = {
-                # "filepath": "/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars3.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced4.mxmat/cropcals3.f19-g17.rx_crop_calendars3.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced4.mxmat.clm2.h1.1958-01-01-00000.nc",
                 "filepath": os.path.join(
-                    topdir, casename, "lnd", "hist", f"{casename}.clm2.h1.1958-01-01-00000.nc"
+                    topdir, casename, "lnd", "hist", f"{casename}.clm2.h1.1958-01-01-00000.nc.orig"
+                    # topdir, casename, "lnd", "hist", f"{casename}.clm2.h1.*-01-01-00000.nc"
                 ),
                 "constantVars": constantVars,
                 "constantGSs": constantGSs,
