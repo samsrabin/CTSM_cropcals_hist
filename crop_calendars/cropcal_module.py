@@ -2631,7 +2631,7 @@ def import_output(
     check_no_zeros(this_ds, varList_no_zero, "original file")
 
     # Convert time*mxharvests axes to growingseason axis
-    this_ds_gs = convert_axis_time2gs(this_ds, verbose=verbose, incl_orig=False)
+    this_ds_gs = convert_axis_time2gs(this_ds, verbose=True, incl_orig=False)
 
     # These are needed for calculating yield later
     this_ds_gs["GRAINC_TO_FOOD_PERHARV"] = this_ds["GRAINC_TO_FOOD_PERHARV"]
