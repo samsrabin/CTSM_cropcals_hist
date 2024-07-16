@@ -12,7 +12,7 @@ from cropcal_figs_module import cropcal_colors
 # What machine are we on?
 from socket import gethostname
 hostname = gethostname()
-if any(x in hostname for x in ["derecho", "casper"]):
+if any(x in hostname for x in ["derecho", "casper"]) or "crhtc" in hostname:
     machine = "glade"
     # Only possible because I have export PYTHONPATH=$HOME in my .bash_profile
     from ctsm_python_gallery_myfork.ctsm_py import utils

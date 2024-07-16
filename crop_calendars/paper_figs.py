@@ -36,7 +36,7 @@ import cropcal_figs_module as ccf
 # What machine are we on?
 from socket import gethostname
 hostname = gethostname()
-if any(x in hostname for x in ["derecho", "casper"]):
+if any(x in hostname for x in ["derecho", "casper"]) or "crhtc" in hostname:
     machine = "glade"
     inputdata = "/glade/campaign/cesm/cesmdata/cseg/inputdata"
     faostat_csv_dir = "/glade/u/home/samrabin/analysis/CTSM_cropcals_hist/crop_calendar_MATLAB"
