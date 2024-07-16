@@ -115,7 +115,7 @@ def get_new_fsurdat_v1(surf, lu, params):
     new_pct_cft = np.full_like(surf["PCT_CFT"].isel(cft=0), 0.0)
     new_pct_cft[N_crops_ever_active > 0] = 100 / N_crops_ever_active[N_crops_ever_active > 0]
     new_pct_cft = np.expand_dims(new_pct_cft, axis=0)
-    new_pct_cft = np.tile(new_pct_cft, reps=[surf.dims["cft"], 1, 1])
+    new_pct_cft = np.tile(new_pct_cft, reps=[surf.sizes["cft"], 1, 1])
     where_zero = np.where(max_merged_pct_crop_da)
     new_pct_cft[where_zero] = 0.0
     new_pct_cft_da = xr.DataArray(

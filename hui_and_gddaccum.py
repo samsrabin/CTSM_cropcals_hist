@@ -69,7 +69,7 @@ run1_ds = utils.import_ds(glob.glob(runDir + "/*clm2.h1.*"), \
 
 # # %% Look at some random patches' info
 
-# Npatch = run1_ds.dims["patch"]
+# Npatch = run1_ds.sizes["patch"]
 # for i in np.sort(np.random.choice(np.arange(Npatch), 10, replace=False)):
 #     p = run1_ds["patch"].values[i]
 #     lon = round(run1_ds['patches1d_lon'].values[i], 3)
@@ -95,7 +95,7 @@ for i, thisPatch in enumerate(run1_ds.patch.values):
     n_patches = n_patches + 1
     vt_str = run1_ds['patches1d_itype_veg_str'].sel(patch=thisPatch).values
     print(f"HUI and GDDACCUM differ in patch {thisPatch} ({vt_str}, lon {lon} lat {lat})")
-    make_plot(thisPatch, hui, gddaccum, lon, lat, run1_ds.dims["time"])
+    make_plot(thisPatch, hui, gddaccum, lon, lat, run1_ds.sizes["time"])
 
     outfile = f"{outdir}/patch{thisPatch}-{vt_str}.png"
     plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \

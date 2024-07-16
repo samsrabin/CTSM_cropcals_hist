@@ -391,22 +391,22 @@ for i, (casename, case) in enumerate(cases.items()):
 
     # Where was there crop area throughout the season? This is needed for variables with time axis 'gs' (growing season). Where harvest happened the same year as planting, we can just use croparea_positive_sowing. Elsewhere: Mask out cells where either sowing OR harvest year had 0 area.
     # First, make sure the time/gs axes align correctly.
-    yearY_as_gs = lu_ds["time"].isel(time=slice(0, lu_ds.dims["time"] - 1)).dt.year.values
+    yearY_as_gs = lu_ds["time"].isel(time=slice(0, lu_ds.sizes["time"] - 1)).dt.year.values
     if not np.array_equal(yearY_as_gs, case["ds"]["gs"].values):
         raise RuntimeError("Growing season mismatch")
     # Start with where there was crop area at sowing.
     croparea_positive_wholeseason = (
         case["ds"]["croparea_positive_sowing"]
-        .isel(time=slice(0, lu_ds.dims["time"] - 1))
+        .isel(time=slice(0, lu_ds.sizes["time"] - 1))
         .copy()
         .values
     )
     # Where was crop area positive in years Y and Y+1? Need to use .values because time coordinates
     # won't match.
     croparea_positive_bothyears = (
-        lu_ds["AREA_CFT"].isel(time=slice(0, lu_ds.dims["time"] - 1)) > 0
+        lu_ds["AREA_CFT"].isel(time=slice(0, lu_ds.sizes["time"] - 1)) > 0
     ).values & (  # sowing year
-        lu_ds["AREA_CFT"].isel(time=slice(1, lu_ds.dims["time"])) > 0
+        lu_ds["AREA_CFT"].isel(time=slice(1, lu_ds.sizes["time"])) > 0
     ).values  # harvest year
     # In patch-growingseasons where harvest year is different from sowing year,
     # use croparea_positive_bothyears instead of croparea_positive_sowing.
@@ -2021,8 +2021,8 @@ def trim_years_ggcmi(y1, yN, ds_in):
     sinceyear = int(re.search("since \d+", match.group()).group().replace("since ", ""))
     thisDS_years = ds_in.time.values + sinceyear - 1
     ds_in = ds_in.isel(time=np.nonzero(np.bitwise_and(thisDS_years >= y1, thisDS_years <= yN))[0])
-    if ds_in.dims["time"] != Ngs:
-        tmp = ds_in.dims["time"]
+    if ds_in.sizes["time"] != Ngs:
+        tmp = ds_in.sizes["time"]
         raise RuntimeError(f"Expected {Ngs} matching growing seasons in GGCMI dataset; found {tmp}")
     return ds_in
 
@@ -2155,7 +2155,7 @@ for thisVar_orig in varList:
             if g == 0:
                 matyday_da = xr.DataArray(
                     data=np.full(
-                        (Ngs_ggcmi, thisDS.dims["lat"], thisDS.dims["lon"], Nggcmi_models_orig),
+                        (Ngs_ggcmi, thisDS.sizes["lat"], thisDS.sizes["lon"], Nggcmi_models_orig),
                         fill_value=np.nan,
                     ),
                     coords=[(gs_ggcmi)] + [ggcmiDS.coords[x] for x in ["lat", "lon", "model"]],

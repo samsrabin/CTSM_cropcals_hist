@@ -503,7 +503,7 @@ def maps_allCrops(cases, these_cases, reses, thisVar, varInfo, outDir_figs, crop
                         rx2_da = xr.concat(objs=[rx_ds[x] for x in rx_varList],
                                            dim="ivt_str")
                         rx2_da = rx2_da.assign_coords({'ivt_str': itype_veg_str_list})
-                        if "time" in rx_ds and rx_ds.dims["time"]==1:
+                        if "time" in rx_ds and rx_ds.sizes["time"]==1:
                             rx2_da = rx2_da.isel(time=0, drop=True)
                         
                     else:

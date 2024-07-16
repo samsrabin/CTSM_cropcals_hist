@@ -154,7 +154,7 @@ dates_ds0_orig = utils.import_ds(glob.glob(indirs[0]["path"] + "*h1.*"), \
 dates_ds0_orig = cc.check_and_trim_years(y1, yN, dates_ds0_orig)
 
 # How many growing seasons can we use? Ignore last season because it can be incomplete for some gridcells.
-Ngs = dates_ds1_orig.dims['time'] - 1
+Ngs = dates_ds1_orig.sizes['time'] - 1
 
 # What vegetation types are included?
 vegtype_list = [x for x in dates_ds0_orig.vegtype_str.values if x in dates_ds0_orig.patches1d_itype_veg_str.values]
@@ -207,8 +207,8 @@ cc.check_v0_le_v1(dates_ds1, ["GDDACCUM", "HUI"], msg_txt=" dates_ds1: ", both_n
 # %% Check that prescribed sowing dates were obeyed
 
 if "time" in sdates_rx_ds.dims:
-    if sdates_rx_ds.dims["time"] > 1:
-        Ntime = sdates_rx_ds.dims["time"]
+    if sdates_rx_ds.sizes["time"] > 1:
+        Ntime = sdates_rx_ds.sizes["time"]
         raise RuntimeError(f"Expected time dimension length 1; found length {Ntime}")
     sdates_rx_ds = sdates_rx_ds.isel(time=0, drop=True)
     hdates_rx_ds = hdates_rx_ds.isel(time=0, drop=True)
@@ -634,8 +634,8 @@ def trim_years(y1, yN, Ngs, ds_in):
     sinceyear = int(re.search("since \d+", match.group()).group().replace("since ", ""))
     thisDS_years = ds_in.time.values + sinceyear - 1
     ds_in = ds_in.isel(time=np.nonzero(np.bitwise_and(thisDS_years>=y1, thisDS_years <= yN))[0])
-    if ds_in.dims["time"] != Ngs:
-        tmp = ds_in.dims["time"]
+    if ds_in.sizes["time"] != Ngs:
+        tmp = ds_in.sizes["time"]
         raise RuntimeError(f"Expected {Ngs} matching growing seasons in GGCMI dataset; found {tmp}")
     return ds_in
 
@@ -777,8 +777,8 @@ for thisVar_orig in varList:
             # Set up DataArray for this crop-irr
             if g==0:
                 matyday_da = xr.DataArray(data=np.full((Ngs,
-                                                        thisDS.dims["lat"],
-                                                        thisDS.dims["lon"],
+                                                        thisDS.sizes["lat"],
+                                                        thisDS.sizes["lon"],
                                                         Nggcmi_models_orig
                                                     ),
                                                     fill_value=np.nan),

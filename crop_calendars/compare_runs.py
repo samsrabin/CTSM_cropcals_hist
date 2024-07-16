@@ -137,7 +137,7 @@ if not np.array_equal(run1_ds['time'].values, run2_ds['time'].values):
 
 # # %% Look at some random patches' info
 
-# Npatch = run1_ds.dims["patch"]
+# Npatch = run1_ds.sizes["patch"]
 # for i in np.sort(np.random.choice(np.arange(Npatch), 10, replace=False)):
 #     p = run1_ds["patch"].values[i]
 #     lon = round(run1_ds['patches1d_lon'].values[i], 3)
@@ -165,7 +165,7 @@ for thisVar in this_varList:
             
             vt_str = run1_ds['patches1d_itype_veg_str'].sel(patch=thisPatch).values
             print(f"{run_1['name']} and {run_2['name']} have different {thisVar} in patch {thisPatch} ({vt_str}, lon {lon} lat {lat})")
-            make_plot(thisPatch, patch1_da, patch2_da, lon, lat, run1_ds.dims["time"])
+            make_plot(thisPatch, patch1_da, patch2_da, lon, lat, run1_ds.sizes["time"])
 
             outfile = f"{outdir}/patch{thisPatch}-{vt_str}-{thisVar}.png"
             plt.savefig(outfile, dpi=150, transparent=False, facecolor='white', \
@@ -207,7 +207,7 @@ for i, thisPatch in enumerate(run1_ds.patch.values):
     
     vt_str = run1_ds['patches1d_itype_veg_str'].sel(patch=thisPatch).values
     print(f"{run_1['name']} and {run_2['name']} have different {thisVar} in patch {thisPatch} ({vt_str}, lon {lon} lat {lat})")
-    make_plot(thisPatch, patch1_da, patch2_da, lon, lat, run1_ds.dims["time"])
+    make_plot(thisPatch, patch1_da, patch2_da, lon, lat, run1_ds.sizes["time"])
     break
 
     outfile = f"{outdir}/patch{thisPatch}-{vt_str}-{thisVar}.png"
@@ -239,7 +239,7 @@ for i, thisPatch in enumerate(run1_ds.patch.values):
     vt_str = run1_ds['patches1d_itype_veg_str'].sel(patch=thisPatch).values
     print(f"patch {thisPatch} ({vt_str}, lon {lon} lat {lat})")
     print(patch2_hdates)
-    make_plot(thisPatch, patch1_da, patch2_da, lon, lat, run1_ds.dims["time"])
+    make_plot(thisPatch, patch1_da, patch2_da, lon, lat, run1_ds.sizes["time"])
     plt.show(); continue
 
     outfile = f"{outdir}/patch{thisPatch}-{vt_str}-{thisVar}.png"
@@ -263,7 +263,7 @@ for thisVar in varList:
     patch2_da = run2_ds.sel(patch=thisPatch)[thisVar]
     # if np.array_equal(patch1_da.values, patch2_da.values):
     #     continue
-    make_plot(thisPatch, patch1_da, patch2_da, lon, lat, run1_ds.dims["time"])
+    make_plot(thisPatch, patch1_da, patch2_da, lon, lat, run1_ds.sizes["time"])
     
     vt_str = run1_ds['patches1d_itype_veg_str'].sel(patch=thisPatch).values
     outfile = f"{outdir}/patch{thisPatch}-{vt_str}-{thisVar}.png"
@@ -287,7 +287,7 @@ for thisPatch in patchList:
         patch2_da = run2_ds.sel(patch=thisPatch)[thisVar]
 
         plt.axes(axs[v])
-        make_plot(thisPatch, patch1_da, patch2_da, lon, lat, run1_ds.dims["time"],
+        make_plot(thisPatch, patch1_da, patch2_da, lon, lat, run1_ds.sizes["time"],
                 newFig=False)
     
     vt_str = run1_ds['patches1d_itype_veg_str'].sel(patch=thisPatch).values

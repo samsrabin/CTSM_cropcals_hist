@@ -71,7 +71,7 @@ sdate_inFile = "/Users/Shared/CESM_work/crop_dates/sdates_ggcmi_crop_calendar_ph
 # Get run info:
 # Max number of growing seasons per year
 if "mxgrowseas" in dates_ds:
-    mxgrowseas = dates_ds.dims["mxgrowseas"]
+    mxgrowseas = dates_ds.sizes["mxgrowseas"]
 else:
     mxgrowseas = 1
     

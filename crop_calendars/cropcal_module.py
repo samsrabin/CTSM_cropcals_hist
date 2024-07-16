@@ -206,9 +206,9 @@ def check_and_trim_years(y1, yN, ds_in):
 
     # Make sure you have the expected number of timesteps (including extra year)
     Nyears_expected = yN - y1 + 2
-    if ds_in.dims["time"] != Nyears_expected:
+    if ds_in.sizes["time"] != Nyears_expected:
         raise RuntimeError(
-            f"Expected {Nyears_expected} timesteps in output but got {ds_in.dims['time']}"
+            f"Expected {Nyears_expected} timesteps in output but got {ds_in.sizes['time']}"
         )
 
     return ds_in
@@ -289,7 +289,7 @@ def check_constant_vars(
                     "gdd", case["rx_gdds_file"], this_ds, set_neg1_to_nan=False
                 ).squeeze()
 
-        for t1 in np.arange(this_ds.dims[time_coord] - 1):
+        for t1 in np.arange(this_ds.sizes[time_coord] - 1):
             condn = ~np.isnan(ra_sp[t1, ...])
             if t1 > 0:
                 condn = np.bitwise_and(condn, np.all(np.isnan(ra_sp[:t1, ...]), axis=0))
@@ -303,7 +303,7 @@ def check_constant_vars(
             t1_yr = this_ds[time_coord].values[t1]
             t1_vals = np.squeeze(this_da.isel({time_coord: t1, "patch": thesePatches}).values)
 
-            for t in np.arange(t1 + 1, this_ds.dims[time_coord]):
+            for t in np.arange(t1 + 1, this_ds.sizes[time_coord]):
                 t_yr = this_ds[time_coord].values[t]
                 t_vals = np.squeeze(this_da.isel({time_coord: t, "patch": thesePatches}).values)
                 ok_p = t1_vals == t_vals
@@ -434,8 +434,8 @@ def check_constant_vars(
         incl_patches = np.sort(incl_patches)
         if not np.array_equal(incl_patches, np.unique(incl_patches)):
             raise RuntimeError("Patch(es) checked but also all-NaN??")
-        if not np.array_equal(incl_patches, np.arange(this_ds.dims["patch"])):
-            for p in np.arange(this_ds.dims["patch"]):
+        if not np.array_equal(incl_patches, np.arange(this_ds.sizes["patch"])):
+            for p in np.arange(this_ds.sizes["patch"]):
                 if p not in incl_patches:
                     break
             raise RuntimeError(
@@ -445,12 +445,12 @@ def check_constant_vars(
         if not any_bad:
             if any_bad_before_checking_rx:
                 print(
-                    f"✅ CLM output {v} do not vary through {this_ds.dims[time_coord]} growing"
+                    f"✅ CLM output {v} do not vary through {this_ds.sizes[time_coord]} growing"
                     " seasons of output (except for patch(es) with missing rx)."
                 )
             else:
                 print(
-                    f"✅ CLM output {v} do not vary through {this_ds.dims[time_coord]} growing"
+                    f"✅ CLM output {v} do not vary through {this_ds.sizes[time_coord]} growing"
                     " seasons of output."
                 )
 
@@ -648,12 +648,12 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     # Otherwise...
 
     # How many non-NaN patch-seasons do we expect to have once we're done organizing things?
-    Npatch = this_ds.dims["patch"]
+    Npatch = this_ds.sizes["patch"]
     # Because some patches will be planted in the last year but not complete, we have to ignore any finalyear-planted seasons that do complete.
-    Ngs = this_ds.dims["time"] - 1
+    Ngs = this_ds.sizes["time"] - 1
     expected_valid = Npatch * Ngs
 
-    mxharvests = this_ds.dims["mxharvests"]
+    mxharvests = this_ds.sizes["mxharvests"]
 
     if verbose:
         print(
@@ -795,7 +795,7 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     )
     is_valid = ~np.isnan(hdates_pg2)
     is_fake = np.isneginf(hdates_pg2)
-    is_fake = np.reshape(is_fake[is_valid], (this_ds.dims["patch"], Ngs))
+    is_fake = np.reshape(is_fake[is_valid], (this_ds.sizes["patch"], Ngs))
     discrepancy = np.sum(is_valid) - expected_valid
     unique_Nseasons = np.unique(np.sum(is_valid, axis=1))
     if verbose:
@@ -828,8 +828,8 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
 
             # Remove the nans and reshape to patches*growingseasons
             da_pyh = da_yhp.transpose("patch", "time", "mxharvests")
-            ar_pg = np.reshape(da_pyh.values, (this_ds.dims["patch"], -1))
-            ar_valid_pg = np.reshape(ar_pg[is_valid], (this_ds.dims["patch"], Ngs))
+            ar_pg = np.reshape(da_pyh.values, (this_ds.sizes["patch"], -1))
+            ar_valid_pg = np.reshape(ar_pg[is_valid], (this_ds.sizes["patch"], Ngs))
             # Change -infs to nans
             ar_valid_pg[is_fake] = np.nan
             # Save as DataArray to new Dataset, stripping _PERHARV from variable name
@@ -925,9 +925,9 @@ def convert_axis_time2gs_old(this_ds, myVars):
         raise RuntimeError("Harvest on day of planting")
 
     ### Setup ###
-    Npatches = this_ds.dims["patch"]
+    Npatches = this_ds.sizes["patch"]
     # Because some patches will be planted in the last year but not complete, we have to ignore any finalyear-planted seasons that do complete.
-    Ngs = this_ds.dims["time"] - 1
+    Ngs = this_ds.sizes["time"] - 1
     # Set up empty Dataset with time axis as "gs" (growing season) instead of what CLM puts out
     gs_years = [t.year - 1 for t in this_ds.time.values[:-1]]
     data_vars = dict()
@@ -1628,7 +1628,7 @@ def get_gs_len_da(this_da):
 def get_irrigation_use_relative_to_supply(cases):
     for casename, case in cases.items():
         # Get MONTH of each gridcell-year's peak irrigation use
-        ind = np.arange(12, case["ds"].dims["time_mth"], 12)
+        ind = np.arange(12, case["ds"].sizes["time_mth"], 12)
         yearly_split = np.split(case["ds"]["QIRRIG_FROM_SURFACE_GRID_MTH"].values, ind, axis=0)
         case["ds"]["QIRRIG_FROM_SURFACE_GRID_PKMTH_ANN"] = xr.DataArray(
             data=np.argmax(yearly_split, axis=1),
@@ -2453,7 +2453,7 @@ def import_rx_dates(var_prefix, date_inFile, dates_ds, set_neg1_to_nan=True):
     # Get run info:
     # Max number of growing seasons per year
     if "mxsowings" in dates_ds:
-        mxsowings = dates_ds.dims["mxsowings"]
+        mxsowings = dates_ds.sizes["mxsowings"]
     else:
         mxsowings = 1
 
@@ -2546,7 +2546,7 @@ def import_output(
             " year before harvest, but no sowings occurred that year."
         )
         falsely_alive_yp = np.concatenate(
-            (np.full((1, this_ds.dims["patch"]), False), falsely_alive_yp), axis=0
+            (np.full((1, this_ds.sizes["patch"]), False), falsely_alive_yp), axis=0
         )
         falsely_alive_y1p = np.expand_dims(falsely_alive_yp, axis=1)
         dummy_false_y1p = np.expand_dims(np.full_like(falsely_alive_yp, False), axis=1)
