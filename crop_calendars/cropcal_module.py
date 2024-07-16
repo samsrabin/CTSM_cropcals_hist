@@ -657,11 +657,19 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
 
     mxharvests = this_ds.sizes["mxharvests"]
 
+    originally_nan_ymp = np.isnan(this_ds.HDATES.values)
+    # verbose_patches = [53618, 53619, 54706, 54707]
+    verbose_patches = [53618]
     if verbose:
+        discrepancy = np.sum(~originally_nan_ymp) - expected_valid
         print(
             "Start: discrepancy of"
-            f" {np.sum(~np.isnan(this_ds.HDATES.values)) - expected_valid} patch-seasons"
+            f" {discrepancy} patch-seasons"
         )
+        for p in verbose_patches:
+            da = this_ds.HDATES.isel(patch=p)
+            n_notnan = np.sum(~np.isnan(da).values)
+            print(f"   patch {p} ({n_notnan}): {np.transpose(da.values)}")
 
     # Set all non-positive date values to NaN. These are seasons that were never harvested (or never started): "non-seasons."
     if this_ds.HDATES.dims != ("time", "mxharvests", "patch"):
@@ -674,11 +682,18 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     sdates_ymp = this_ds.SDATES_PERHARV.copy().where(this_ds.SDATES_PERHARV > 0).values
     sdates_pym = np.transpose(sdates_ymp.copy(), (2, 0, 1))
     hdates_pym[hdates_pym <= 0] = np.nan
+    originally_nan_pmy = np.transpose(originally_nan_ymp, (2, 0, 1))
+    set_to_nan_pym = ~originally_nan_pmy & np.isnan(hdates_pym)
+    discrepancy = np.sum(~np.isnan(hdates_pym)) - expected_valid
     if verbose:
         print(
             'After "Set all non-positive date values to NaN": discrepancy of'
-            f" {np.sum(~np.isnan(hdates_pym)) - expected_valid} patch-seasons"
+            f" {discrepancy} patch-seasons"
         )
+        for p in verbose_patches:
+            ar = hdates_pym[p,:,:]
+            n_notnan = np.sum(~np.isnan(ar))
+            print(f"   patch {p} ({n_notnan}): {np.transpose(ar)}")
 
     # Find years where patch was inactive
     inactive_py = np.transpose(
@@ -704,11 +719,17 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     where_sown_prerun_or_inactive_pym = np.where(sown_prerun_or_inactive_pym)
     hdates_pym[where_sown_prerun_or_inactive_pym] = np.nan
     sdates_pym[where_sown_prerun_or_inactive_pym] = np.nan
+    discrepancy = np.sum(~np.isnan(hdates_pym)) - expected_valid
+    set_to_nan_pym = ~originally_nan_pmy & np.isnan(hdates_pym)
     if verbose:
         print(
             'After "Ignore harvests from before this output began": discrepancy of'
-            f" {np.sum(~np.isnan(hdates_pym)) - expected_valid} patch-seasons"
+            f" {discrepancy} patch-seasons"
         )
+        for p in verbose_patches:
+            ar = hdates_pym[p,:,:]
+            n_notnan = np.sum(~np.isnan(ar))
+            print(f"   patch {p} ({n_notnan}): {np.transpose(ar)}")
 
     # We need to keep some non-seasons---it's possible that "the yearY growing season" never happened (sowing conditions weren't met), but we still need something there so that we can make an array of dimension Npatch*Ngs. We do this by changing those non-seasons from NaN to -Inf before doing the filtering and reshaping, after which we'll convert them back to NaNs.
 
@@ -735,10 +756,15 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
         hdates_pym2[where_nosow_py[0], where_nosow_py[1], h + 1] = -np.inf
         sdates_pym2[where_nosow_py[0], where_nosow_py[1], h + 1] = -np.inf
     if verbose:
+        discrepancy = np.sum(~np.isnan(hdates_pym2)) - expected_valid
         print(
             'After "In years with no sowing, pretend the first no-harvest is meaningful":'
-            f" discrepancy of {np.sum(~np.isnan(hdates_pym2)) - expected_valid} patch-seasons"
+            f" discrepancy of {discrepancy} patch-seasons"
         )
+        for p in verbose_patches:
+            ar = hdates_pym2[p,:,:]
+            n_notnan = np.sum(~np.isnan(ar))
+            print(f"   patch {p} ({n_notnan}): {np.transpose(ar)}")
 
     # "In years with sowing that are followed by inactive years, check whether the last sowing was harvested before the patch was deactivated. If not, pretend the LAST [easier to implement!] no-harvest is meaningful."
     sdates_orig_masked_pym = sdates_orig_pym.copy()
@@ -768,10 +794,15 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     hdates_pym3[where_last_sowing_never_harvested_pym] = -np.inf
     sdates_pym3[where_last_sowing_never_harvested_pym] = -np.inf
     if verbose:
+        discrepancy = np.sum(~np.isnan(hdates_pym3)) - expected_valid
         print(
             'After "In years with sowing that are followed by inactive years...":'
-            f" discrepancy of {np.sum(~np.isnan(hdates_pym3)) - expected_valid} patch-seasons"
+            f" discrepancy of {discrepancy} patch-seasons"
         )
+        for p in verbose_patches:
+            ar = hdates_pym3[p,:,:]
+            n_notnan = np.sum(~np.isnan(ar))
+            print(f"   patch {p} ({n_notnan}): {np.transpose(ar)}")
 
     # Convert to growingseason axis
     def pym_to_pg(pym, quiet=False):
@@ -786,11 +817,16 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
 
     hdates_pg = pym_to_pg(hdates_pym3.copy(), quiet=~verbose)
     sdates_pg = pym_to_pg(sdates_pym3.copy(), quiet=True)
+    discrepancy = np.sum(~np.isnan(hdates_pg)) - expected_valid
     if verbose:
         print(
             'After "Convert to growingseason axis":'
-            f" discrepancy of {np.sum(~np.isnan(hdates_pg)) - expected_valid} patch-seasons"
+            f" discrepancy of {discrepancy} patch-seasons"
         )
+        for p in verbose_patches:
+            ar = hdates_pg[p,:]
+            n_notnan = np.sum(~np.isnan(ar))
+            print(f"   patch {p} ({n_notnan}): {ar}")
 
     # "Ignore any harvests that were planted in the final year, because some cells will have incomplete growing seasons for the final year."
     lastyear_complete_season = (
@@ -820,6 +856,8 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
             ' will have incomplete growing seasons for the final year": discrepancy of'
             f" {discrepancy} patch-seasons"
         )
+        for p in verbose_patches:
+            print(f"   patch {p} ({np.sum(is_valid[p,:])}): {hdates_pg2[p,:]}")
         try:
             import pandas as pd
 
