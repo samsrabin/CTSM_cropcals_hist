@@ -581,9 +581,6 @@ for i, (casename, case) in enumerate(cases.items()):
             )
 
 
-# %%
-print("Crop" in cases["default"]["ds"])
-
 # %% Get FAO data from CSV
 
 filename = os.path.join(
@@ -599,9 +596,6 @@ fao_area, fao_area_nosgc = cc.fao_data_get(
     fao_all, "Area harvested", y1, yN, fao_to_clm_dict, cropList_combined_clm
 )
 
-
-# %%
-print("Crop" in cases["default"]["ds"])
 
 # %% Import FAO Earthstat (gridded FAO data)
 
@@ -766,9 +760,6 @@ earthstats["f19_g17_ctsm5.2.c240216"] = earthstats["f19_g17"]
 print("Done importing FAO EarthStat.")
 
 
-# %%
-print("Crop" in cases["default"]["ds"])
-
 # %% Import country map and key
 
 # Half-degree countries from Brendan
@@ -853,9 +844,6 @@ for i, x in enumerate(np.unique(countries.gadm0.values)):
 # END OF IMPORT AND SETUP
 print("Done with import and setup.")
 
-
-# %%
-print("Crop" in cases["default"]["ds"])
 
 # %% * Compare area, production, yield, and irrigation of individual crops
 importlib.reload(cc)
@@ -997,9 +985,6 @@ if incl_irrig:
         plot_yN=plot_yN,
     )
 
-
-# %%
-print("Crop" in cases["default"]["ds"])
 
 # %% Make maps of individual crops (rainfed, irrigated)
 importlib.reload(cc)
