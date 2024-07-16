@@ -674,6 +674,11 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     sdates_ymp = this_ds.SDATES_PERHARV.copy().where(this_ds.SDATES_PERHARV > 0).values
     sdates_pym = np.transpose(sdates_ymp.copy(), (2, 0, 1))
     hdates_pym[hdates_pym <= 0] = np.nan
+    if verbose:
+        print(
+            'After "Set all non-positive date values to NaN": discrepancy of'
+            f" {np.sum(~np.isnan(hdates_pym)) - expected_valid} patch-seasons"
+        )
 
     # Find years where patch was inactive
     inactive_py = np.transpose(
