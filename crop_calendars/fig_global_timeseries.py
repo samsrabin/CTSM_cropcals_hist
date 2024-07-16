@@ -9,9 +9,19 @@ import cropcal_module as cc
 import cropcal_figs_module as ccf
 
 # Import general CTSM Python utilities
-my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
-sys.path.append(my_ctsm_python_gallery)
-import utils
+from socket import gethostname
+hostname = gethostname()
+if any(x in hostname for x in ["derecho", "casper"]):
+    machine = "glade"
+    # Only possible because I have export PYTHONPATH=$HOME in my .bash_profile
+    from ctsm_python_gallery_myfork.ctsm_py import utils
+elif hostname == "cgdm-helsing":
+    machine = "mymac"
+    my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
+    sys.path.append(my_ctsm_python_gallery)
+    import utils
+else:
+    raise ValueError(f"hostname {hostname} not recognized")
 
 import importlib
 importlib.reload(ccf)
@@ -118,6 +128,8 @@ def make_1plot_lines(ax_this, ydata_this, caselist, thisCrop_clm, ylabel, xlabel
         if len(stats2) != 2:
             if all(x in caselist for x in ["CLM Default", "Prescribed Calendars"]):
                 stats2 = [stats2[caselist.index(y)-2] for y in ["CLM Default", "Prescribed Calendars"]]
+            elif all(x in caselist for x in ["default", "rx_sdates"]):
+                stats2 = [stats2[caselist.index(y)-2] for y in ["default", "rx_sdates"]]
             else:
                 skip_this = True
                 print(f"Not adding stats to title because Nstats {len(stats2)} != 2")
@@ -215,6 +227,8 @@ def make_1plot_scatter(ax_this, xdata, ydata_this, caselist, thisCrop_clm, xlabe
         if len(stats2) != 2:
             if all(x in caselist for x in ["CLM Default", "Prescribed Calendars"]):
                 stats2 = [stats2[caselist.index(y)-2] for y in ["CLM Default", "Prescribed Calendars"]]
+            elif all(x in caselist for x in ["default", "rx_sdates"]):
+                stats2 = [stats2[caselist.index(y)-2] for y in ["default", "rx_sdates"]]
             else:
                 skip_this = True
                 print(f"Not adding stats to title because Nstats {len(stats2)} != 2")
@@ -610,6 +624,8 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
             thisCrop_fao = fao_area.columns[c]
             ydata_area = np.array(fao_area[thisCrop_fao])
             ydata_prod = np.array(fao_prod[thisCrop_fao])
+        print(f"ydata_prod.shape A: {ydata_prod.shape}")
+        
         
         # FAO EarthStat
         is_obs.append(True)
@@ -631,6 +647,7 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
         ts_prod_y = 1e-6*prod_tyx.sum(dim=["lat","lon"]).values
         ydata_prod = np.stack((ydata_prod,
                             ts_prod_y))
+        print(f"ydata_prod.shape B: {ydata_prod.shape}")
         
         # CLM outputs
         for min_viable_hui in min_viable_hui_list:
@@ -650,6 +667,7 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
                 ydata_prod = np.concatenate((ydata_prod,
                                             np.expand_dims(ts_prod_y.values, axis=0)),
                                             axis=0)
+                print(f"ydata_prod.shape C: {ydata_prod.shape}")
                 
                 # Get yield time dimension name
                 non_Crop_dims = [x for x in case['ds']['ts_prod_yc'].dims if x != "Crop"]
@@ -661,7 +679,10 @@ def global_timeseries_yieldetc(cases, cropList_combined_clm, earthstats_gd, fao_
         ydata_area *= 1e-6
             
         # Calculate FAO* yields
+        print(f"ydata_prod.shape D: {ydata_prod.shape}")
+        print(f"ydata_area.shape: {ydata_area.shape}")
         ydata_yield = ydata_prod / ydata_area
+        print(f"ydata_yield.shape: {ydata_yield.shape}")
             
         # Get stats
         

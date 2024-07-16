@@ -4,16 +4,17 @@
 # which_cases = "diagnose.52"
 # which_cases = "diagnose.2022"
 # which_cases = "diagnose"
-which_cases = "main2.52"
+# which_cases = "main2.52"
 # which_cases = "main2.2022"
 # which_cases = "main2"
 # which_cases = "originalBaseline" # As originalCLM, but without cmip6
 # which_cases = "originalCLM"
 # which_cases = "test"
+which_cases = "20240714"
 
 
 # Include irrigation?
-incl_irrig = True
+incl_irrig = False
 
 # Yields will be set to zero unless HUI at harvest is ≥ min_viable_hui
 min_viable_hui = 1
@@ -32,10 +33,23 @@ sys.path.insert(0, parentdir)
 import cropcal_module as cc
 import cropcal_figs_module as ccf
 
-# Import general CTSM Python utilities
-my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
-sys.path.append(my_ctsm_python_gallery)
-import utils
+# What machine are we on?
+from socket import gethostname
+hostname = gethostname()
+if any(x in hostname for x in ["derecho", "casper"]):
+    machine = "glade"
+    inputdata = "/glade/campaign/cesm/cesmdata/cseg/inputdata"
+    faostat_csv_dir = "/glade/u/home/samrabin/analysis/CTSM_cropcals_hist/crop_calendar_MATLAB"
+    # Only possible because I have export PYTHONPATH=$HOME in my .bash_profile
+    from ctsm_python_gallery_myfork.ctsm_py import utils
+elif hostname == "cgdm-helsing":
+    machine = "mymac"
+    faostat_csv_dir = "/Users/samrabin/Documents/git_repos/CTSM_cropcals_hist/crop_calendar_MATLAB"
+    my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
+    sys.path.append(my_ctsm_python_gallery)
+    import utils
+else:
+    raise ValueError(f"hostname {hostname} not recognized")
 
 import numpy as np
 from scipy import stats
@@ -104,14 +118,22 @@ fao_to_clm_dict = {
     "Total": "Total",
 }
 
-plt.rc("font", **{"family": "sans-serif", "sans-serif": ["Arial"]})
+if machine == "mymac":
+    plt.rc("font", **{"family": "sans-serif", "sans-serif": ["Arial"]})
+elif machine == "glade":
+    plt.rc("font", **{"family": "sans-serif", "sans-serif": ["Roboto"]})
 
 # Add GRAINC variants with too-long seasons set to 0
 # CLM max growing season length, mxmat, is stored in the following files:
 # 	 * clm5_1: lnd/clm2/paramdata/ctsm51_params.c211112.nc
 # 	 * clm5_0: lnd/clm2/paramdata/clm50_params.c211112.nc
 # 	 * clm4_5: lnd/clm2/paramdata/clm45_params.c211112.nc
-paramfile_dir = "/Users/Shared/CESM_inputdata/lnd/clm2/paramdata/"
+if machine == "mymac":
+    paramfile_dir = "/Users/Shared/CESM_inputdata/lnd/clm2/paramdata/"
+elif machine == "glade":
+    paramfile_dir = os.path.join(inputdata, "lnd", "clm2", "paramdata")
+else:
+    raise ValueError(f"machine {machine} not recognized")
 my_clm_ver = 50
 my_clm_subver = "c211112"
 pattern = os.path.join(paramfile_dir, f"*{my_clm_ver}_params.{my_clm_subver}.nc")
@@ -142,9 +164,9 @@ yearList = np.arange(y1, yN + 1)
 Nyears = len(yearList)
 
 # Define cases
-cases = cc.get_caselist(which_cases)
-
-outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures/"
+cases, outDir_figs = cc.get_caselist(which_cases)
+if outDir_figs is None:
+    outDir_figs = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/Figures/"
 for i, (casename, case) in enumerate(cases.items()):
     outDir_figs += case["verbosename"].replace(": ", " | ") + "/"
 outDir_figs += "figs/"
@@ -258,6 +280,9 @@ for _, case in cases.items():
 print("Done importing model output.")
 
 
+# %%
+print("Crop" in cases["default"]["ds"])
+
 # %% Import LU data
 importlib.reload(cc)
 
@@ -282,7 +307,11 @@ reses["f19_g17_ctsm5.2"] = {
         lu_dir, "landuse.timeseries_1.9x2.5_SSP5-8.5_78_CMIP6_1850-2015_c230227.nc"
     )
 }
-
+# f19_g17 ("""2-degree"""; i.e., 2.5 lon x 1.9 lat), ctsm5.2, c240216
+reses["f19_g17_ctsm5.2.c240216"] = {
+    "lu_path": "/glade/campaign/cesm/cesmdata/inputdata/lnd/clm2/surfdata_esmf/ctsm5.2.0/landuse.timeseries_1.9x2.5_SSP2-4.5_1850-2100_78pfts_c240216.nc",
+    "area_ds_path": "/glade/campaign/cesm/cesmdata/cseg/inputdata/lnd/clm2/surfdata_map/landuse.timeseries_1.9x2.5_hist_78pfts_CMIP6_simyr1850-2015_c170824.nc"
+}
 # Import land use to reses dicts
 for i, (resname, res) in enumerate(reses.items()):
     # Find a matching case
@@ -292,8 +321,14 @@ for i, (resname, res) in enumerate(reses.items()):
     if case["res"] != resname:
         continue
     print(f"Importing {resname}...")
+    
+    if "area_ds_path" in res:
+        da_area = xr.open_dataset(res["area_ds_path"])["AREA"]
+    else:
+        da_area = None
 
-    res["ds"] = cc.open_lu_ds(res["lu_path"], y1, yN + 1, case["ds"].sel(time=slice(y1, yN + 1)))
+    res["ds"] = cc.open_lu_ds(res["lu_path"], y1, yN + 1, case["ds"].sel(time=slice(y1, yN + 1)),
+                              da_area=da_area)
     res["ds"] = res["ds"].assign_coords(
         {
             "time": [
@@ -395,6 +430,8 @@ for _, res in reses.items():
 
 print("Done.")
 
+
+# %%
 
 # %% Calculate irrigation totals
 importlib.reload(cc)
@@ -530,11 +567,15 @@ for i, (casename, case) in enumerate(cases.items()):
             )
 
 
+# %%
+print("Crop" in cases["default"]["ds"])
+
 # %% Get FAO data from CSV
 
-fao_all = pd.read_csv(
-    "/Users/sam/Documents/git_repos/CTSM_cropcals_hist/crop_calendar_MATLAB/FAOSTAT_data_6-15-2022.csv"
+filename = os.path.join(
+   faostat_csv_dir, "FAOSTAT_data_6-15-2022.csv"
 )
+fao_all = pd.read_csv(filename)
 
 fao_all = cc.fao_data_preproc(fao_all)
 fao_prod, fao_prod_nosgc = cc.fao_data_get(
@@ -545,6 +586,9 @@ fao_area, fao_area_nosgc = cc.fao_data_get(
 )
 
 
+# %%
+print("Crop" in cases["default"]["ds"])
+
 # %% Import FAO Earthstat (gridded FAO data)
 
 print("Importing FAO EarthStat...")
@@ -552,9 +596,15 @@ earthstats_gd = {}
 earthstats_gd = {}
 
 # Import high res
+if machine == "mymac":
+    fao_earthstat_dir = "/Users/Shared/CESM_work/CropEvalData_ssr/FAO-EarthStatYields"
+elif machine == "glade":
+    fao_earthstat_dir = "/glade/campaign/cgd/tss/projects/CropEvalData/FAO-EarthStatYields"
+else:
+    raise ValueError(f"machine {machine} not recognized")
 earthstats_gd["f09_g17"] = xr.open_dataset(
     os.path.join(
-        "/Users/Shared/CESM_work/CropEvalData_ssr/FAO-EarthStatYields",
+        fao_earthstat_dir,
         "EARTHSTATMIRCAUNFAOCropDataDeg09.nc",
     )
 )
@@ -697,15 +747,25 @@ earthstats["f19_g17"] = cc.ungrid(
 )
 
 earthstats["f19_g17_ctsm5.2"] = earthstats["f19_g17"]
+earthstats["f19_g17_ctsm5.2.c240216"] = earthstats["f19_g17"]
 
 print("Done importing FAO EarthStat.")
 
 
+# %%
+print("Crop" in cases["default"]["ds"])
+
 # %% Import country map and key
 
 # Half-degree countries from Brendan
+if machine == "mymac":
+    countries_dir = "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_brendan"
+elif machine == "glade":
+    countries_dir = "/glade/campaign/cgd/tss/people/samrabin/cropcals-2024/countries_brendan"
+else:
+    raise ValueError(f"machine {machine} not recognized")
 countries = xr.open_dataset(
-    "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_brendan/gadm0.mask.nc4"
+    os.path.join(countries_dir, "gadm0.mask.nc4")
 )
 
 # Nearest-neighbor remap countries to gridspecs we have EarthStats data for
@@ -731,14 +791,14 @@ for resname, res in reses.items():
     )
 
 countries_key = pd.read_csv(
-    "/Users/sam/Documents/Dropbox/2021_Rutgers/CropCalendars/countries_brendan/Nation_ID.csv",
+    os.path.join(countries_dir, "Nation_ID.csv"),
     header=None,
     names=["num", "name"],
 )
 
 fao_all_ctry = pd.read_csv(
     os.path.join(
-        "/Users/sam/Documents/git_repos/CTSM_cropcals_hist/crop_calendar_MATLAB",
+        faostat_csv_dir,
         "FAOSTAT_data_en_8-21-2022_byCountry.csv",
     )
 )
@@ -779,6 +839,9 @@ for i, x in enumerate(np.unique(countries.gadm0.values)):
 # END OF IMPORT AND SETUP
 print("Done with import and setup.")
 
+
+# %%
+print("Crop" in cases["default"]["ds"])
 
 # %% * Compare area, production, yield, and irrigation of individual crops
 importlib.reload(cc)
@@ -921,6 +984,9 @@ if incl_irrig:
     )
 
 
+# %%
+print("Crop" in cases["default"]["ds"])
+
 # %% Make maps of individual crops (rainfed, irrigated)
 importlib.reload(cc)
 importlib.reload(sys.modules["fig_maps_eachCrop"])
@@ -934,9 +1000,12 @@ min_viable_hui = "ggcmi3"
 mxmat_limited = False
 
 # Define reference case, if you want to plot differences
-# ref_casename = None
-ref_casename = "CLM Default"
-# ref_casename = 'rx'
+if which_cases == "20240714":
+    ref_casename = "default"
+else:
+    # ref_casename = None
+    ref_casename = "CLM Default"
+    # ref_casename = 'rx'
 
 overwrite = True
 save_netcdfs = False
@@ -1296,7 +1365,11 @@ for c, thisCrop in enumerate(fao_crops):
     axes = axes.flatten()
 
     # CLM Default will have hollow circles if Original baseline is included
-    i_h = caselist.index("CLM Default")
+    if which_cases == "20240714":
+        ref_casename = "default"
+    else:
+        ref_casename = "CLM Default"
+    i_h = caselist.index(ref_casename)
 
     for c, country in enumerate(plot_ds.Country.values):
         # Text describing R-squared changes for each country
@@ -1312,7 +1385,7 @@ for c, thisCrop in enumerate(fao_crops):
                 x=plot_ds["Yield (FAOSTAT)"].sel(Country=country),
                 y=plot_ds["Yield"].sel(Country=country, Case=case),
             )
-            if case == "CLM Default":
+            if case in ["CLM Default", "default"]:
                 t = "{r1:.3g} $\\rightarrow$ "
                 stat_change_text += t.format(r1=lr.rvalue**2)
             elif case == "Prescribed Calendars":
@@ -1496,7 +1569,11 @@ for thisCrop in fao_crops:
     axes = axes.flatten()
 
     # CLM Default will have hollow circles if Original baseline is included
-    i_h = caselist.index("CLM Default")
+    if which_cases == "20240714":
+        ref_casename = "default"
+    else:
+        ref_casename = "CLM Default"
+    i_h = caselist.index(ref_casename)
 
     for c, country in enumerate(plot_ds.Country.values):
         # Text describing statistic changes for each country
@@ -1522,7 +1599,7 @@ for thisCrop in fao_crops:
                 bias = cc.get_timeseries_bias(ydata, xdata)
                 if np.isnan(bias):
                     raise RuntimeError("Bias is NaN")
-                if case == "CLM Default":
+                if case in ["CLM Default", "default"]:
                     t = "{r1:.3g} $\\rightarrow$ "
                     stat_change_text += t.format(r1=bias)
                 elif case == "Prescribed Calendars":
@@ -1627,9 +1704,15 @@ for c, fao_crop in enumerate(fao_crops):
     ax_faoProd = axes_faoProd[spy][spx]
 
     # Change in production
-    prod0 = get_country_data(cases["CLM Default"]["ds"]["PROD_ANN"], clm_crop, countries_thiscrop)
+    if which_cases == "20240714":
+        case1 = "default"
+        case2 = "rx_sdates"
+    else:
+        case1 = "CLM Default"
+        case2 = "Prescribed Calendars"
+    prod0 = get_country_data(cases[case1]["ds"]["PROD_ANN"], clm_crop, countries_thiscrop)
     prod1 = get_country_data(
-        cases["Prescribed Calendars"]["ds"]["PROD_ANN"], clm_crop, countries_thiscrop
+        cases[case2]["ds"]["PROD_ANN"], clm_crop, countries_thiscrop
     )
     prod0_pd = prod0.to_pandas()
     prod1_pd = prod1.to_pandas()
@@ -1664,9 +1747,9 @@ for c, fao_crop in enumerate(fao_crops):
     ax_simProdDiff.grid(True, axis="y", alpha=gridline_alpha)
 
     # Of those countries, how much is absolute yield bias changed?
-    area0 = get_country_data(cases["CLM Default"]["ds"]["AREA_CFT"], clm_crop, countries_thiscrop)
+    area0 = get_country_data(cases[case1]["ds"]["AREA_CFT"], clm_crop, countries_thiscrop)
     area1 = get_country_data(
-        cases["Prescribed Calendars"]["ds"]["AREA_CFT"], clm_crop, countries_thiscrop
+        cases[case2]["ds"]["AREA_CFT"], clm_crop, countries_thiscrop
     )
     yield0 = prod0 / area0
     yield1 = prod1 / area1
@@ -2329,7 +2412,10 @@ from cropcal_figs_module import *
 importlib.reload(sys.modules["fig_maps_allCrops"])
 from fig_maps_allCrops import *
 
-these_cases = ["CLM Default", "Prescribed Calendars"]
+if which_cases == "20240714":
+    these_cases = ["default", "rx_sdates"]
+else:
+    these_cases = ["CLM Default", "Prescribed Calendars"]
 
 crop_subset = None
 ny = 3
@@ -2434,7 +2520,10 @@ importlib.reload(utils)
 crop_subset = ["Cotton", "Rice", "Sugarcane"]
 # crop_subset = ['Corn', 'Soybean', 'Wheat'];
 
-these_cases = ["CLM Default", "Prescribed Calendars"]
+if which_cases == "20240714":
+    these_cases = ["default", "rx_sdates"]
+else:
+    these_cases = ["CLM Default", "Prescribed Calendars"]
 ny = 3
 nx = 1
 figsize = (14, 16)

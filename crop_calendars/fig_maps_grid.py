@@ -9,11 +9,20 @@ import os
 import cropcal_module as cc
 from cropcal_figs_module import cropcal_colors
 
-# Import general CTSM Python utilities
-import sys
-my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
-sys.path.append(my_ctsm_python_gallery)
-import utils
+# What machine are we on?
+from socket import gethostname
+hostname = gethostname()
+if any(x in hostname for x in ["derecho", "casper"]):
+    machine = "glade"
+    # Only possible because I have export PYTHONPATH=$HOME in my .bash_profile
+    from ctsm_python_gallery_myfork.ctsm_py import utils
+elif hostname == "cgdm-helsing":
+    machine = "mymac"
+    my_ctsm_python_gallery = "/Users/sam/Documents/git_repos/ctsm_python_gallery_myfork/ctsm_py/"
+    sys.path.append(my_ctsm_python_gallery)
+    import utils
+else:
+    raise ValueError(f"hostname {hostname} not recognized")
 
 # Settings
 

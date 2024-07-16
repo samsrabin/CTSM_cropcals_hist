@@ -231,12 +231,14 @@ def check_case_earthstats_dim_match(case, earthstats_ds, dim):
 def check_constant_vars(
     this_ds, case, ignore_nan, constantGSs=None, verbose=True, throw_error=True
 ):
+    casename = None
     if isinstance(case, str):
         constantVars = [case]
     elif isinstance(case, list):
         constantVars = case
     elif isinstance(case, dict):
         constantVars = case["constantVars"]
+        casename = case["verbosename"]
     else:
         raise TypeError(f"case must be str or dict, not {type(case)}")
 
@@ -329,8 +331,14 @@ def check_constant_vars(
                         rx_var = f"gs1_{c}"
                         varyLons_thisCrop = varyLons[np.where(varyCrops_int == c)]
                         varyLats_thisCrop = varyLats[np.where(varyCrops_int == c)]
+
+                        # Interpolate, as needed
+                        da = rx_ds[rx_var].interp(
+                            lat=this_ds["lat"], lon=this_ds["lon"], method="nearest"
+                        )
+
                         theseRxVals = np.diag(
-                            rx_ds[rx_var].sel(lon=varyLons_thisCrop, lat=varyLats_thisCrop).values
+                            da.sel(lon=varyLons_thisCrop, lat=varyLats_thisCrop).values
                         )
                         if len(theseRxVals) != len(varyLats_thisCrop):
                             raise RuntimeError(
@@ -355,21 +363,22 @@ def check_constant_vars(
                         # If prescribed input had missing value (-1), it's fine for it to vary.
                         if rx_ds:
                             rx_var = f"gs1_{thisCrop_int}"
-                            if thisLon in rx_ds.lon.values and thisLat in rx_ds.lat.values:
-                                rx = rx_ds[rx_var].sel(lon=thisLon, lat=thisLat).values
-                                Nunique = len(np.unique(rx))
-                                if Nunique == 1:
-                                    found_in_rx[i] = True
-                                    if rx == -1:
-                                        continue
-                                elif Nunique > 1:
-                                    raise RuntimeError(
-                                        f"How does lon {thisLon} lat {thisLat} {thisCrop} have"
-                                        f" time-varying {v}?"
-                                    )
-                            else:
+
+                            # Interpolate, as needed
+                            da = rx_ds[rx_var].interp(
+                                lat=this_ds["lat"], lon=this_ds["lon"], method="nearest"
+                            )
+
+                            rx = da.sel(lon=thisLon, lat=thisLat).values
+                            Nunique = len(np.unique(rx))
+                            if Nunique == 1:
+                                found_in_rx[i] = True
+                                if rx == -1:
+                                    continue
+                            elif Nunique > 1:
                                 raise RuntimeError(
-                                    "lon {thisLon} lat {thisLat} {thisCrop} not in rx dataset?"
+                                    f"How does lon {thisLon} lat {thisLat} {thisCrop} have"
+                                    f" time-varying {v}?"
                                 )
 
                         # Print info (or save to print later)
@@ -401,12 +410,12 @@ def check_constant_vars(
                                 )
                         else:
                             if ok:
-                                print(f"{emojus} CLM output {v} unexpectedly vary over time:")
+                                print(f"{emojus} {casename}: CLM output {v} unexpectedly vary over time:")
                                 ok = False
                             print(f"{v} timestep {t} does not match timestep {t1}")
                             break
         if verbose and any_bad:
-            print(f"{emojus} CLM output {v} unexpectedly vary over time:")
+            print(f"{emojus} {casename}: CLM output {v} unexpectedly vary over time:")
             strList.sort()
             if rx_ds and np.any(~found_in_rx):
                 strList = [
@@ -1201,6 +1210,7 @@ def fullname_to_combinedCrop(fullnames, cropList_combined_clm):
 
 def get_caselist(which_cases):
     cases = {}
+    outDir_figs = None
 
     if which_cases == "test":
         rx_dir = "/Users/Shared/CESM_work/crop_dates_mostrice"
@@ -1418,7 +1428,55 @@ def get_caselist(which_cases):
                 "gdd_min": 1.0,
             }
 
-    return cases
+    # 2-degree test 2024-07-14
+    if which_cases in ["20230714", "20240714"]:
+        cases = {}
+        topdir = "/glade/campaign/cgd/tss/people/samrabin/cropcals-2024/run-outputs/2deg_1958-2014_20240714"
+        outDir_figs = topdir
+        # casebase_list = ["default", "rx_sdates", "rx_swindows", "rx_swindows_adaptGGCMI"]
+        casebase_list = ["default", "rx_sdates"]
+        casename_prefix = "20230714_cropcals_pr2_1deg"
+        res = "f19_g17_ctsm5.2.c240216"
+        dir_cropcals_processed = "/glade/campaign/cesm/cesmdata/cseg/inputdata/lnd/clm2/cropdata/calendars/processed"
+        rx_sdates_file0 = os.path.join(dir_cropcals_processed, "sdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-hcru_hcru_mt13.2000-2000.20230728_165845.tweaked_latlons.nc")
+        rx_hdates_file0 = os.path.join(dir_cropcals_processed, "hdates_ggcmi_crop_calendar_phase3_v1.01_nninterp-hcru_hcru_mt13.2000-2000.20230728_165845.tweaked_latlons.nc")
+        rx_gdds_file0 = os.path.join(dir_cropcals_processed, "gdds_20230829_161011.tweaked_latlons.nc")
+        gdd_min = 1.0
+        for casebase in casebase_list:
+            casename = ".".join([casename_prefix, casebase])
+            if casebase == "default":
+                constantVars = None
+                constantGSs = None  # 'None' w/ constantVars specified means all should be constant
+                rx_sdates_file = None
+                rx_hdates_file = None
+                rx_gdds_file = None
+                verbosename = casename
+            elif casebase == "rx_sdates":
+                constantVars = ["SDATES", "GDDHARV"]
+                constantGSs = None  # 'None' w/ constantVars specified means all should be constant
+                rx_sdates_file = rx_sdates_file0
+                rx_hdates_file = rx_hdates_file0
+                rx_gdds_file = rx_gdds_file0
+                verbosename = casename
+            cases[casebase] = {
+                # "filepath": "/Users/Shared/CESM_runs/cropcals_2deg_v3/cropcals3.f19-g17.rx_crop_calendars3.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced4.mxmat/cropcals3.f19-g17.rx_crop_calendars3.IHistClm50BgcCrop.ggcmi.1958-2014.gddforced4.mxmat.clm2.h1.1958-01-01-00000.nc",
+                "filepath": os.path.join(
+                    topdir, casename, "lnd", "hist", f"{casename}.clm2.h1.1958-01-01-00000.nc"
+                ),
+                "constantVars": constantVars,
+                "constantGSs": constantGSs,
+                "res": res,
+                "verbosename": verbosename,
+                "gdd_min": gdd_min,
+            }
+            if rx_sdates_file is not None:
+                cases[casebase]["rx_sdates_file"] = rx_sdates_file
+            if rx_hdates_file is not None:
+                cases[casebase]["rx_hdates_file"] = rx_hdates_file
+            if rx_gdds_file is not None:
+                cases[casebase]["rx_gdds_file"] = rx_gdds_file
+
+    return cases, outDir_figs
 
 
 def get_earthstat_country_ts(
@@ -1659,7 +1717,10 @@ def get_moving_average(x, w):
     if x.ndim == 2:
         Ncases = x.shape[0]
         r = get_window_radius(w)
-        result = np.full((Ncases, x.shape[1] - 2 * r), fill_value=np.nan)
+        dim1 = x.shape[1] - 2 * r
+        if dim1 < 0:
+            raise ValueError(f"get_moving average: dim1 size {dim1}. Window {w} too big for # incl. years?\n\tx.shape: {x.shape}\n\tr: {r}")
+        result = np.full((Ncases, dim1), fill_value=np.nan)
         for c in np.arange(0, (Ncases)):
             result[c, :] = get_moving_average(x[c, :], w)
     else:
@@ -2138,6 +2199,9 @@ def get_ts_prod_clm_yc_da(yield_gd, lu_ds, yearList, cropList_combined_clm):
     ts_prod_clm_yc_da = xr.DataArray(
         ts_prod_clm_yc, coords={"Year": yearList, "Crop": cropList_combined_clm}
     )
+    print("!!!!!!!!!!!")
+    print(ts_prod_clm_yc_da.sizes)
+    print("!!!!!!!!!!!")
     return ts_prod_clm_yc_da
 
 
@@ -2178,12 +2242,30 @@ def get_ts_prod_clm_yc_da2(case_ds, lu_ds, yieldVar, cropList_combined_clm, quie
         .isel(Crop=slice(1, len(cropList_combined_clm)))
         * 1e-12
     )
+    # ts_prod_clm_ySUM = ts_prod_clm_yc_da.sum(dim="Crop").expand_dims(
+    #     dim="Crop", axis=list(ts_prod_clm_yc_da.dims).index("Crop")
+    # )
+    # print(ts_prod_clm_yc_da["Crop"].values)
     ts_prod_clm_ySUM = ts_prod_clm_yc_da.sum(dim="Crop").expand_dims(
-        dim="Crop", axis=list(ts_prod_clm_yc_da.dims).index("Crop")
+        dim={"Crop": 1}, axis=list(ts_prod_clm_yc_da.dims).index("Crop")
     )
-    ts_prod_clm_yc_da = xr.concat((ts_prod_clm_yc_da, ts_prod_clm_ySUM), dim="Crop").assign_coords(
+    ts_prod_clm_ySUM = ts_prod_clm_ySUM.assign_coords(
+        {"Crop": np.array(["Total"])}
+    )
+    # print(ts_prod_clm_yc_da.dims)
+    # print(ts_prod_clm_ySUM.dims)
+    # print(ts_prod_clm_yc_da.coords)
+    # print(ts_prod_clm_ySUM.coords)
+    # print(ts_prod_clm_yc_da.sizes)
+    # print(ts_prod_clm_ySUM.sizes)
+    # print(f"cropList_combined_clm: {cropList_combined_clm}")
+    ts_prod_clm_yc_da = xr.concat((ts_prod_clm_yc_da, ts_prod_clm_ySUM), dim="Crop")
+    ts_prod_clm_yc_da = ts_prod_clm_yc_da.assign_coords(
         {"Crop": cropList_combined_clm, time_dim_out: yearList}
     )
+    # print(ts_prod_clm_yc_da.coords)
+    # print(ts_prod_clm_yc_da.sizes)
+    # print("~~~~~~~")
 
     return ts_prod_clm_yc_da
 
@@ -2385,6 +2467,10 @@ def import_rx_dates(var_prefix, date_inFile, dates_ds, set_neg1_to_nan=True):
             date_varList = date_varList + [thisVar]
 
     ds = utils.import_ds(date_inFile, myVars=date_varList)
+    
+    # Interpolate, if needed
+    if not (dates_ds["lon"].equals(ds["lon"]) and dates_ds["lat"].equals(ds["lat"])):
+        ds = ds.interp(lat=dates_ds["lat"], lon=dates_ds["lon"], method="nearest")
 
     did_warn = False
     for v in ds:
@@ -2739,9 +2825,11 @@ def mask_immature(this_ds, this_vegtype, gridded_da):
     return gridded_da
 
 
-def open_lu_ds(filename, y1, yN, existing_ds, ungrid=True):
+def open_lu_ds(filename, y1, yN, existing_ds, ungrid=True, da_area=None):
     # Open and trim to years of interest
     dsg = xr.open_dataset(filename).sel(time=slice(y1, yN))
+    if da_area is not None:
+        dsg["AREA"] = da_area
 
     # Assign actual lon/lat coordinates
     dsg = dsg.assign_coords(
@@ -2749,12 +2837,11 @@ def open_lu_ds(filename, y1, yN, existing_ds, ungrid=True):
     )
     dsg = dsg.swap_dims({"lsmlon": "lon", "lsmlat": "lat"})
 
-    if "AREA" in dsg:
-        dsg["AREA_CFT"] = dsg.AREA * 1e6 * dsg.LANDFRAC_PFT * dsg.PCT_CROP / 100 * dsg.PCT_CFT / 100
-        dsg["AREA_CFT"].attrs = {"units": "m2"}
-        dsg["AREA_CFT"].load()
-    else:
-        print("Warning: AREA missing from Dataset, so AREA_CFT will not be created")
+    if "AREA" not in dsg:
+        raise RuntimeError("AREA not in landuse dataset, so you must provide it to open_lu_ds as da_area")
+    dsg["AREA_CFT"] = dsg.AREA * 1e6 * dsg.LANDFRAC_PFT * dsg.PCT_CROP / 100 * dsg.PCT_CFT / 100
+    dsg["AREA_CFT"].attrs = {"units": "m2"}
+    dsg["AREA_CFT"].load()
 
     if not ungrid:
         return dsg

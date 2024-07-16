@@ -44,7 +44,9 @@ cropcal_colors = {
 def cropcal_colors_cases(casename):
     case_color_dict = {
         "clm default": [x / 255 for x in [92, 219, 219]],
+        "default": [x / 255 for x in [92, 219, 219]],
         "prescribed calendars": [x / 255 for x in [250, 102, 240]],
+        "rx_sdates": [x / 255 for x in [250, 102, 240]],
         "prescribed maturity": [x / 255 for x in [128, 0, 0]],
         "prescribed sowing": [x / 255 for x in [133, 92, 255]],
     }
