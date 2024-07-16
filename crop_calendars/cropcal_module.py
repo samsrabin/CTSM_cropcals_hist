@@ -674,6 +674,11 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     sdates_ymp = this_ds.SDATES_PERHARV.copy().where(this_ds.SDATES_PERHARV > 0).values
     sdates_pym = np.transpose(sdates_ymp.copy(), (2, 0, 1))
     hdates_pym[hdates_pym <= 0] = np.nan
+    if verbose:
+        print(
+            'After "Set all non-positive date values to NaN": discrepancy of'
+            f" {np.sum(~np.isnan(hdates_pym)) - expected_valid} patch-seasons"
+        )
 
     # Find years where patch was inactive
     inactive_py = np.transpose(
@@ -701,7 +706,7 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     sdates_pym[where_sown_prerun_or_inactive_pym] = np.nan
     if verbose:
         print(
-            'After "Ignore harvests from before this output began: discrepancy of'
+            'After "Ignore harvests from before this output began": discrepancy of'
             f" {np.sum(~np.isnan(hdates_pym)) - expected_valid} patch-seasons"
         )
 
@@ -729,6 +734,11 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
         )
         hdates_pym2[where_nosow_py[0], where_nosow_py[1], h + 1] = -np.inf
         sdates_pym2[where_nosow_py[0], where_nosow_py[1], h + 1] = -np.inf
+    if verbose:
+        print(
+            'After "In years with no sowing, pretend the first no-harvest is meaningful":'
+            f" discrepancy of {np.sum(~np.isnan(hdates_pym2)) - expected_valid} patch-seasons"
+        )
 
     # "In years with sowing that are followed by inactive years, check whether the last sowing was harvested before the patch was deactivated. If not, pretend the LAST [easier to implement!] no-harvest is meaningful."
     sdates_orig_masked_pym = sdates_orig_pym.copy()
@@ -757,6 +767,11 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     sdates_pym3 = sdates_pym2.copy()
     hdates_pym3[where_last_sowing_never_harvested_pym] = -np.inf
     sdates_pym3[where_last_sowing_never_harvested_pym] = -np.inf
+    if verbose:
+        print(
+            'After "In years with sowing that are followed by inactive years...":'
+            f" discrepancy of {np.sum(~np.isnan(hdates_pym3)) - expected_valid} patch-seasons"
+        )
 
     # Convert to growingseason axis
     def pym_to_pg(pym, quiet=False):
@@ -773,7 +788,7 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     sdates_pg = pym_to_pg(sdates_pym3.copy(), quiet=True)
     if verbose:
         print(
-            'After "In years with no sowing, pretend the first no-harvest is meaningful:'
+            'After "Convert to growingseason axis":'
             f" discrepancy of {np.sum(~np.isnan(hdates_pg)) - expected_valid} patch-seasons"
         )
 
@@ -795,14 +810,13 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
     sdates_pg2 = ignore_lastyear_complete_season(
         sdates_pg.copy(), lastyear_complete_season, mxharvests
     )
+
     is_valid = ~np.isnan(hdates_pg2)
-    is_fake = np.isneginf(hdates_pg2)
-    is_fake = np.reshape(is_fake[is_valid], (this_ds.sizes["patch"], Ngs))
     discrepancy = np.sum(is_valid) - expected_valid
     unique_Nseasons = np.unique(np.sum(is_valid, axis=1))
-    if verbose:
+    if verbose or discrepancy != 0:
         print(
-            'After "Ignore any harvests that were planted in the final year, because other cells'
+            'After "Ignore any harvests that were planted in the final year, because some cells'
             ' will have incomplete growing seasons for the final year": discrepancy of'
             f" {discrepancy} patch-seasons"
         )
@@ -816,6 +830,13 @@ def convert_axis_time2gs(this_ds, verbose=False, myVars=None, incl_orig=False):
         except:
             print(f"unique N seasons = {unique_Nseasons}")
         print(" ")
+    if discrepancy != 0:
+        raise RuntimeError(f"Expected {expected_valid} non-NaN patch-seasons by now; found {np.sum(is_valid)}")
+
+    # Get array that we'll use to mask out "fake" seasons
+    is_fake = np.isneginf(hdates_pg2)
+    is_fake = np.reshape(is_fake[is_valid], (this_ds.sizes["patch"], Ngs))
+
 
     # Create Dataset with time axis as "gs" (growing season) instead of what CLM puts out
     if discrepancy == 0:
