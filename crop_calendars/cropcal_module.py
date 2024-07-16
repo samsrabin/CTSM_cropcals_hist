@@ -334,7 +334,8 @@ def check_constant_vars(
 
                         # Interpolate, as needed
                         da = rx_ds[rx_var].interp(
-                            lat=this_ds["lat"], lon=this_ds["lon"], method="nearest"
+                            lat=this_ds["lat"], lon=this_ds["lon"], method="nearest",
+                            kwargs={"fill_value": "extrapolate"}
                         )
 
                         theseRxVals = np.diag(
@@ -366,7 +367,8 @@ def check_constant_vars(
 
                             # Interpolate, as needed
                             da = rx_ds[rx_var].interp(
-                                lat=this_ds["lat"], lon=this_ds["lon"], method="nearest"
+                                lat=this_ds["lat"], lon=this_ds["lon"], method="nearest",
+                                kwargs={"fill_value": "extrapolate"}
                             )
 
                             rx = da.sel(lon=thisLon, lat=thisLat).values
@@ -2470,7 +2472,8 @@ def import_rx_dates(var_prefix, date_inFile, dates_ds, set_neg1_to_nan=True):
     
     # Interpolate, if needed
     if not (dates_ds["lon"].equals(ds["lon"]) and dates_ds["lat"].equals(ds["lat"])):
-        ds = ds.interp(lat=dates_ds["lat"], lon=dates_ds["lon"], method="nearest")
+        ds = ds.interp(lat=dates_ds["lat"], lon=dates_ds["lon"], method="nearest",
+                       kwargs={"fill_value": "extrapolate"})
 
     did_warn = False
     for v in ds:
