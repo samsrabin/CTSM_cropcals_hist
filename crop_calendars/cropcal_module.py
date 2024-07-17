@@ -1529,8 +1529,7 @@ def get_caselist(which_cases):
                 raise ValueError(f"casebase {casebase} not recognized")
             cases[casebase] = {
                 "filepath": os.path.join(
-                    topdir, casename, "lnd", "hist", f"{casename}.clm2.h1.1958-01-01-00000.nc.orig"
-                    # topdir, casename, "lnd", "hist", f"{casename}.clm2.h1.*-01-01-00000.nc"
+                    topdir, casename, "lnd", "hist", f"{casename}.clm2.h1.1958-01-01-00000.nc"
                 ),
                 "constantVars": constantVars,
                 "constantGSs": constantGSs,
