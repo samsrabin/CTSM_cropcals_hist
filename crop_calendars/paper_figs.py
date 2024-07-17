@@ -189,19 +189,6 @@ myVars = [
     "HARVEST_REASON_PERHARV",
 ]
 
-# Only include vegetation types that actually get simulated
-myVegtypes = [
-    "temperate_corn",
-    "tropical_corn",
-    "spring_wheat",
-    "soybean",
-    "tropical_soybean",
-    "sugarcane",
-    "cotton",
-    "rice",
-]
-myVegtypes = myVegtypes + ["irrigated_" + x for x in myVegtypes]
-
 verbose_import = False
 caselist = []
 for i, (casename, case) in enumerate(cases.items()):
@@ -237,7 +224,6 @@ for i, (casename, case) in enumerate(cases.items()):
         this_ds = cc.import_output(
             case["filepath"],
             myVars=myVars,
-            myVegtypes=myVegtypes,
             y1=y1,
             yN=yN,
             verbose=verbose_import,
